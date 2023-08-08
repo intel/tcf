@@ -1,0 +1,412 @@
+/*
+ * Copyright (c) 2023 Intel Corporation
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ */
+
+
+/* define some properties for all the document */
+:root {
+    box-sizing: border-box;
+    --body-bg-color: #EEF0F2;
+    --nav-bg-color: #e7e7e7;
+    --nav-bg-color: #022d51;
+}
+
+
+/*
+ * set the box-sizing property to inherit for all elements, including the
+ * content before and after each element. It ensures consistent box-sizing
+ * behavior throughout the webpage.
+ */
+*,
+::before,
+::after {
+    box-sizing: inherit;
+}
+
+body {
+    background-color: var(--body-bg-color);
+    font-family: 'Helvetica', 'Arial';
+    margin-top: 0;
+    max-width: 1080px;
+    margin: 0 auto;
+}
+
+/* the famous lobotomized owl notation (* + *)
+ * this adds a 1.5em top margin to all elements inside the body element, except
+ * the first child, using the "lobotomized owl" notation. */
+body * + * {
+    margin-top: 1.5em;
+}
+
+.container {
+    max-width: 1080px;
+    margin: 0 auto;
+}
+
+header {
+    position: sticky;
+    top: 0;
+    z-index: 999;
+}
+
+header > h1 {
+    font-family: monospace;
+    font-weight: normal;
+}
+
+header > h1 > a{
+    text-decoration: none;
+    color: black;
+}
+
+header > h1 > a:active {
+    color: black;
+}
+
+header > h1 > a:visited {
+    color: black;
+}
+
+nav {
+    margin-top: 0;
+}
+
+nav > ul {
+    display: flex;
+    padding: 1em;
+    list-style-type: none;
+    background-color: var(--nav-bg-color);
+    border-bottom-left-radius: 0.2em;
+    border-bottom-right-radius: 0.2em;
+    margin-top: 1em;
+    color: white;
+}
+
+nav > ul > img {
+    padding: 0 0.5em;
+}
+
+nav > ul> li {
+    margin-top: 0;
+    margin-left: 0.3em;
+}
+
+nav > ul> li > a {
+    display: block;
+    background-color: transparent;
+    padding: 0.1em 1em;
+    color: white;
+    text-decoration: none;
+    border-radius: 0.1em;
+    font-size: 0.9em;
+}
+
+nav > ul> li > a:link {
+    color: white;
+    background-color: transparent;
+}
+
+nav > ul> li > a:visited{
+    color: white;
+    background-color: transparent;
+}
+
+nav > ul> li > a:hover {
+    color: white;
+    text-decoration: underline;
+    background-color: transparent;
+}
+
+nav > ul> li > a:active {
+    color: white;
+    text-decoration: underline;
+    background-color: transparent;
+}
+
+
+nav > ul>  li + li {
+    margin-left: 1.5em;
+}
+
+nav > ul > .nav-right {
+    margin-left: auto;
+}
+
+.nav-right > a {
+    margin-left: auto;
+    background-color: transparent;
+    border-radius: 0;
+    border-left: 1px solid white;
+}
+
+.nav-right > a:hover {
+    color: #0071c5;
+    background-color: transparent;
+}
+
+main {
+    font-family: 'Helvetica Neue', 'Helvetica', 'Arial';
+    padding: 0em 1.5em;
+    border: 1px solid #ddd;
+    border-radius: 2px;
+    background-color: white;
+    border-bottom-left-radius: 0.5em;
+    border-bottom-right-radius: 0.5em;
+}
+
+main > h1 {
+    font-weight: normal;
+}
+
+.dataTables_scrollBody{
+    margin-top: 0;
+}
+
+form {
+    display: block;
+    background-color: #fff;
+    padding: 1em;
+}
+
+.main {
+    display: flex;
+    margin-top: 1em;
+}
+
+.column-main {
+    flex: 66.67%
+}
+
+.column-sidebar {
+    flex: 33.33%;
+    display: flex;
+    flex-direction: column;
+}
+
+/* remove all decoration from buttons */
+.allocate-btn {
+	background: none;
+	color: inherit;
+	border: none;
+	padding: 0;
+	font: inherit;
+	cursor: pointer;
+	outline: inherit;
+    margin-top: 0;
+}
+
+.manage {
+    padding: 0 1em;
+    background-color: #fff;
+    text-decoration: none;
+    border: 1px #adadad solid;
+}
+
+.manage:link {
+    color: #333;
+}
+.manage:visited {
+    color: #333;
+}
+.manage:hover {
+    color: #333;
+    background-color: #d4d4d4;
+    border-color: #8c8c8c;
+}
+.manage:active {
+    color: #333;
+}
+
+.toolbox {
+    background-color: #eee;
+    padding: 0.5em 1em;
+    margin-bottom: 1em;
+    border-bottom-left-radius: 0.5em;
+    border-bottom-right-radius: 0.5em;
+    border: 1px solid rgb(190,190,190);
+}
+
+.toolbox > .subsection {
+    display: flex;
+    margin-top: 1em;
+    margin-right: 0.5em;
+}
+
+
+/* remove default decoration */
+.toolbox > .subsection > button {
+	background: none;
+	color: inherit;
+	border: none;
+	padding: 0;
+	font: inherit;
+	cursor: pointer;
+	outline: inherit;
+    margin-top: 0;
+}
+
+/* make our own config for buttons */
+.toolbox > .subsection > button {
+    margin-right: 0.5em;
+    padding: 0 0.5em;
+    background-color: #fff;
+    border: 1px #adadad solid;
+    border-radius: 1px;
+}
+
+.toolbox > .subsection > button:hover:enabled {
+    color: #333;
+    background-color: #d4d4d4;
+    border-color: #8c8c8c;
+}
+
+.toolbox > .subsection > button:disabled {
+	cursor: not-allowed;
+    opacity: 0.65
+}
+
+.subsection > h4 {
+    margin: 0em;
+}
+
+.toolbox > .subsection > .acquire {
+    color: #fff;
+    background-color: #b46102;
+    border-color:  #b46102
+}
+
+.toolbox > .subsection > .acquire:hover:enabled {
+    color: #fff;
+    background-color: #d58512;
+    border-color:  #985f0d;
+}
+
+.toolbox > .subsection > .release {
+    color: #fff;
+    background-color: #489FB5;
+    border-color:  #82C0CC;
+}
+
+.toolbox > .subsection > .release:hover:enabled {
+    color: #fff;
+    background-color: #16697A;
+    border-color:  #82C0CC;
+}
+
+.info {
+    padding: 1em;
+    border: 1px solid transparent;
+    border-radius: 0.5em;
+}
+
+.info-yellow {
+    color: #59402D;
+    background-color: #fff3cd;
+    border-color: #c9ba9b;
+}
+
+.info-grey {
+    padding: 0.5em 1em;
+    color: #333;
+    background-color: #eee;
+    border-color: rgb(190,190,190);
+    border-radius: 0em;
+    border-bottom-left-radius: 0.2em;
+    border-bottom-right-radius: 0.2em;
+}
+
+.status {
+    padding: 1.81em 2em;
+}
+
+.status > p {
+    margin-bottom: 0;
+    margin-top: 1em;
+}
+
+button {
+	background: none;
+	color: inherit;
+	border: none;
+	padding: 0;
+	font: inherit;
+	cursor: pointer;
+	outline: inherit;
+    margin-top: 0;
+}
+button {
+    margin-right: 0.5em;
+    padding: 0 0.5em;
+    background-color: #fff;
+    border: 1px #adadad solid;
+    border-radius: 1px;
+}
+
+#alloc-tbl {
+    background-color: var(--nav-bg-color);
+    border-bottom-left-radius: 0.5em;
+    border-bottom-right-radius: 0.5em;
+    padding-bottom: 1em 1em;
+    margin-top: 0;
+    margin-bottom: 2em;
+    border: 1px solid rgb(190,190,190);
+}
+
+#t-targets_wrapper {
+    padding: 1em 1em;
+}
+
+#t-alloc_wrapper {
+    padding: 1em 1em;
+}
+
+.toolbox > .subsection > .minor {
+    background-color: #eee;
+    border-color: #eee;
+}
+
+.arrow {
+  border: solid black;
+  border-width: 0 1px 1px 0;
+  display: inline-block;
+  padding: 3px;
+  margin-bottom: 0.2em;
+}
+
+.down {
+  transform: rotate(45deg);
+  -webkit-transform: rotate(45deg);
+}
+
+table.dataTable.row-border {
+    background-color: #fff;
+    border-radius: 0.1em;
+}
+
+table.dataTable.row-border > thead {
+    background-color: #eee;
+}
+
+.power-on-btn:hover:enabled {
+    color: white;
+    background-color: green;
+    border-color: #8c8c8c;
+}
+
+.power-off-btn:hover:enabled {
+    color: white;
+    background-color: red;
+    border-color: #8c8c8c;
+}
+
+.power-cycle-btn:hover:enabled {
+    color: black;
+    background-color: yellow;
+    border-color: #8c8c8c;
+}
+
+.flex {
+    display: flex;
+}
