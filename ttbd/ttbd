@@ -487,6 +487,19 @@ def _bad_version(version, any_route):
                        % (version, any_route, API_VERSION, action))
 
 
+# add ui blueprint. If you are not familiar with blueprints brief explanation.
+# They are a way to organize views and functionality of an application. This
+# allows us to split the application into smaller, more manageable pieces,
+# which can be developed and tested separately. Each blueprint has its own set
+# of routes, templates, static files, which can be registered with the main
+# Flask application.
+#
+# more info:
+# https://flask.palletsprojects.com/en/2.2.x/blueprints/
+import ttbl.ui
+app.register_blueprint(ttbl.ui.bp)
+
+
 def _login(audit_record):
     """
     Given a User ID token and a password, go over all the
