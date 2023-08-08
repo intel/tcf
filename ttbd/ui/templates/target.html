@@ -1,0 +1,160 @@
+{% extends 'base.html' %}
+
+
+{% block head %}
+<!-- link our js file -->
+<script type="text/javascript" src="{{url_for('static', filename = 'js/main.js')}}"></script> <script type="text/javascript" src="{{url_for('static', filename = 'js/main.js')}}"></script>
+<script src="{{url_for('static', filename = 'js/jquery-3.6.4.slim.min.js')}}" integrity="sha256-a2yjHM4jnF9f54xUQakjZGaqYs/V1CYvWpoqZzC2/Bw=" crossorigin="anonymous"></script>
+<link rel="stylesheet" href="{{url_for('static', filename = 'css/jquery.dataTables.css')}}"/>
+<script src="{{url_for('static', filename = 'js/jquery.dataTables.js')}}"></script>
+
+{% endblock %}
+
+{% block title %} {{ targetid }} {% endblock %}
+
+{% block navbar %}{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{{url_for('static', filename = 'css/color-brewer.min.css')}}"/>
+<script src="{{url_for('static', filename = 'js/highlight.min.js')}}"></script>
+
+<script>hljs.highlightAll();</script>
+
+
+
+<div class='main'>
+<div class='column-main tile'>
+<h2>{{targetid}}</h2>
+
+<div class='toolbox'>
+    <div class='subsection'>
+        <h4> control panel</h4>
+    </div>
+    <div class='subsection'>
+    {% if state.owner == g.user %}
+        <button class='release' onclick='release("{{state.alloc}}")'>release</button>
+    {% else %}
+        <button class='acquire' onclick='open_acquire("{{targetid}}")'>acquire</button>
+    {% endif %}
+        <button onclick="toggle('inv')">inventory</button>
+    </div>
+    {% if state.owner == g.user %}
+        <div class='subsection'>
+            <button onclick='power("{{ targetid }}", "on", "components")'>power on</button>
+            <button onclick='power("{{ targetid }}", "off", "components")'>power off</button>
+            <button onclick='power("{{ targetid }}", "cycle", "components")'>power cycle</button>
+            <button class='minor' onclick="toggle('power-ls')">components  <i class="arrow down"></i></button>
+        </div>
+        <div class='subsection' id='power-ls' style="display: none;">
+          <table id='t-powerls' class='row-border hover'>
+            <thead>
+              <tr>
+                <th>component</th>
+                <th>state</th>
+                <th>&nbsp;</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for k, v in powerls.items() %}
+              <tr>
+                <td>{{k}}</td>
+                {% if v.state == False %}
+                  <td>
+                    <span style='color: red;'>off</span>
+                  </td>
+                {% else %}
+                  <td>
+                    <span style='color: green;'>on</span>
+                  </td>
+                {% endif %}
+                <!-- FIXME add functionality to this -->
+                <td>
+                    <div class='flex'>
+                      <button class='power-on-btn'>power on</button>
+                      <button class='power-off-btn'>power off</button>
+                      <button class='power-cycle-btn'>power cycle</button>
+                    </div>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <div class='subsection'>
+            <button>flash all</button>
+            <button>flash bios</button>
+            <button>flash bmc</button>
+            <button>flash cpld1</button>
+            <button>flash cpld2</button>
+        </div>
+        <div class='subsection'>
+            <button>console wall</button>
+        </div>
+    {% else %}
+        <div class='subsection'>
+            <button disabled>power on</button>
+            <button disabled>power off</button>
+            <button disabled>power cycle</button>
+        </div>
+        <div class='subsection'>
+            <button disabled>flash all</button>
+            <button disabled>flash bios</button>
+            <button disabled>flash bmc</button>
+            <button disabled>flash cpld1</button>
+            <button disabled>flash cpld2</button>
+        </div>
+        <div class='subsection'>
+            <button disabled>console wall</button>
+        </div>
+    {% endif %}
+</div>
+
+
+<div id='inv' style="display: none;">
+    <pre><code class="language-json">
+        {{ d }}
+    </code></pre>
+</div>
+</div>
+
+<div class='column-sidebar'>
+    <div class='status'>
+        <h4 class='info info-grey'>overview</h4>
+
+        {% if state.power == 'True' %}
+            <p> power state: <label style='color: green;'>on</label></p>
+        {% else %}
+            <p> power state: <label style='color: red;'>off</label></p>
+        {% endif %}
+
+        {% if state.owner == 'available' %}
+            <p>owner: <label style='color: green;'>{{ state.owner }}</label></p>
+        {% elif state.owner == g.user %}
+            <p>owner: <label style='color: tomato;'>you </label>({{ state.owner }})</p>
+        {% else %}
+            <p>owner: <label style='color: red;'>{{ state.owner }}</label></p>
+        {% endif %}
+        <p>type: {{ state.type}}</p>
+        <p>ipv4 address: {{ state.ip}}</p>
+        <p>mac address: {{ state.mac}}</p>
+    </div>
+</div>
+
+</div>
+
+
+<script>
+// datatables part, basically pass the id of the table to the function, and it
+// does the rest
+$(document).ready( function () {
+    $('#t-powerls').DataTable({
+        paging: false,
+        ordering: false,
+        info:   false,
+        searching:   false
+    });
+
+} );
+</script>
+
+{% endblock %}

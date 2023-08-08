@@ -1,0 +1,54 @@
+{% extends 'base.html' %}
+
+{% block title %} targets {% endblock %}
+
+{% block head %}
+<script src="{{url_for('static', filename = 'js/jquery-3.6.4.slim.min.js')}}" integrity="sha256-a2yjHM4jnF9f54xUQakjZGaqYs/V1CYvWpoqZzC2/Bw=" crossorigin="anonymous"></script>
+<link rel="stylesheet" href="{{url_for('static', filename = 'css/jquery.dataTables.css')}}"/>
+<script src="{{url_for('static', filename = 'js/jquery.dataTables.js')}}"></script>
+{% endblock %}
+
+{% block navbar %}{% endblock %}
+
+{% block content %}
+<table id='t-targets' class='display'>
+<thead>
+  <tr>
+    <!--<th>&nbsp;</td>-->
+    <th>target id</td>
+    <th>type</td>
+    <th>ipv4 address</td>
+    <th>mac address</td>
+    <th>owner</td>
+  </tr>
+</thead>
+<tbody>
+  {% for k, v in targets.items() %}
+  <tr>
+    <td> <a href='/ttb-v2/ui/target/{{k}}'>{{ k }}</td>
+    <td>{{ v.type }}</td>
+    <td>{{ v.ip }}</td>
+    <td>{{ v.mac }}</td>
+    {% if v.owner == 'available'%}
+        <td style='color: green;'>{{ v.owner }}</td>
+    {% else %}
+        <td style='color: red;'>{{ v.owner }}</td>
+    {% endif %}
+  </tr>
+  {% endfor %}
+</tbody>
+</table>
+
+<script>
+// datatables part, basically pass the id of the table to the function, and it
+// does the rest
+$(document).ready( function () {
+    $('#t-targets').DataTable({
+        scrollY: '70vh',
+        scrollCollapse: true,
+        paging: false,
+    });
+
+} );
+</script>
+{% endblock %}

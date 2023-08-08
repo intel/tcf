@@ -1,0 +1,62 @@
+{% extends 'base.html' %}
+
+
+{% block head %}
+<!-- link our js file -->
+<script type="text/javascript" src="{{url_for('static', filename = 'js/main.js')}}"></script>
+
+<script src="{{url_for('static', filename = 'js/jquery-3.6.4.slim.min.js')}}" integrity="sha256-a2yjHM4jnF9f54xUQakjZGaqYs/V1CYvWpoqZzC2/Bw=" crossorigin="anonymous"></script>
+<link rel="stylesheet" href="{{url_for('static', filename = 'css/jquery.dataTables.css')}}"/>
+<script src="{{url_for('static', filename = 'js/jquery.dataTables.js')}}"></script>
+
+{% endblock %}
+
+{% block title %} allocations {% endblock %}
+
+{% block navbar %}{% endblock %}
+
+{% block content %}
+  <table id='t-alloc' class='display'>
+    <thead>
+      <tr>
+        <th>allocation id</td>
+        <th>state</td>
+        <th>target</td>
+        <th>actions</td>
+      </tr>
+    </thead>
+    <tbody>
+        {% for k, v in allocs.items() %}
+            <tr>
+                <td>{{ k }}</td>
+                {% if v.state == 'active'%}
+                    <td style='color: green;'>{{ v.state }}</td>
+                {% else %}
+                    <td style='color: red;'>{{ v.state }}</td>
+                {% endif %}
+                <td>{{ v.targetid}}</td>
+                <!-- FIXME we need to implement the release to work with more
+                     than one target -->
+                <td>
+                    <button class='acquire' onclick='release("{{k}}")'>release</button>
+                    <button>control panel</button>
+                </td>
+            </tr>
+        {% endfor %}
+    </tbody>
+  </table>
+
+<script>
+// datatables part, basically pass the id of the table to the function, and it
+// does the rest
+$(document).ready( function () {
+    $('#t-alloc').DataTable({
+        scrollY: '70vh',
+        scrollCollapse: true,
+        paging: false,
+    });
+
+} );
+</script>
+{% endblock %}
+
