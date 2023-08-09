@@ -172,7 +172,7 @@ ansi_key_codes = {
         "\x1b[21~": [ "rxvt", "xterm", 'vt100' ],
     },
     'F12': {
-        # 24, not 23 :/ https://en.wikipedia.org/wiki/ANSI_escape_code#Terminal_input_sequences
+        # 24, not 23 https://en.wikipedia.org/wiki/ANSI_escape_code#Terminal_input_sequences
         "\x1b[24~": [ "rxvt", "xterm", 'vt100' ],
     },
 }
@@ -1065,7 +1065,8 @@ def bios_boot_expect(target):
 
     ts0 = time.time()
     target.report_info("BIOS: waiting for main menu after power on")
-    boot_prompt = target.kws.get("bios.boot_prompt", None)
+    boot_prompt = target.kws.get("bios.boot_prompt",
+                                 target.kws.get("bios_boot_prompt", None))
     if boot_prompt == None:
         raise tcfl.tc.blocked_e(
             r"%s: target does not declare what the BIOS boot prompt looks"
