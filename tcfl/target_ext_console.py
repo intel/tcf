@@ -483,7 +483,7 @@ class expect_text_on_console_c(tc.expectation_c):
                        search_offset + match.start(),
                        search_offset + match.end(),
                        target.fullid, self.console, of.name),
-                    attachments = match_data, dlevel = 1, alevel = 0)
+                    attachments = match_data, dlevel = 1, alevel = 1)
                 # make this match on_timeout()'s as much as possible
                 match_data["target"] = self.target
                 match_data["origin"] = self.origin
