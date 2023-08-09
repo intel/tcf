@@ -795,7 +795,8 @@ class fs_cache_c():
 
 
 
-def lru_cache_disk(path, max_age_s, max_entries, key_maker = None):
+def lru_cache_disk(path, max_age_s, max_entries, key_maker = None,
+                   exclude_exceptions = None):
     """
     Decorator to implement an aged LRU memoize pattern (like
     :python:`functools.lru_cache`) in disk to cache value of functions.
@@ -823,6 +824,9 @@ def lru_cache_disk(path, max_age_s, max_entries, key_maker = None):
       the same for an object uniquely identifed by *args* and *kwargs*
       over multiple executions in different processes.
 
+    :param list(type) exclude_exceptions: (optional, default *None*)
+      list of types that when raised as exceptions will not be cached.
+
     An exception can be ignored (not cached) if it has an attribute
     *cacheable* set to *False*:
 
@@ -834,9 +838,18 @@ def lru_cache_disk(path, max_age_s, max_entries, key_maker = None):
     >>> e.cacheable = False
     >>> raise e
 
+    You can also exclude exceptions by listing their types in
+    *exclude_exceptions*.
+
     This is useful to ensure transient errors are retried insted of
     cached (which might be valid too based on circumstances).
     """
+
+    if exclude_exceptions != None:
+        assert isinstance(exclude_exceptions, collections.abc.Iterable)
+        for exception_t in exclude_exceptions:
+            assert isinstance(exception_t, type), \
+                f"{exception_t}: expected a type, got a {type(exception_t)}"
 
     def _lru_cache_disk(fn):
         makedirs_p(path, reason = "cache for lru_cache_disk")
@@ -862,6 +875,11 @@ def lru_cache_disk(path, max_age_s, max_entries, key_maker = None):
                         fn.cache.set_unlocked(key, pickle.dumps((r, None )))
                     return r
                 except Exception as e:
+                    if exclude_exceptions != None:
+                        for exception_t in exclude_exceptions:
+                            if isinstance(e, exception_t):
+                                # we are told not to cache this exception
+                                raise
                     if getattr(e, "cacheable", True) == False:
                         raise
                     with fn.cache.lock():
