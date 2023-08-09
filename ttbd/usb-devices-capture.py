@@ -22,6 +22,17 @@
 ## }
 #
 #
+# For each VENDOR/PRODUCT if a script exists in the PATH or
+# /usr/share/tcf called usb-device-discover-VVVV-PPPP, it will be
+# invoked as
+#
+##  usb-device-discover-VVVV-PPPP USBPATH SERIAL
+##  usb-device-discover-VVVV-PPPP 25-4.3.1 32342dr4
+#
+# The outut of said script has to be a json dictionary containing keys
+# and valus to include along the aforementioned vendor, product and
+# serial keys.
+#
 # To configure:
 #
 ## 
@@ -49,9 +60,10 @@
 ## ttbl.config.target_add(target)
 
 import json
-import logging
 import os
+import subprocess
 import sys
+import time
 
 def sysfs_read(fn):
     try:
@@ -61,6 +73,7 @@ def sysfs_read(fn):
         return None
 
 d = {}
+procs = {}
 for entry in os.listdir("/sys/bus/usb/devices"):
 
     vendor = sysfs_read(f"/sys/bus/usb/devices/{entry}/idVendor")
@@ -69,9 +82,75 @@ for entry in os.listdir("/sys/bus/usb/devices"):
     if vendor == None or product == None:
         continue
 
-    d[entry] = dict(product = product, vendor = vendor)
+    d[entry] = dict(
+        product = product,
+        vendor = vendor,
+        bDeviceClass = sysfs_read(
+            f"/sys/bus/usb/devices/{entry}/bDeviceClass"),
+    )
     if serial:
         d[entry]['serial'] = serial
 
+    # run hooks if any available -- just start'em in parallel, we'll
+    # wait for them later
+    env = dict(os.environ)
+    env["PATH"] += f":{os.path.dirname(__file__)}"
+    if serial == None:
+        serial_cmdline = "n/a"
+    else:
+        serial_cmdline = serial
+    cmdline = [ f"usb-device-discover-{vendor}-{product}",
+                entry, serial_cmdline ]
+    try:
+        procs[entry] = subprocess.Popen(
+            cmdline,
+            stderr = subprocess.PIPE, stdout = subprocess.PIPE,
+            env = env, text = True)
+        print(f"INFO: {entry}: starting {cmdline}", file = sys.stderr)
+    except FileNotFoundError as e:
+        # that's ok, that means there is no usb-device-discover for
+        # this kind of device, skip
+        pass
+
+# Wait for processes to finish
+timeout = 60
+ts0 = time.time()
+while procs and time.time() - ts0 < timeout:
+    for entry, p in list(procs.items()):
+        if p.poll() == None:
+            print(f"INFO: {entry}: still running", file = sys.stderr)
+            continue		# still running, check next
+
+        # done, collect info
+        print(f"INFO: {entry}: done, collecting data", file = sys.stderr)
+        product = d[entry]['product']
+        vendor = d[entry]['vendor']
+        d[entry][f"usb-device-discover-{vendor}-{product}/cmdline"] = \
+            ' '.join(p.args)
+        d[entry][f"usb-device-discover-{vendor}-{product}/stdout"] = \
+            p.stdout.read()
+        d[entry][f"usb-device-discover-{vendor}-{product}/stderr"] = \
+            p.stderr.read()
+        try:
+            j = json.loads(d[entry][f"usb-device-discover-{vendor}-{product}/stdout"])
+            if not isinstance(j, dict):
+                d[entry][f"usb-device-discover-{vendor}-{product}/log"] = \
+                    f"ERROR: bad format returned, expected dict, got {type(j)}"
+            for k, v in j.items():
+                d[entry][k] = v
+        except json.decoder.JSONDecodeError as e:
+            d[entry][f"usb-device-discover-{vendor}-{product}/log"] = \
+                f"ERROR: bad JSON format returned: {e}"
+
+        # wipe from the table, so we don't even check it anymore
+        del procs[entry]
+    time.sleep(1)
+
+
+# if we are here and we timed out, kill any left over processes
+for entry, p in list(procs.items()):
+    p.kill()
+
+# dump
 with open(sys.argv[1], "w") as f:
     json.dump(d, f, indent = 4)
