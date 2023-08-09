@@ -218,11 +218,9 @@ class pci(ttbl.power.impl_c, ttbl.capture.impl_c): # pylint: disable = abstract-
         # So we call getState by hand (from
         # raritan/Interface.py:Interface.Method) and we extract the
         # value manually.
-        obj = self._outlet.getState
-        r = obj.parent.agent.json_rpc(obj.parent.target, obj.name, {})
-        state = r['_ret_']['powerState']
+        r = self._outlet.getState().powerState
 
-        if state == 0:
+        if r == raritan.rpc.pdumodel.Outlet.PowerState.PS_OFF:
             return False
         return True
 
