@@ -410,3 +410,12 @@ table.dataTable.row-border > thead {
 .flex {
     display: flex;
 }
+
+hr {
+  margin-top: 1em;
+  border: none;
+  height: 1px;
+  /* Set the hr color */
+  color: #ddd;  /* old IE */
+  background-color: #ddd;  /* Modern Browsers */
+}
