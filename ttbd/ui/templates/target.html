@@ -38,11 +38,18 @@
     {% endif %}
         <button onclick="toggle('inv')">get inventory</button>
     </div>
+    <hr>
     {% if state.owner == g.user %}
         <div class='subsection'>
-            <button onclick='power("{{ targetid }}", "on", "components")'>power on</button>
-            <button onclick='power("{{ targetid }}", "off", "components")'>power off</button>
-            <button onclick='power("{{ targetid }}", "cycle", "components")'>power cycle</button>
+            <button onclick='power("{{ targetid }}", "on", "all")'>
+                power on
+            </button>
+            <button onclick='power("{{ targetid }}", "off", "all")'>
+                power off
+            </button>
+            <button onclick='power("{{ targetid }}", "cycle", "all")'>
+                power cycle
+            </button>
             <button class='minor' onclick="toggle('power-ls')">components  <i class="arrow down"></i></button>
         </div>
         <div class='subsection' id='power-ls' style="display: none;">
@@ -67,12 +74,17 @@
                     <span style='color: green;'>on</span>
                   </td>
                 {% endif %}
-                <!-- FIXME add functionality to this -->
                 <td>
                     <div class='flex'>
-                      <button class='power-on-btn'>power on</button>
-                      <button class='power-off-btn'>power off</button>
-                      <button class='power-cycle-btn'>power cycle</button>
+                      <button class='power-on-btn' onclick='power("{{ targetid }}", "on", "{{k}}")'>
+                        power on
+                      </button>
+                      <button class='power-off-btn' onclick='power("{{ targetid }}", "off", "{{k}}")'>
+                        power off
+                      </button>
+                      <button class='power-cycle-btn'  onclick='power("{{ targetid }}", "cycle", "{{k}}")'>
+                        power cycle
+                      </button>
                     </div>
                 </td>
               </tr>
@@ -80,6 +92,7 @@
             </tbody>
           </table>
         </div>
+        <hr>
         <div class='subsection'>
             <button>flash all</button>
             <button>flash bios</button>
@@ -87,8 +100,11 @@
             <button>flash cpld1</button>
             <button>flash cpld2</button>
         </div>
+        <hr>
         <div class='subsection'>
             <button>console wall</button>
+        </div>
+        <div class='subsection' id='loading'>
         </div>
     {% else %}
         <div class='subsection'>
