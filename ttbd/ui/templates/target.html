@@ -34,9 +34,9 @@
     {% if state.owner == g.user %}
         <button class='release' onclick='release("{{state.alloc}}")'>release</button>
     {% else %}
-        <button class='acquire' onclick='open_acquire("{{targetid}}")'>acquire</button>
+        <button class='acquire' onclick='acquire("{{targetid}}")'>acquire</button>
     {% endif %}
-        <button onclick="toggle('inv')">inventory</button>
+        <button onclick="toggle('inv')">get inventory</button>
     </div>
     {% if state.owner == g.user %}
         <div class='subsection'>
