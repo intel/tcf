@@ -1,6 +1,13 @@
 "use strict";
 
-async function open_acquire(targetid) {
+/*
+* make an http request to make an allocation for the current user
+*
+* @param {targetid} str -> target to acquire
+*
+* return {void} -> it reloads the windows though
+*/
+async function acquire(targetid) {
     let r = await fetch('/ttb-v2/allocation', {
       method: 'PUT',
       headers: {
@@ -33,6 +40,13 @@ async function open_acquire(targetid) {
     window.location.reload()
 }
 
+/*
+* releases target based on an allocation id
+*
+* @param {allocid} str -> allocation id that you want to remove
+*
+* return {void} -> it reloads the windows though
+*/
 async function release(allocid) {
     let r = await fetch('/ttb-v2/allocation/' + allocid, {
       method: 'DELETE',
