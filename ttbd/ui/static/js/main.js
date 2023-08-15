@@ -146,3 +146,14 @@ function toggle(id) {
     }
     inv.style.display = "none";
 }
+
+
+/**
+ * make inventory dialog appear
+ *
+ * @return {void}
+ */
+function show_inventory() {
+    const inventory = document.getElementById('inventory');
+    inventory.showModal();
+}
