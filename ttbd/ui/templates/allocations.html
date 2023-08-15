@@ -22,6 +22,8 @@
         <th>allocation id</td>
         <th>state</td>
         <th>target</td>
+        <th>user</td>
+        <th>priority</td>
         <th>actions</td>
       </tr>
     </thead>
@@ -34,7 +36,17 @@
                 {% else %}
                     <td style='color: red;'>{{ v.state }}</td>
                 {% endif %}
-                <td>{{ v.targetid}}</td>
+                <td>
+                    {% for targetid in v.targets %}
+                        {{targetid}},
+                    {% endfor %}
+                </td>
+                {% if v.user == g.user %}
+                    <td><label style='color: lightseagreen;'>you </label>({{ v.user }})</td>
+                {% else %}
+                    <td>{{v.user}}</td>
+                {% endif %}
+                <td>{{v.priority}}</td>
                 <!-- FIXME we need to implement the release to work with more
                      than one target -->
                 <td>

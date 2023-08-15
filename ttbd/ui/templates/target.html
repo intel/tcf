@@ -146,7 +146,7 @@
         {% if state.owner == 'available' %}
             <p>owner: <label style='color: green;'>{{ state.owner }}</label></p>
         {% elif state.owner == g.user %}
-            <p>owner: <label style='color: tomato;'>you </label>({{ state.owner }})</p>
+            <p>owner: <label style='color: lightseagreen;'>you </label>({{ state.owner }})</p>
         {% else %}
             <p>owner: <label style='color: red;'>{{ state.owner }}</label></p>
         {% endif %}
