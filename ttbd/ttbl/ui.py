@@ -136,10 +136,20 @@ def _allocation_ui():
     allocations = ttbl.allocation.query(
         flask_login.current_user._get_current_object())
     allocs = {}
+
     for k, v in allocations.items():
+        # to get the targets from the allocation we need to iterate thru the
+        # target_group dict.
+        targets = v.get('target_group', {})
+        t = []
+        for _, group in targets.items():
+            t.extend(group)
+
         allocs[k] = {
-            'targetid': v.get('target_group', {}).get('targetid', 'error'),
-            'state': v.get('state', 'error'),
+            'targets': t,
+            'state': v.get('state', '<unkown>'),
+            'user': v.get('user', '<unkown>'),
+            'priority': v.get('priority', '<unkown>'),
         }
     return flask.render_template('allocations.html', allocs = allocs)
 
