@@ -44,7 +44,7 @@ bp = flask.Blueprint('ui', __name__, url_prefix = API_PREFIX  + '/ui')
 
 
 def _interconnect_values_render(d: dict, field: str,
-                                separator: str = "<br>"):
+                                separator: str = " "):
     # For network fields, collect them and if there is more than
     # one network, prefix the network name, eg:
     #
@@ -52,7 +52,7 @@ def _interconnect_values_render(d: dict, field: str,
     #
     # except if there is only one it shows no "nwX:" for simplicity
     #
-    # if not available, return "n/a"
+    # if not available, return "-", more visually pleasing than n/a
 
     ic = d.get('interconnects', {})
     vl = []
@@ -65,7 +65,7 @@ def _interconnect_values_render(d: dict, field: str,
         return vl[0][vl[0].find(":") + 1:]
     if vl:
         return separator.join(vl)
-    return "n/a"
+    return "-"
 
 
 
