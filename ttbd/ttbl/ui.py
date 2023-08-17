@@ -42,6 +42,33 @@ API_PREFIX = API_PATH + str(API_VERSION) + "/"
 bp = flask.Blueprint('ui', __name__, url_prefix = API_PREFIX  + '/ui')
 
 
+
+def _interconnect_values_render(d: dict, field: str,
+                                separator: str = "<br>"):
+    # For network fields, collect them and if there is more than
+    # one network, prefix the network name, eg:
+    #
+    # nw1:ipv4.1 nw2:ipv4.2...
+    #
+    # except if there is only one it shows no "nwX:" for simplicity
+    #
+    # if not available, return "n/a"
+
+    ic = d.get('interconnects', {})
+    vl = []
+    for ic_name, v in ic.items():
+        vl.append(ic_name + ":" + v.get(field, "n/a"))
+
+    if len(vl) == 1:
+        # extract only the value, remove the first WHATEVER:, taking
+        # into account the value itself might have colons
+        return vl[0][vl[0].find(":") + 1:]
+    if vl:
+        return separator.join(vl)
+    return "n/a"
+
+
+
 @bp.route('/', methods = ['GET'])
 def _targets():
     '''
@@ -69,17 +96,17 @@ def _targets():
             continue
 
         nw = d.get('interconnects', {})
-        if not nw:
-            continue
 
-        for _, v in nw.items():
-            ip = v.get("ipv4_addr")
-            mac = v.get("mac_addr")
+        # For network fields, collect them and if there is more than
+        # one network, prefix the network name
+        # FIXME: only if ipv4_addr in fields
+        ipv4_addr = _interconnect_values_render(d, "ipv4_addr")
+        mac_addr = _interconnect_values_render(d, "mac_addr")
 
         targets[targetid] = {
             'type': t,
-            'ip': ip,
-            'mac': mac,
+            'ip': ipv4_addr,
+            'mac': mac_addr,
             'owner': owner,
         }
 
@@ -105,12 +132,6 @@ def _target(targetid):
     # get alloc info
     alloc = d.get('_alloc', {}).get('id', 'none')
 
-    # get network info
-    nw = d.get('interconnects', {})
-    for _, v in nw.items():
-        ip = v.get("ipv4_addr")
-        mac = v.get("mac_addr")
-
     # get power info
     p_state, p_data, p_substate = target.power._get(target)
 
@@ -120,8 +141,8 @@ def _target(targetid):
         'power': p_state,
         'owner': owner,
         'type': t,
-        'mac': mac,
-        'ip': ip,
+        'mac': _interconnect_values_render(d, "mac_addr", separator = " "),
+        'ip': _interconnect_values_render(d, "ipv4_addr", separator = " "),
         'alloc': alloc,
     }
 
