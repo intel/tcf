@@ -121,7 +121,8 @@ fi
 if [ $vnc != disabled ] && ! [ -z "${VNC_PORT:-}" ]; then
     echo "NOTICE: using VNC port $VNC_PORT; TCP port $(($VNC_PORT + 5900))!" 1>&2
     gfx=${GRAPHIC:--vnc :${VNC_PORT:-1} -serial stdio}
-    append="inst.text inst.ks=hd:LABEL=KS:/ks.cfg"
+    # don't say inst.text or anything, let the ks.cfg drive that
+    append="inst.ks=hd:LABEL=KS:/ks.cfg"
 else
     gfx=${GRAPHIC:--nographic}
     append="console=ttyS0,115200n81 inst.text inst.ks=hd:LABEL=KS:/ks.cfg"
