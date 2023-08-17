@@ -354,7 +354,7 @@ def setup_by_spec(targetspecs: list, verbosity: int = 1,
             project = { 'id', 'disabled', 'type' }
     else:
         assert isinstance(project, set), \
-            "project: expected set of strings; got {type(set)}"
+            f"project: expected set of strings; got {type(project)}"
 
     # ensure the name and the disabled fields (so we can filter on it)
     # if we are only doing "tcf ls" to list target NAMEs, then
