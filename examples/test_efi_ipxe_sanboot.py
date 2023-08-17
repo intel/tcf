@@ -242,6 +242,8 @@ class _test(tcfl.pos.tc_pos_base):
 
             if self.sanboot_url == "skip":
                 target.report_info("not booting", level = 0)
+            elif self.sanboot_url.endswith(".ipxe"):
+                target.send("boot %s" % self.sanboot_url)
             else:
                 target.send("sanboot %s" % self.sanboot_url)
                 # can't use shell.run...it will timeout, since we'll print no more prompt
