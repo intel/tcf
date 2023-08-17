@@ -115,7 +115,7 @@ def _target(targetid):
     p_state, p_data, p_substate = target.power._get(target)
 
     # parse all the inventory to str
-    d = json.dumps(d, indent = 4)
+    json_d = json.dumps(d, indent = 4)
     state = {
         'power': p_state,
         'owner': owner,
@@ -126,8 +126,9 @@ def _target(targetid):
     }
 
     return flask.render_template(
-        'target.html', targetid = targetid, d = d, state = state,
-        powerls = p_data)
+        'target.html', targetid = targetid, d = json_d, state = state,
+        powerls = p_data,
+        buttonls = button_data)
 
 
 @bp.route('/allocations', methods = [ 'GET' ])
