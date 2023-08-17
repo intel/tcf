@@ -123,7 +123,7 @@ class _test(tcfl.pos.tc_pos_base):
     def start_50(self, ic, target):
         pass
 
-    def eval(self, target):
+    def eval(self, ic, target):
 
         if self.sanboot_url == None:
             SANBOOT_URL = os.environ.get("SANBOOT_URL", None)
@@ -133,14 +133,22 @@ class _test(tcfl.pos.tc_pos_base):
                     " SANBOOT_URL environment given")
             self.sanboot_url = SANBOOT_URL
 
-        target.power.cycle()
-
         boot_ic = target.kws['pos_boot_interconnect']
         mac_addr = target.kws['interconnects'][boot_ic]['mac_addr']
-        tcfl.biosl.boot_network_pxe(
-            target,
-            # Eg: UEFI PXEv4 (MAC:4AB0155F98A1)
-            r"UEFI PXEv4 \(MAC:%s\)" % mac_addr.replace(":", "").upper().strip())
+        ic.power.on()
+        if 'qemu' in target.type:
+            # QEMU has iPXE already baked into the BIOS, we don't
+            # need to TFTP boot to it
+            target.property_set("pos_mode", "pxe")
+            target.power.cycle()
+            # Now setup the local boot loader to boot off that
+            target.property_set("pos_mode", "local")
+        else:
+            target.power.cycle()
+            tcfl.biosl.boot_network_pxe(
+                target,
+                # Eg: UEFI PXEv4 (MAC:4AB0155F98A1)
+                r"UEFI PXEv4 \(MAC:%s\)" % mac_addr.replace(":", "").upper().strip())
 
         # can't wait also for the "ok" -- debugging info might pop in th emiddle
         target.expect("iPXE initialising devices...")
