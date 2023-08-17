@@ -676,7 +676,10 @@ def _logout_ui():
     with audit("logout",
                calling_user = flask_login.current_user._get_current_object(),
                request = flask.request) as audit_record:
-        flask_login.current_user.wipe()
+        if hasattr(flask_login.current_user, "wipe"):
+            # if this is an anynymous user, we can't wipe it, because
+            # it doesn't know how to
+            flask_login.current_user.wipe()
         flask_login.logout_user()
         for key in ('identity.name', 'identity.auth_type'):
             flask.session.pop(key, None)
