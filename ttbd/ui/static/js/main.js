@@ -128,6 +128,67 @@ async function power(targetid, action, component) {
     window.location.reload()
 }
 
+
+/*
+ * make a button call given an action and a component
+ *
+ * FIXME: this iss exactly the same as for power; refactor adding an interface name
+ *
+ * @param {targetid} str -> target for performing power action
+ * @param {action} str -> on/off/cycle, action you want to perform
+ * @param {component} str -> component we want to perform the action onto
+ *
+ * return {void}
+ */
+async function js_buttons(targetid, action, component) {
+    $('.diagnostics').empty();
+    $('#loading').append(
+        '<label>powering ' + action + ': ' + component+ '</label><progress id="progress-bar" aria-label="Content loading…"></progress></div>'
+    );
+
+    // https://SERVERNAME:5000/ttb-v2/targets/TARGETNAME/buttons/on
+    let data = new URLSearchParams();
+
+    if (component != 'all') {
+        data.append('component', component);
+    }
+
+    let r = await fetch('/ttb-v2/targets/' + targetid + '/buttons/' + action, {
+        method: 'PUT',
+        body: data,
+    });
+
+    let b = await r.text();
+
+    if (r.status == 401) {
+        alert(
+            'oops, seems that you are not logged in. Please log in to' +
+            ' acquire machines (top right corner)'
+        );
+        return
+    }
+
+    if (!r.ok) {
+        alert(
+            'something went wrong: ' + b
+        );
+        $('#loading').empty();
+        $('#loading').append(
+            '<b><label style="color: red;">FAIL</label></b>'
+        );
+        window.location.reload();
+        return
+    }
+
+
+    $('#loading').empty();
+    $('#loading').append(
+        '<b><label style="color: green;">SUCCESS</label></b>'
+    );
+
+    window.location.reload()
+}
+
 /**
  * toggle visibilty of div
  *

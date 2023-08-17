@@ -64,6 +64,9 @@
                 power cycle
             </button>
             <button class='minor' onclick="toggle('power-ls')">components  <i class="arrow down"></i></button>
+            <button class='minor' onclick="toggle('buttons-ls')">
+              buttons, jumpers and relays <i class="arrow down"></i>
+            </button>
         </div>
         <div class='subsection' id='power-ls' style="display: none;">
           <table id='t-powerls' class='row-border hover'>
@@ -106,6 +109,57 @@
           </table>
         </div>
         <hr>
+
+        <!-- If we have button -->
+        <div class='subsection' id='buttons-ls' style="display: none;">
+          <table id='buttons-table' class='row-border hover'>
+            <thead>
+              <tr>
+                <th>button/jumper/relay</th>
+                <th>state</th>
+                <th>&nbsp;</th>
+              </tr>
+            </thead>
+            <tbody>
+              <!-- buttonls comes from the data jinja2 is taking as
+                   input to render in ttbl.ui._target() -->
+              {% for k, v in buttonls.items() %}
+              <tr>
+                <td>{{k}}</td>
+                {% if v.state == False %}
+                  <td>
+                    <span style='color: red;'>released/open/off</span>
+                  </td>
+                {% elif v.state == True %}
+                  <td>
+                    <span style='color: green;'>pressed/closed/on</span>
+                  </td>
+                {% elif v.state == None %}
+                  <td>
+                    <span style='color: gray;'>n/a</span>
+                  </td>
+                {% else %}
+                  <td>
+                    <span style='color: blak;'>unknown</span>
+                  </td>
+                {% endif %}
+                <td>
+                    <div class='flex'>
+                      <button class='button-press-btn' onclick='js_buttons("{{ targetid }}", "on", "{{k}}")'>
+                        press/close/on
+                      </button>
+                      <button class='button-release-btn' onclick='js_buttons("{{ targetid }}", "off", "{{k}}")'>
+                        release/open/off
+                      </button>
+                    </div>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <hr>
+
         <div class='subsection'>
             <button>flash all</button>
             <button>flash bios</button>
@@ -119,11 +173,17 @@
         </div>
         <div class='subsection' id='loading'>
         </div>
-    {% else %}
+        {% else %}
+        <!-- the current user is not the owner, so they can't do
+             anything, grey it out -->
         <div class='subsection'>
             <button disabled>power on</button>
             <button disabled>power off</button>
             <button disabled>power cycle</button>
+            <button disabled class='minor'>components  <i class="arrow down"></i></button>
+            <button disabled class='minor'>
+              buttons, jumpers and relays <i class="arrow down"></i>
+            </button>
         </div>
         <div class='subsection'>
             <button disabled>flash all</button>
@@ -171,6 +231,15 @@
 // does the rest
 $(document).ready( function () {
     $('#t-powerls').DataTable({
+        paging: false,
+        ordering: false,
+        info:   false,
+        searching:   false
+    });
+
+} );
+$(document).ready( function () {
+    $('#buttons-table').DataTable({
         paging: false,
         ordering: false,
         info:   false,

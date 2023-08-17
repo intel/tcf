@@ -146,6 +146,27 @@ def _target(targetid):
         'alloc': alloc,
     }
 
+    #
+    # Provive button data for the UI to display, if wanted/needed
+    #
+    # This is formatted by jinja, taking as template
+    # ui/templates/target.html, by a button that toggles the button-ls
+    # table, which will be rendered by jinja2 from the template and
+    # will be managed, display wise, by
+    # ttbd/ui/static/js/jquery.dataTables.js
+    #
+    if hasattr(target, "buttons"):
+        # buttons interface is the ame as the power interface...with
+        # another name :) w ignore the state and substate, because
+        # they make no sense here
+        _state, button_data, _substate = target.buttons._get(target)
+    else:
+        # FIXME: this is a hack; ideally, if no button control is
+        # available, it shall not even show the list
+        button_data = {
+            "no buttons/relays/jumpers available": None
+        }
+
     return flask.render_template(
         'target.html', targetid = targetid, d = json_d, state = state,
         powerls = p_data,
