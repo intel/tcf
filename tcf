@@ -227,6 +227,9 @@ if __name__ == "__main__":
     import tcfl.ui_cli_targets
     tcfl.ui_cli_targets._cmdline_setup(arg_subparsers)
 
+    import tcfl.ui_cli_alloc
+    tcfl.ui_cli_alloc.cmdline_setup(arg_subparsers)
+
     arg_parser_target_list = arg_subparsers.add_parser(
         f"ls{tcfl.ui_cli.commands_old_suffix}",
         help = "List the targets; by default, in a terminal, it will "
@@ -254,6 +257,7 @@ if __name__ == "__main__":
         "'zephyr_board and not type:\"^qemu.*\"'")
     arg_parser_target_list.set_defaults(func = ttb_client.rest_target_list)
 
+    tcfl.ui_cli_alloc.cmdline_setup(arg_subparsers)
     tcfl.tc.target_ext_alloc._cmdline_setup(arg_subparsers)
 
     arg_parser_target_release = arg_subparsers.add_parser(
@@ -290,7 +294,7 @@ if __name__ == "__main__":
     tcfl.ui_cli_tunnel.cmdline_setup(arg_subparsers)
     tcfl.tc.target_ext_tunnel.cmdline_setup(arg_subparsers)
 
-
+    tcfl.ui_cli_alloc.cmdline_setup_intermediate(arg_subparsers)
     tcfl.tc.target_ext_alloc._cmdline_setup_intermediate(arg_subparsers)
 
     import tcfl.ui_cli_certs
@@ -306,6 +310,8 @@ if __name__ == "__main__":
     ap = arg_subparsers.add_parser("cache-flush",
                                    help = "wipe all caches")
     ap.set_defaults(func = _cmdline_cache_flush)
+
+    tcfl.ui_cli_alloc.cmdline_setup_advanced(arg_subparsers)
 
     tcfl.tc.pos.cmdline_setup(arg_subparsers)
     tcfl.ui_cli_images._cmdline_setup_advanced(arg_subparsers)
