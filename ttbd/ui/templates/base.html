@@ -8,22 +8,58 @@
   <title>{% block title %} {% endblock %} - ttbdweb </title>
   <link rel='stylesheet' href="{{url_for('static', filename = 'css/style.css')}}">
   {% block head %}{% endblock %}
+    <link rel="stylesheet" href="{{url_for('static', filename = 'css/color-brewer.min.css')}}"/>
+    <script src="{{url_for('static', filename = 'js/highlight.min.js')}}"></script>
 </head>
 <body>
+<script>hljs.highlightAll();</script>
   <header>
       <nav>
         <ul>
             <img src="{{url_for('static', filename = 'img/bot.svg')}}" width=40em>
-            <li><a href='/ttb-v2/ui'>ttbdweb</a></li>
-            <li><a href='/ttb-v2/ui'>targets</a></li>
-            <li><a href='/ttb-v2/ui/allocations'>allocations</a></li>
+            <li><div class = "tooltip">
+                <a href='/ttb-v2/ui'>targets</a>
+                <span class = "tooltiptext">
+                  List all targets visible to you.
+                  <p>On the command line, you can use:
+                    <pre><code class="language-bash">$ tcf ls</code></pre>
+                  </p>
+                </span>
+            </div></li>
+            <li><div class = "tooltip">
+                <a href='/ttb-v2/ui/allocations'>allocations</a>
+                <span class = "tooltiptext">
+                  List all allocations visible to you.
+                  <p>On the command line, you can use:
+                    <pre><code class="language-bash">$ tcf alloc-ls</code></pre>
+                  </p>
+                </span>
+            </div></li>
             <li><a href='/'>help</a></li>
               {% if g.user %}
                 <li class='nav-right'>
-                  <a class='username' href='/ttb-v2/ui/logout'>{{ g.user }}</a>
+                  <div class = "tooltip">
+                    <a class='username' href='/ttb-v2/ui/logout'>{{ g.user }}</a>
+                    <span class = "tooltiptext">
+                      Logout from this server
+                      <p>On the command line, you can use:
+                        <pre><code class="language-bash">$ tcf logout</code></pre>
+                      </p>
+                    </span>
+                  </div>
                 </li>
               {% else %}
-                <li class='nav-right'><a href='/ttb-v2/ui/login'>login</a></li>
+                <li class='nav-right'>
+                  <div class = "tooltip">
+                    <a href='/ttb-v2/ui/login'>login</a>
+                    <span class = "tooltiptext">
+                      Login to this server
+                      <p>On the command line, you can use:
+                        <pre><code class="language-bash">$ tcf login</code></pre>
+                      </p>
+                    </span>
+                  </div>
+                </li>
               {% endif %}
             {% block navbar %}{% endblock %}
         </ul>

@@ -93,6 +93,8 @@ nav > ul> li {
     margin-left: 0.3em;
 }
 
+
+/* nav anchor tags without tooltip formating */
 nav > ul> li > a {
     display: block;
     background-color: transparent;
@@ -120,6 +122,39 @@ nav > ul> li > a:hover {
 }
 
 nav > ul> li > a:active {
+    color: white;
+    text-decoration: underline;
+    background-color: transparent;
+}
+
+/* nav anchor tags with tooltip formating */
+nav > ul> li > div >  a {
+    display: block;
+    background-color: transparent;
+    padding: 0.1em 1em;
+    color: white;
+    text-decoration: none;
+    border-radius: 0.1em;
+    font-size: 0.9em;
+}
+
+nav > ul> li > div > a:link {
+    color: white;
+    background-color: transparent;
+}
+
+nav > ul> li > div > a:visited{
+    color: white;
+    background-color: transparent;
+}
+
+nav > ul> li > div > a:hover {
+    color: white;
+    text-decoration: underline;
+    background-color: transparent;
+}
+
+nav > ul> li > div > a:active {
     color: white;
     text-decoration: underline;
     background-color: transparent;
@@ -448,4 +483,37 @@ hr {
     color: #333;
     background-color: #d4d4d4;
     border-color: #8c8c8c;
+}
+
+
+.tooltip {
+  position: relative;
+  display: inline-block;
+}
+
+.tooltip .tooltiptext {
+  visibility: hidden;
+  width: 25em;
+  opacity: 1;
+  text-align: left;
+  background-color: #eee;
+  color: black;
+  padding: 2em;
+  font-size: 0.7em;
+
+
+  border: 1px solid rgb(190,190,190);
+  border-bottom-left-radius: 0.5em;
+  border-bottom-right-radius: 0.5em;
+
+  /* Position the tooltip */
+  position: absolute;
+  z-index: 1;
+  top: 60%;
+  left: 50%;
+  margin-left: -60px;
+}
+
+.tooltip:hover .tooltiptext {
+  visibility: visible;
 }
