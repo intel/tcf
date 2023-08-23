@@ -187,9 +187,8 @@ def _allocation_ui():
         t = []
         for _, group in targets.items():
             t.extend(group)
-
         allocs[k] = {
-            'targets': t,
+            'targets': ",".join(t),
             'state': v.get('state', '<unkown>'),
             'user': v.get('user', '<unkown>'),
             'priority': v.get('priority', '<unkown>'),

@@ -37,9 +37,7 @@
                     <td style='color: red;'>{{ v.state }}</td>
                 {% endif %}
                 <td>
-                    {% for targetid in v.targets %}
-                        {{targetid}},
-                    {% endfor %}
+                    {{v.targets}}
                 </td>
                 {% if v.user == g.user %}
                     <td><label style='color: lightseagreen;'>you </label>({{ v.user }})</td>
