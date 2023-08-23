@@ -21,6 +21,7 @@
       <tr>
         <th>allocation id</td>
         <th>state</td>
+        <th>server</td>
         <th>target</td>
         <th>user</td>
         <th>priority</td>
@@ -36,6 +37,9 @@
                 {% else %}
                     <td style='color: red;'>{{ v.state }}</td>
                 {% endif %}
+                <td>
+                    {{v.server}}
+                </td>
                 <td>
                     {{v.targets}}
                 </td>
