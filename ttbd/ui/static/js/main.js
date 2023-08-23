@@ -47,7 +47,7 @@ async function acquire(targetid) {
 *
 * return {void} -> it reloads the windows though
 */
-async function release(allocid) {
+async function js_alloc_remove(allocid) {
     let r = await fetch('/ttb-v2/allocation/' + allocid, {
       method: 'DELETE',
     });
