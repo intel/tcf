@@ -192,6 +192,7 @@ def _allocation_ui():
             'state': v.get('state', '<unkown>'),
             'user': v.get('user', '<unkown>'),
             'priority': v.get('priority', '<unkown>'),
+            'server': "[local]",
         }
     return flask.render_template('allocations.html', allocs = allocs)
 
