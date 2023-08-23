@@ -47,10 +47,8 @@
                     <td>{{v.user}}</td>
                 {% endif %}
                 <td>{{v.priority}}</td>
-                <!-- FIXME we need to implement the release to work with more
-                     than one target -->
                 <td>
-                    <button class='acquire' onclick='release("{{k}}")'>release</button>
+                    <button class='acquire' onclick='js_alloc_remove("{{k}}")'>remove</button>
                     <button>control panel</button>
                 </td>
             </tr>
