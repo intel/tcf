@@ -40,9 +40,21 @@
                 <td>
                     {{v.server}}
                 </td>
+
                 <td>
+                  {% if v.targets_short is defined %}  {# too long, shorten and tooltip #}
+                    <div class = "tooltip">
+                      {{v.targets_short}}
+                      <span class = "tooltiptext">
+                        <!-- FIXME: add hyperlinks to control panel for each target-->
+                        {{v.targets}}
+                      </span>
+                    </div>
+                  {% else %}	{# entry is short, no need to tooltip it #}
                     {{v.targets}}
+                  {% endif %}
                 </td>
+                
                 {% if v.user == g.user %}
                     <td><label style='color: lightseagreen;'>you </label>({{ v.user }})</td>
                 {% else %}

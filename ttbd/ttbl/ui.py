@@ -69,6 +69,38 @@ def _interconnect_values_render(d: dict, field: str,
 
 
 
+def short_field_maybe_add(d: dict, fieldname: str, max_length: int):
+    """
+    If a field is longer than @max_length, create a version of it
+    called "<fieldname>_short" that is "<first chars>...".
+
+    The UI templates can then choose to replace the long version with
+    the short and display the long version as a tooltip, eg as::
+
+      {% if v.targets_short is defined %}  {# too long, shorten and tooltip #}
+        <div class = "tooltip">
+          {{v.targets_short}}
+          <span class = "tooltiptext">{{v.targets}}</span>
+        </div>
+      {% else %}	{# entry is short, no need to tooltip it #}
+        {{v.targets}}
+      {% endif %}
+
+    :param dict d: dictionary keyed by strings of fieldnames with
+      string values
+
+    :param str fieldname: name of the field to inspect
+
+    :param int max_length: max value length
+    """
+    v = d[fieldname]
+    # if the field is too long, add a _short version so the
+    # HTML/jinja2 can decide if to add a short/long version with tooltips
+    if len(v) > max_length:
+        d[fieldname + "_short"] = v[:max_length] + "..."
+
+
+
 @bp.route('/', methods = ['GET'])
 def _targets():
     '''
