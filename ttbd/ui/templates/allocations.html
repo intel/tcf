@@ -38,7 +38,14 @@
                     <td style='color: red;'>{{ v.state }}</td>
                 {% endif %}
                 <td>
-                    {{v.server}}
+                  <div class = "tooltip">
+                    {# this is the short server name, the URL is in a
+                       tool tip, so the table displays better #}
+                    {{ v.server }}
+                    <span class = "tooltiptext">
+                      <a href = {{v.server_url}}/ttb-v2/ui>{{v.server_url}}</a>
+                    </span>
+                  </div>
                 </td>
 
                 <td>
@@ -54,16 +61,33 @@
                     {{v.targets}}
                   {% endif %}
                 </td>
+
+                <td>
+                  {% if v.user == g.user %}
+                    <div class = "tooltip">
+                      <label style='color: lightseagreen;'>you </label>
+                      <span class = "tooltiptext">{{ v.user }}</span>
+                    </div>
+                  {% else %}
+                    {{v.user}}
+                  {% endif %}
+                </td>
                 
-                {% if v.user == g.user %}
-                    <td><label style='color: lightseagreen;'>you </label>({{ v.user }})</td>
-                {% else %}
-                    <td>{{v.user}}</td>
-                {% endif %}
                 <td>{{v.priority}}</td>
                 <td>
-                    <button class='acquire' onclick='js_alloc_remove("{{k}}")'>remove</button>
+                    <!-- FIXME: to save horizonzal space, replace with
+                         a trashcan icon next to the ALLOCID in col
+                         #1? ask to confirm to avoid confusions -->
+                    <button class='acquire' onclick='js_alloc_remove("{{v.server_url}}", "{{k}}")'>remove</button>
+                    <!-- FIXME: replace with a hyperlink on the ALLOCID in col #1? -->
                     <button>control panel</button>
+                    <!-- FIXME: in general, we could replace most
+                         fields in tables that are going to be long
+                         with two fields fieldname and fieldname_short
+                         so that fieldname is displayed in a tooltip
+                         and fieldname_short is always displayed and
+                         this way tables would be consistently in
+                         size? -->
                 </td>
             </tr>
         {% endfor %}
