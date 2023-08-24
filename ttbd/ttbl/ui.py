@@ -212,20 +212,32 @@ def _allocation_ui():
         flask_login.current_user._get_current_object())
     allocs = {}
 
-    for k, v in allocations.items():
-        # to get the targets from the allocation we need to iterate thru the
-        # target_group dict.
-        targets = v.get('target_group', {})
-        t = []
-        for _, group in targets.items():
-            t.extend(group)
-        allocs[k] = {
-            'targets': ",".join(t),
+
+    def _allocs_fill(allocid: str, v: dict, server_url: str, servername: str):
+        # to get the targets from the allocation we need to iterate
+        # thru the target_group dict.  the targets allocated to this
+        # allocation are represented in field group_allocated, a comma
+        # separated string
+        targets = v.get('group_allocated', "").split(",")
+        allocs[allocid] = {
+            # rejoin it with spaces so it is properly broken in lines
+            # by the table code
+            'targets': " ".join(targets),
+            'target_list': targets,
             'state': v.get('state', '<unkown>'),
             'user': v.get('user', '<unkown>'),
             'priority': v.get('priority', '<unkown>'),
-            'server': "[local]",
+            'server': servername,
+            'server_url': server_url,
         }
+        short_field_maybe_add(allocs[allocid], 'targets', 15)
+
+
+    # Get local allocations
+    for k, v in allocations.items():
+        server = tcfl.server_c.servers[server_url]
+        _allocs_fill(k, v, "/ttb-v2/ui", "local")
+
     return flask.render_template('allocations.html', allocs = allocs)
 
 
