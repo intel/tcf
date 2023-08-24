@@ -235,7 +235,6 @@ def _allocation_ui():
 
     # Get local allocations
     for k, v in allocations.items():
-        server = tcfl.server_c.servers[server_url]
         _allocs_fill(k, v, "/ttb-v2/ui", "local")
 
     return flask.render_template('allocations.html', allocs = allocs)
