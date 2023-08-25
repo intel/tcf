@@ -127,8 +127,6 @@ def _targets():
         if t == 'ethernet':
             continue
 
-        nw = d.get('interconnects', {})
-
         # For network fields, collect them and if there is more than
         # one network, prefix the network name
         # FIXME: only if ipv4_addr in fields
@@ -136,11 +134,16 @@ def _targets():
         mac_addr = _interconnect_values_render(d, "mac_addr")
 
         targets[targetid] = {
+            'id': targetid,
             'type': t,
             'ip': ipv4_addr,
             'mac': mac_addr,
             'owner': owner,
         }
+        # single IPs are at least 16 chars
+        short_field_maybe_add(targets[targetid], 'ip', 16)
+        # single MACs are at least 18 chars
+        short_field_maybe_add(targets[targetid], 'mac', 18)
 
     return flask.render_template('targets.html', targets = targets)
 
