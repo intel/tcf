@@ -233,7 +233,7 @@ class qmp_c(object):
 
 
 class pc(ttbl.power.daemon_c,
-         ttbl.images.impl_c,
+         ttbl.images.impl2_c,
          ttbl.debug.impl_c):
     """Power controller that manages a QEMU instance
 
@@ -428,7 +428,7 @@ class pc(ttbl.power.daemon_c,
         self.power_on_recovery = True
         self.paranoid_get_samples = 1
         self.paranoid = True
-        ttbl.images.impl_c.__init__(self)
+        ttbl.images.impl2_c.__init__(self)
         self.upid_set(
             "QEMU virtual machine",
             name = "qemu",
@@ -439,9 +439,9 @@ class pc(ttbl.power.daemon_c,
         )
 
     #
-    # Images interface (ttbl.images.impl_c)
+    # Images interface (ttbl.images.impl2_c)
     #
-    def flash(self, target, images):
+    def flash_start(self, target, images, _context):
         # for flashing we set target's runtime properties which point
         # to what files shall be loaded; when the QEMU command is run,
         # those properties are read by ttbl.power.daemon_c() as things
@@ -464,6 +464,23 @@ class pc(ttbl.power.daemon_c,
                 target.fsdb.set("qemu-image-bios", image_name)
             else:
                 raise ValueError("unknown image type %s" % image_type)
+
+
+
+    def flash_check_done(self, target, images, context):
+        # nothing to do here, we have set the file name above in flash_start
+        return True
+
+
+    def flash_kill(self, target, images, context, msg):
+        # nothing to do here, we don't start any processes
+        return
+
+
+    def flash_post_check(self, target, images, context):
+        # nothing to do here, we don't start any processes
+        return None	# always successful
+
 
     #
     # Power Control Interface (ttbl.power.impl_c via ttbl.power.daemon_c)
