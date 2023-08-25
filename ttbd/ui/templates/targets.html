@@ -27,8 +27,29 @@
   <tr>
     <td> <a href='/ttb-v2/ui/target/{{k}}'>{{ k }}</td>
     <td>{{ v.type }}</td>
-    <td>{{ v.ip }}</td>
-    <td>{{ v.mac }}</td>
+
+    <td>
+      {% if v.ip_short is defined %}  {# too long, shorten and tooltip #}
+        <div class = "tooltip">
+          {{v.ip_short}}
+          <span class = "tooltiptext">{{v.ip}}</span>
+        </div>
+      {% else %}	{# entry is short, no need to tooltip it #}
+        {{v.ip}}
+      {% endif %}
+    </td>
+
+    <td>
+      {% if v.mac_short is defined %}  {# too long, shorten and tooltip #}
+        <div class = "tooltip">
+          {{v.mac_short}}
+          <span class = "tooltiptext">{{v.mac}}</span>
+        </div>
+      {% else %}	{# entry is short, no need to tooltip it #}
+        {{v.mac}}
+      {% endif %}
+    </td>
+
     {% if v.owner == 'available'%}
         <td style='color: green;'>{{ v.owner }}</td>
     {% else %}
