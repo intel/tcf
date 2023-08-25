@@ -45,7 +45,7 @@
     </div>
     <div class='subsection'>
     {% if state.owner == g.user %}
-        <button class='release' onclick='release("{{state.alloc}}")'>release</button>
+        <button class='release' onclick='js_alloc_remove("{{state.alloc}}")'>release</button>
     {% else %}
         <button class='acquire' onclick='acquire("{{targetid}}")'>acquire</button>
     {% endif %}
