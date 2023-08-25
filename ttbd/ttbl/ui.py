@@ -180,6 +180,10 @@ def _target(targetid):
         'ip': _interconnect_values_render(d, "ipv4_addr", separator = " "),
         'alloc': alloc,
     }
+    # single IPs are at least 16 chars
+    short_field_maybe_add(state, 'ip', 16)
+    # single MACs are at least 18 chars
+    short_field_maybe_add(state, 'mac', 18)
 
     #
     # Provive button data for the UI to display, if wanted/needed
