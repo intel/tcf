@@ -203,23 +203,68 @@
 <div class='column-sidebar'>
     <div class='status'>
         <h4 class='info info-grey'>overview</h4>
+        <table class='display'>
+          <tr>
+            <td>power state:</td>
+            <td>
+              {% if state.power == 'True' %}
+              <label style='color: green;'>on</label>
+              {% else %}
+              <label style='color: red;'>off</label>
+              {% endif %}
+            </td>
+          </tr>
 
-        {% if state.power == 'True' %}
-            <p> power state: <label style='color: green;'>on</label></p>
-        {% else %}
-            <p> power state: <label style='color: red;'>off</label></p>
-        {% endif %}
+          <tr>
+            <td>owner:</td>
+            <td>
+              {% if state.owner == 'available' %}
+              <label style='color: green;'>{{ state.owner }}</label>
+              {% elif state.owner == g.user %}
+              <div class = "tooltip">
+                <label style='color: lightseagreen;'>you </label>
+                <span class = "tooltiptext">{{ g.user }}</span>
+              </div>
+              {% else %}
+              <label style='color: red;'>{{ state.owner }}</label>
+              {% endif %}
+            </td>
+          </tr>
 
-        {% if state.owner == 'available' %}
-            <p>owner: <label style='color: green;'>{{ state.owner }}</label></p>
-        {% elif state.owner == g.user %}
-            <p>owner: <label style='color: lightseagreen;'>you </label>({{ state.owner }})</p>
-        {% else %}
-            <p>owner: <label style='color: red;'>{{ state.owner }}</label></p>
-        {% endif %}
-        <p>type: {{ state.type}}</p>
-        <p>ipv4 address: {{ state.ip}}</p>
-        <p>mac address: {{ state.mac}}</p>
+          <tr>
+            <td>type:</td>
+            <td>{{ state.type }}</td>
+          </tr>
+
+          <tr>
+            <td>IPv4 address:</td>
+            <td>
+              {% if state.ip_short is defined %}  {# too long, shorten and tooltip #}
+                <div class = "tooltip">
+                  {{state.ip_short}}
+                  <span class = "tooltiptext">{{state.ip}}</span>
+                </div>
+              {% else %}	{# entry is short, no need to tooltip it #}
+                {{state.ip}}
+              {% endif %}
+            </td>
+          </tr>
+
+          <tr>
+            <td>MAC address:</td>
+            <td>
+              {% if state.mac_short is defined %}  {# too long, shorten and tooltip #}
+                <div class = "tooltip">
+                  {{state.mac_short}}
+                  <span class = "tooltiptext">{{state.mac}}</span>
+                </div>
+              {% else %}	{# entry is short, no need to tooltip it #}
+                {{state.mac}}
+              {% endif %}
+            </td>
+          </tr>
+
+        </table>
     </div>
 </div>
 
