@@ -1,4 +1,4 @@
-#! /bin/bash -eu
+#!/usr/bin/bash -eu
 #
 # Copyright (c) 2018-23 Intel Corporation
 #
@@ -571,6 +571,10 @@ for shadow_file in \
 done
 
 for file in $destdir/etc/pam.d/* $destdir/usr/share/pam.d/*; do
+    # do not act on symlinks, only on regular files -- since otherwise
+    # it will dererence stuff from the host system
+    [ -h $file ] && continue
+    # not a regular file? skip it
     [ -f $file ] || continue
     info "$file: allowing login to accounts with no password (replacing 'nullok_secure')"
     selinux_relabel["${file##$destdir}"]=1
