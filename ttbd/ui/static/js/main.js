@@ -189,6 +189,91 @@ async function js_buttons(targetid, action, component) {
     window.location.reload()
 }
 
+/*
+* make a flashing call given a version and an image type
+*
+* @param {targetid} str -> target id to which you want to flash
+* @param {select_id} str -> select tag html id where the paths for flashing are
+* @param {image_type} str ->  the type of firmware you want to flash, if you
+*   want to flash multiple you can separate them by `:`
+*   Ex. fw:bios:ifwi:
+* @param {suffix} str ->  suffix, if any, of the image files name names , you
+*   can send multiple separated by `:`
+*   Ex. ::.img:
+*
+* return {void}
+*/
+async function js_images_flash(targetid, select_id, image_type, suffix) {
+
+    // jquery does not like dots in ids, we need to escape them
+    select_id = select_id.replace('.', '\\.');
+
+    let selected = document.getElementById(select_id);
+    let fullpath = selected.value;
+    $('#loading').append(
+        '<label>flashing ' + image_type + ': ' + fullpath + '</label><progress id="progress-bar" aria-label="Content loading…"></progress></div>'
+    );
+
+    let images = new Object();
+    if (select_id != 'flash_images_version_for_all') {
+        images[image_type] = fullpath;
+    } else {
+        // flashing multiple images bios:fw:smth:
+        const imgs = image_type.split(':');
+        const suffixes = suffix.split(':');
+        imgs.pop()
+        suffixes.pop()
+
+        let i = 0;
+        imgs.forEach((img_type) => {
+            images[img_type] = fullpath + img_type + suffixes[i];
+            i++;
+        });
+    }
+
+    images = JSON.stringify(images);
+
+    let data = new URLSearchParams();
+    data.append('images', images);
+
+    // https://<SERVER>:5000/ttb-v2/targets/<TARGET NAME>/images/flash
+    //  -X PUT-d images='{"bios":"bios.xz"}'
+    let r = await fetch('/ttb-v2/targets/' + targetid + '/images/flash', {
+        method: 'PUT',
+        body: data,
+    });
+
+    let response_text = await r.text();
+
+    if (r.status == 401) {
+        alert(
+            'oops, seems that you are not logged in. Please log in to' +
+            ' acquire machines (top right corner)'
+        );
+        return
+    }
+
+    if (!r.ok) {
+        alert(
+            'something went wrong: ' + response_text
+        );
+        $('#loading').empty();
+        $('#loading').append(
+            '<b><label style="color: red;">FAIL</label></b>'
+        );
+        window.location.reload();
+        return
+    }
+
+
+    $('#loading').empty();
+    $('#loading').append(
+        '<b><label style="color: green;">SUCCESS</label></b>'
+    );
+
+    window.location.reload()
+}
+
 /**
  * toggle visibilty of div
  *
