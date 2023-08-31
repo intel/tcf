@@ -21,10 +21,72 @@ When defining a route, take into account that each blueprint has a url_prefix,
 here we chose `ui`, so all the routes in here have `API_PREFIX + /ui` before
 the actual route (when opening it on your browser or make the http request)
 even if it's not specified in the actual function decorator.
+
+This blueprint has the capability of listing images found in the server and
+rendering them. Images can have a lot of formats, so in order to add this layer
+of flexibility you can add some variables to the configuration that will help
+with this.
+
+- suffixes:
+    `ttbl.ui.image_suffix`:dict
+    image files can have suffixes that the image type does not include, say you
+    have a firmware binary named `bios.img` but the image type is listed as
+    `bios` in the inventory. You can create a dict in the config to solve this
+    issue. Where the key is the image type and the value is the file suffix you
+    want to add.
+
+    >>> ttbl.ui.image_suffix = {
+    >>>     'fw': '.dd',
+    >>>     'os': '.iso',
+    >>> }
+
+- path prefixes:
+    `ttbl.ui.image_path_prefixes`: list
+    you can have your images almost anywhere in your file directory, this list
+    of paths helps ttbd daemon to know where to look. This supports keyword
+    expansion meaning you can have dynamic fields from the inventory in your
+    path string.
+
+    >>> ttbl.ui.image_path_prefixes = [
+    >>>     '/some/path/%(type)s',
+    >>>     '/my/cool/images/of/type/%(type)s',
+    >>> ]
+
+- different versions of the same type of image:
+    `ttbl.ui.keywords_to_ignore_when_path`: list
+    this can get a little tricky so bear with me. The keywords defined here
+    can, be found in different files for the same image type, since the way we
+    know which paths contain all image types is by counting them, this will
+    give false results:
+
+    Ex: say we have 3 image types (bios, fw, img), and we count the image
+    files inside the directories
+    >>> /my/path
+    >>>    - bios
+    >>>    - bios-test
+    >>>   - fw
+    >>>  /my/path2
+    >>>    - bios
+    >>>    - fw
+    >>>    - img
+
+    here both `path` and `path2` will say they have 3 different images, but
+    only path2 has the 3 correct images types.
+    >>> ttbl.ui.keywords_to_ignore_when_path = [
+    >>>    '-test',
+    >>>    '.info',
+    >>> ]
+
+    defining these two keywords in the list will make ttbd ignore `bios-test`
+    and consider `path` to only have two images types
 """
 
+import collections
+import glob
 import logging
 import json
+import os
+import packaging.version
 
 import flask
 import flask_login
@@ -215,10 +277,136 @@ def _target(targetid):
             "no buttons/relays/jumpers available": None
         }
 
+    # more info about this tuple on the docstring of the function
+    # `_get_images_paths`
+    images, paths_for_all_images_types = _get_images_paths(d)
+
     return flask.render_template(
         'target.html', targetid = targetid, d = json_d, state = state,
         powerls = p_data,
+        images = images,
+        paths_for_all_images_types = paths_for_all_images_types,
         buttonls = button_data)
+
+
+
+def _get_images_paths(inventory: dict):
+    '''
+    this function process the interfaces.images property
+    from the inventory and extends on it by adding new fields:
+        `suffix`:str: suffix to image file name (if any defined in config, see
+            ttbl/ui docstring for more info)
+        `last_short_name`:str: short version of last_name field
+        `file_list`:dict: paths to images (see example for more info)
+
+    :param:inventory:dict:
+        target's inventory, usually we get it with
+        >>> target = ttbl.config.targets.get(targetid, None)
+        >>> inventory = target.to_dict(list())
+
+    :returns:tuple: (images, paths_for_all_images_types)
+        The first element is an extended dictonary based on interfaces.images,
+        The second element is a list of dictionaries with path available for
+        all images.
+
+        images:dict: example,
+        >>> {
+        >>>     'bios': {
+        >>>         'instrument': 'dfs',
+        >>>         'estimated_duration': '123',
+        >>>         'last_name': 'prefix/some/path/bios',
+        >>>         'last_sha512': 'a-long-sha',
+        >>>         'suffix': '.img',
+        >>>         'last_short_name': '/some/path',
+        >>>         'file_list': {
+        >>>             '/prefix/path/bios': {
+        >>>                 'short_name': 'path'
+        >>>             },
+        >>>             '/prefix/path2/bios': {
+        >>>                 'short_name': 'path2'
+        >>>             }
+        >>>         },
+        >>>     },
+        >>>     'firmware': {
+        >>>         'instrument': 'klj',
+        >>>         'estimated_duration': '23',
+        >>>         'last_name': 'prefix/path/image',
+        >>>         'last_sha512': 'a-long-sha',
+        >>>         'suffix': '',
+        >>>     ...more
+        >>> }
+
+        paths_for_all_images_types:list: example,
+        >>> [
+        >>>     {
+        >>>         'paths': '/prefix/path/'
+        >>>         'short_name': 'path'
+        >>>     },
+        >>>     {
+        >>>         'paths': '/prefix/some/path/'
+        >>>         'short_name': 'some/path'
+        >>>     },
+        >>>     ...more
+        >>> ]
+    '''
+    images = dict(inventory.get('interfaces', {}).get('images', {}))
+    # `images_by_path` tell us the valid images types that are in each path
+    # found in the server
+    images_by_path = collections.defaultdict(dict)
+    for image_type in images.keys():
+        images[image_type]['suffix'] = ''
+        # for more info on ttbl.ui.image_suffix, check file docstring
+        if image_type in ttbl.ui.image_suffix:
+            images[image_type]['suffix'] = ttbl.ui.image_suffix[image_type]
+        # if no last_name property is set in the inventory we want to add one
+        # to give info to the user in the html
+        if not 'last_name' in images[image_type]:
+            images[image_type]['last_name'] = 'no record of last flashed image'
+            images[image_type]['last_short_name'] = '-'
+
+        # dict that contains all paths for each image type
+        file_list = dict()
+        for prefix in ttbl.ui.image_path_prefixes:
+            # here we allow for lazy strings, meaning we expand the string with
+            # fields from the inventory,
+            # ex. '/path/something/%(type)s' -> '/path/something/some_type'
+            prefix_formatted = prefix % inventory
+            suffix = images[image_type]['suffix']
+
+            # we look for the prefix in the path from the last flashed image,
+            # this will allow us to make a shorter verison of the path, this
+            # improves the readablity of the site
+            if prefix_formatted in images[image_type]['last_name']:
+                short_name_formatted = \
+                    images[image_type]['last_name'][len(prefix_formatted) + 1:]
+                images[image_type]['last_short_name'] = \
+                    short_name_formatted[:-(len(image_type) + len(suffix))]
+
+            local_list = glob.glob(prefix_formatted + f"/*/{image_type}*" + suffix)
+            for filename in sorted(local_list):
+                file_data = {}
+                file_data["short_name"] = os.path.dirname(filename)[len(prefix_formatted) + 1:]
+                dirname, basename = os.path.split(filename)
+                for keyword in ttbl.ui.keywords_to_ignore_when_path:
+                    if keyword in basename:
+                        basename = basename.split(keyword)[0]
+                file_list[filename] = file_data
+                images_by_path[dirname].setdefault("images", set())
+                images_by_path[dirname]["images"].add(basename)
+                images_by_path[dirname]["prefix"] = prefix_formatted
+
+        images[image_type]['file_list'] = file_list
+
+    paths_for_all_images_types = []
+    for path, info in images_by_path.items():
+        if len(info['images']) == len(images.keys()):
+            tmp = {}
+            tmp['paths'] = path + '/'
+            tmp['short_name'] = path[len(info['prefix']) + 1:]
+            paths_for_all_images_types.append(tmp)
+
+    return images, paths_for_all_images_types
+
 
 
 @bp.route('/allocations', methods = [ 'GET' ])

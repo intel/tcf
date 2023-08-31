@@ -3,7 +3,7 @@
 
 {% block head %}
 <!-- link our js file -->
-<script type="text/javascript" src="{{url_for('static', filename = 'js/main.js')}}"></script> <script type="text/javascript" src="{{url_for('static', filename = 'js/main.js')}}"></script>
+<script type="text/javascript" src="{{url_for('static', filename = 'js/main.js')}}"></script>
 <script src="{{url_for('static', filename = 'js/jquery-3.6.4.slim.min.js')}}" integrity="sha256-a2yjHM4jnF9f54xUQakjZGaqYs/V1CYvWpoqZzC2/Bw=" crossorigin="anonymous"></script>
 <link rel="stylesheet" href="{{url_for('static', filename = 'css/jquery.dataTables.css')}}"/>
 <script src="{{url_for('static', filename = 'js/jquery.dataTables.js')}}"></script>
@@ -111,7 +111,6 @@
             </tbody>
           </table>
         </div>
-        <hr>
 
         <!-- If we have button -->
         <div class='subsection' id='buttons-ls' style="display: none;">
@@ -164,11 +163,66 @@
         <hr>
 
         <div class='subsection'>
-            <button>flash all</button>
-            <button>flash bios</button>
-            <button>flash bmc</button>
-            <button>flash cpld1</button>
-            <button>flash cpld2</button>
+            <div class = "tooltip">
+                <p style='margin: 0;'>ⓘ&nbsp;</p>
+                <span class = "tooltiptext">
+                  This will flash:
+                  <span style='color: blue;'>
+                  {% for image_type in images.keys() %}
+                    {{image_type}},
+                  {% endfor %}
+                  </span>
+                  on the target
+                </span>
+            </div>
+            <button id='flash-button'
+                onclick='js_images_flash(
+                    "{{targetid}}",
+                    "flash_images_version_for_all",
+                    "{% for image_type in images.keys() %}{{image_type}}:{%endfor%}",
+                    "{% for image_info in images.values() %}{{image_info.suffix}}:{%endfor%}"
+                    )'>flash firmware</button>
+            <select class='list_versions' id='flash_images_version_for_all'>
+                {% for path in paths_for_all_images_types %}
+                    <option value={{path.paths}}>{{path.short_name}}</option>
+                {% endfor %}
+            </select>
+            <button class='minor' onclick="toggle('flash-ls')">more <i class="arrow down"></i></button>
+        </div>
+        <div class='subsection' id='flash-ls' style="display: none;">
+          <table id='t-flashls' class='row-border hover'>
+            <thead>
+              <tr>
+                <th>image type</th>
+                <th>last flashed</th>
+                <th>version</th>
+                <th>&nbsp;</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for image_type, image_info in images.items() %}
+              <tr>
+                <td>{{image_type}}</td>
+                <td>
+                    <div class = "tooltip">
+                        <small>
+                            {{image_info.last_short_name}}
+                        </small>
+                        <span class = "tooltiptext">{{ image_info.last_name }}</span>
+                    </div>
+                </td>
+                <td>
+                  <select class='list_versions' id='flash_images_version_for_component_{{image_type}}'>
+                    {% for full_image_path, short_image_path in image_info.file_list.items() %}
+                        <option value='{{full_image_path}}'>{{short_image_path.short_name}}</option>
+                    {% endfor %}
+                  <select>
+                </td>
+                <td><button onclick='js_images_flash("{{targetid}}", "flash_images_version_for_component_{{image_type}}", "{{image_type}}", "{{image_info.suffix}}")'>flash</button></td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
         </div>
         <hr>
         <div class='subsection'>
@@ -189,11 +243,7 @@
             </button>
         </div>
         <div class='subsection'>
-            <button disabled>flash all</button>
-            <button disabled>flash bios</button>
-            <button disabled>flash bmc</button>
-            <button disabled>flash cpld1</button>
-            <button disabled>flash cpld2</button>
+            <button disabled>flash firmware</button>
         </div>
         <div class='subsection'>
             <button disabled>console wall</button>
@@ -292,6 +342,15 @@ $(document).ready( function () {
         ordering: false,
         info:   false,
         searching:   false
+    });
+
+} );
+$(document).ready( function () {
+    $('#t-flashls').DataTable({
+        paging: false,
+        ordering: false,
+        info:   false,
+        searching:   false,
     });
 
 } );
