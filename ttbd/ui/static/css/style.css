@@ -380,6 +380,11 @@ button {
     border-radius: 1px;
 }
 
+button:hover:enabled {
+    background-color: #eee;
+    color: #3182bd;
+}
+
 #alloc-tbl {
     background-color: var(--nav-bg-color);
     border-bottom-left-radius: 0.5em;
@@ -401,6 +406,7 @@ button {
 .toolbox > .subsection > .minor {
     background-color: #eee;
     border-color: #eee;
+    height: 2em;
 }
 
 .arrow {
@@ -516,4 +522,14 @@ hr {
 
 .tooltip:hover .tooltiptext {
   visibility: visible;
+}
+
+.subsection > select {
+    height: 2em;
+    margin-top: 0em;
+}
+
+#flash-button {
+    height: 2em;
+    margin-top: 0em;
 }
