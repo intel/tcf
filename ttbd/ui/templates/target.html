@@ -34,6 +34,7 @@
     </form>
 </dialog>
 
+    <! -- {{ state  }} -->
 
 <div class='main'>
 <div class='column-main tile'>
@@ -44,7 +45,9 @@
         <h4> control panel</h4>
     </div>
     <div class='subsection'>
-    {% if state.acquired %}
+    {% if state.user_is_guest %}
+        <button class='release' onclick='js_alloc_remove("{{state.alloc}}")'>remove guest</button>
+    {% elif state.acquired %}
         <button class='release' onclick='js_alloc_remove("{{state.alloc}}")'>release</button>
     {% else %}
         <button class='acquire' onclick='acquire("{{targetid}}")'>acquire</button>
