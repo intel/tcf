@@ -220,3 +220,71 @@ def run_fn_on_each_targetspec(
     if retval == 0:
         return 1
     return 0
+
+
+def run_fn_on_each_server(
+        servers: dict,
+        fn: callable, cli_args: argparse.Namespace,
+        *args, logger = logging, return_details: bool = False,
+        **kwargs):
+    """Initialize the target discovery and run a function on each target
+    that matches a specification
+
+    See :func:'tcfl.targets.run_fn_on_each_targetspec` for arguments;
+    the only difference is this function takes most arguments as CLI
+    arguments and the return value.
+
+    :param argparse.Namespace cli_args:
+
+      Initialized with :func:`tcfl.ui_cli.args_targetspec_add`
+
+      - *target*: (optional; default *all*) :ref:`target
+        specifications<targetspec>`
+
+      - *all*: (optional; default *False*) consider also disabled targets.
+
+      - *parallelization-factor*: (optional) how many threads to run
+        per CPU.
+
+      - *serialize*: (optional; default *False*) force the execution of
+        fn to be serialized on each target (versus default that runs
+        them in parallel)
+
+    :returns int: result of the overall operation
+
+      - 0 if all functions executed ok
+      - 1 some functions failed
+      - 2 all functions failed
+
+    will log results
+
+    """
+
+    import tcfl.servers
+    tcfl.servers.subsystem_setup()
+
+    r = tcfl.servers.run_fn_on_each_server(
+        servers, fn, cli_args, *args,
+        parallelization_factor = cli_args.parallelization_factor,
+        traces = cli_args.traces,
+        **kwargs)
+    # r now is a dict keyed by server_name of tuples usernames,
+    # exception
+
+    retval = 0
+    for server_name, ( _result, exception, ex_tb ) in r.items():
+        if exception != None:
+            msg = str(exception.args[0])
+            if cli_args.traces:
+                logger.error("%s: %s:\n" + "".join(ex_tb), server_name, msg)
+            else:
+                logger.error("%s: %s", server_name, msg)
+
+            retval += 1
+    if return_details:
+        return r
+    if retval == len(r):
+        return 2
+    if retval == 0:
+        return 1
+    return 0
