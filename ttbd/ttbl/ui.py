@@ -173,8 +173,12 @@ def _target(targetid):
     # parse all the inventory to str
     json_d = json.dumps(d, indent = 4)
     who = ttbl.who_create(flask_login.current_user.get_id(), None)
-    acquired = target.target_is_owned_and_locked(who)
-    user_is_guest = who != target.owner_get()
+    if who:
+        acquired = target.target_is_owned_and_locked(who)
+        user_is_guest = who != target.owner_get()
+    else:
+        acquired = False
+        user_is_guest = False
     state = {
         'power': p_state,
         'owner': owner,
