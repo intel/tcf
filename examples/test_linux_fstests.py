@@ -257,6 +257,7 @@ class _test(tcfl.pos.tc_pos_base):
 
         # List which tests we are going to run
         groups = "auto"
+        output = target.shell.run("rm -f configs/localhost.config", output = True)
         output = target.shell.run(f"./check -n -g {groups}", output = True)
         ##
 	## FSTYP         -- ext4
