@@ -101,9 +101,29 @@ def server_allocs_get(_server_name: str, self: tcfl.server_c,
     return r
 
 
-def ls(spec, username: str, parallelization_factor: int = -4,
+def ls(username: str, parallelization_factor: int = -4,
        traces: bool = True):
+    """
+    List all allocations in all known servers
 
+    :param str: username: Name of the user whose allocations are to be
+      removed. The special name *self* refers to the current logged in
+      user for that server.
+
+    :param bool traces: (optional; default *False*) do log trace
+      information when detecting issues.
+
+    :returns dict: dictionary keyed by server URL of allocation
+      data:
+
+      >>> { SERVERNAME: [ { ALLOCID: ALLOCDATA }, EXCEPTION, TB ] }
+
+      *ALLOCDATA* is documented in :func:`server_allocs_get`.
+
+      if a server failed, the allocid dictionary will be empty and
+      *EXCEPTION* and *TB* will be set (see
+      :func:`tcfl.servers.run_fn_on_each_server`).
+    """
     import tcfl.servers
 
     return tcfl.servers.run_fn_on_each_server(
