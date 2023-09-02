@@ -85,7 +85,7 @@ def _cmdline_alloc_ls(cli_args: argparse.Namespace):
                 table.append([
                     allocid,
                     # put state/prio/preempt together
-                    data['state'] + " " + prio,
+                    data['state'] + "\n" + prio,
                     "\n".join(userl),
                     data.get('reason', "n/a"),
                 ])
@@ -124,7 +124,7 @@ def _cmdline_alloc_ls(cli_args: argparse.Namespace):
             columns_available = display_w - 44
             maxcolwidths = [
                 8,
-                8 + 1 + 6,
+                None,
                 int(0.30 * columns_available) - 2,
                 int(0.70 * columns_available) - 2,
             ]
