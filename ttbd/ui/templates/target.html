@@ -44,7 +44,7 @@
         <h4> control panel</h4>
     </div>
     <div class='subsection'>
-    {% if state.owner == g.user %}
+    {% if state.acquired %}
         <button class='release' onclick='js_alloc_remove("{{state.alloc}}")'>release</button>
     {% else %}
         <button class='acquire' onclick='acquire("{{targetid}}")'>acquire</button>
@@ -52,7 +52,7 @@
         <button id='get_inventory' onclick='show_inventory()'>get inventory</button>
     </div>
     <hr>
-    {% if state.owner == g.user %}
+    {% if state.acquired %}
         <div class='subsection'>
             <button onclick='power("{{ targetid }}", "on", "all")'>
                 power on
@@ -218,7 +218,7 @@
           <tr>
             <td>owner:</td>
             <td>
-              {% if state.owner == 'available' %}
+              {% if not state.acquired %}
               <label style='color: green;'>{{ state.owner }}</label>
               {% elif state.owner == g.user %}
               <div class = "tooltip">

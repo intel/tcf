@@ -161,7 +161,7 @@ def _target(targetid):
     d = target.to_dict(list())
 
     # get owner
-    owner = d.get('owner', 'available')
+    owner = target.owner_get()
     # get type
     t =  d.get('type', 'n/a')
     # get alloc info
@@ -172,9 +172,14 @@ def _target(targetid):
 
     # parse all the inventory to str
     json_d = json.dumps(d, indent = 4)
+    who = ttbl.who_create(flask_login.current_user.get_id(), None)
+    acquired = target.target_is_owned_and_locked(who)
+    user_is_guest = who != target.owner_get()
     state = {
         'power': p_state,
         'owner': owner,
+        'acquired': acquired,
+        'user_is_guest': user_is_guest,
         'type': t,
         'mac': _interconnect_values_render(d, "mac_addr", separator = " "),
         'ip': _interconnect_values_render(d, "ipv4_addr", separator = " "),
