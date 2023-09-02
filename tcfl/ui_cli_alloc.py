@@ -188,6 +188,75 @@ def _cmdline_alloc_ls(cli_args: argparse.Namespace):
 
 
 
+
+def _alloc_rm_by_username(server_name: str, server: tcfl.server_c,
+                          cli_args: argparse.Namespace):
+
+    count = tcfl.allocation.rm_server_by_username(
+        server_name, server, cli_args.username)
+    if count == 0:
+        logger.info("removed 0 allocations @%s", server.url)
+    else:
+        logger.warning("removed %s allocations @%s", count, server.url)
+    return count	# return how many we found
+
+
+def _alloc_rm_by_allocid(server_name: str, server: tcfl.server_c,
+                         _cli_args: argparse.Namespace, allocid: str):
+    try:
+        tcfl.allocation.rm_server_by_allocid(server_name, server, allocid)
+        # most likely we'll remove only ONE allocation in ONE server,
+        # so no need to plan for a multicolumn display
+        print(f"allocation '{allocid}' removed from server {server.url}")
+        return 1	# let known we found something
+    except Exception as e:
+        if 'invalid allocation' in str(e):
+            # this might be way too common, as we try to remove in all
+            # servers, so don't bother if invalid, just if we -vv it
+            logger.warning("%s: invalid allocation: %s", server.url, allocid)
+            return 0	# let know we found nothing
+        raise
+
+
+
+def _cmdline_alloc_rm(cli_args: argparse.Namespace):
+    import tcfl.allocation
+    tcfl.allocation.subsystem_setup()
+
+    tcfl.ui_cli.logger_verbosity_from_cli(logger, cli_args)
+    tcfl.servers.subsystem_setup()
+
+    if not tcfl.server_c.servers:
+        logger.error("E: no servers available, did you configure?")
+        return 1
+
+    if cli_args.allocid:
+        retval = 0
+        for allocid in cli_args.allocid:
+            r = tcfl.ui_cli.run_fn_on_each_server(
+                tcfl.server_c.servers,
+                _alloc_rm_by_allocid, cli_args, allocid,
+                return_details = True)
+            # r is a dict keyed by server name of tuples ( retval,
+            # exception, traceback )
+            if all(i[0] == 0 for i in r.values()):
+                logger.error("allocation '%s' not found in any server",
+                             allocid)
+        return retval
+    if cli_args.username:
+        r = tcfl.ui_cli.run_fn_on_each_server(
+            tcfl.server_c.servers,
+            _alloc_rm_by_username, cli_args, return_details = True)
+        if all(i[0] == 0 for i in r.values()):
+            logger.error("no allocations for user found")
+            return 1
+        return 0
+    raise RuntimeError(
+        "need to specify ALLOCIDs or --user USERNAME or --self;"
+        " see --help")
+
+
+
 def cmdline_setup(arg_subparser):
     pass
 
@@ -209,6 +278,31 @@ def cmdline_setup_intermediate(arg_subparser):
         type = float, nargs = "?", const = 1, default = 0,
         help = "Repeat every int seconds (by default, only once)")
     ap.set_defaults(func = _cmdline_alloc_ls)
+
+
+    ap = arg_subparser.add_parser(
+        "alloc-rm",
+        help = "Delete an existing allocation (which might be "
+        "in any state; any targets allocated to said allocation "
+        "will be released")
+    tcfl.ui_cli.args_verbosity_add(ap)
+    ap.add_argument(
+        "--parallelization-factor",
+        action = "store", type = int, default = -4,
+        help = "(advanced) parallelization factor")
+    ap.add_argument(
+        "-u", "--username", action = "store", default = None,
+        help = "Remove allocations by user")
+    ap.add_argument(
+        "-s", "--self", action = "store_const", dest = "username",
+        const = "self",
+        help = "Remove allocations by the logged in user")
+    ap.add_argument(
+        "allocid", metavar = "[SERVER/]ALLOCATIONID", nargs = "*",
+        action = "store", default = [],
+        help = "Allocation IDs to remove")
+    ap.set_defaults(func = _cmdline_alloc_rm)
+
 
 
 def cmdline_setup_advanced(arg_subparser):
