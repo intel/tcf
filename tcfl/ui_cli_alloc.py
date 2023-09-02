@@ -45,7 +45,7 @@ def _cmdline_alloc_ls(cli_args: argparse.Namespace):
         return
 
     allocations = tcfl.allocation.ls(
-        verbosity, cli_args.username,
+        cli_args.username,
         parallelization_factor = cli_args.parallelization_factor,
         traces = cli_args.traces)
 
