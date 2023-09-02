@@ -101,6 +101,53 @@ def server_allocs_get(_server_name: str, self: tcfl.server_c,
     return r
 
 
+
+def rm_server_by_allocid(
+        _server_name: str, server: tcfl.server_c, allocid: str):
+    """
+    Remove an allocation from a server given its ID
+
+    :param str server_name: Server's name
+
+      Note this parameter is mostly ignored; it allows the function to
+      be used with :func:`tcfl.servers.run_for_each_server`.
+
+    :param tcfl.server_c server: Object describing the server
+
+    :param str allocid: Allocation ID
+
+    """
+    server.send_request("DELETE", "allocation/" + allocid)
+
+
+
+def rm_server_by_username(
+        server_name: str, server: tcfl.server_c, username: str):
+    """
+    Remove all allocations in a server owner by a given user
+
+    :param str server_name: Server's name
+
+      Note this parameter is mostly ignored; it allows the function to
+      be used with :func:`tcfl.servers.run_for_each_server`.
+
+    :param tcfl.server_c server: Object describing the server
+
+    :param str: username: Name of the user whose allocations are to be
+      removed. The special name *self* refers to the current logged in
+      user for that server.
+
+    :returns int: number of allocations removed in the server
+    """
+    if username == "self":
+        username = server.logged_in_username()
+    allocids = server_allocs_get(server_name, server, username)
+    for allocid in allocids:
+        rm_server_by_allocid(server_name, server, allocid)
+    return len(allocids)
+
+
+
 def ls(username: str, parallelization_factor: int = -4,
        traces: bool = True):
     """

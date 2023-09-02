@@ -322,98 +322,6 @@ def _cmdline_alloc_targets(args):
                 _delete(rtb, allocid)
 
 
-def _allocs_get(rtb, username):
-    try:
-        r = rtb.send_request("GET", "allocation/")
-    except (Exception, tcfl.ttb_client.requests.HTTPError) as e:
-        logging.error("%s", e)
-        return {}
-    if username:
-        # filter here, as we can translate the username 'self' to the
-        # user we are logged in as in the server
-        _r = {}
-        if username == "self":
-            username = rtb.logged_in_username()
-
-        def _alloc_filter(allocdata, username):
-            if username != None \
-               and username != allocdata.get('creator', None) \
-               and username != allocdata.get('user', None):
-                return False
-            return True
-
-        for allocid, allocdata in r.items():
-            if _alloc_filter(allocdata, username):
-                _r[allocid] = allocdata
-            else:
-                logging.info(f"filtered out {rtb._url} {allocdata}")
-
-        return _r
-    else:
-        return r
-
-
-
-def _cmdline_alloc_delete(args):
-    with msgid_c("cmdline"):
-
-        # we don't know which request is on which server, so we send
-        # it to all the servers
-        def _allocid_delete(allocid):
-
-            try:
-                rtb = None
-                if '/' in allocid:
-                    server_aka, allocid = allocid.split('/', 1)
-                    for rtb in tcfl.ttb_client.rest_target_brokers.values():
-                        if rtb.aka == server_aka:
-                            rtb = rtb
-                            _delete(rtb, allocid)
-                            return
-                    else:
-                        logging.error("%s: unknown server name", server_aka)
-                        return
-                # Unknown server, so let's try them all ... yeah,
-                # collateral damage might happen--but then, you can
-                # only delete yours
-                for rtb in tcfl.ttb_client.rest_target_brokers.values():
-                    _delete(rtb, allocid)
-            except Exception as e:
-                logging.exception("Exception: %s", e)
-
-        def _allocid_delete_by_user(rtb, username):
-
-            try:
-                # translates username == 'self' on its own
-                if username == "self":
-                    username = rtb.logged_in_username()
-                allocs = _allocs_get(rtb, username)
-                for allocid in allocs:
-                    print(f"removed {allocid} @{rtb}")
-                    _delete(rtb, allocid)
-                return
-            except Exception as e:
-                logging.exception("Exception: %s", e)
-
-        threads = {}
-        if args.allocid:
-            tp = tcfl.ttb_client._multiprocessing_pool_c(
-                processes = len(args.allocid))
-            for allocid in args.allocid:
-                threads[allocid] = tp.apply_async(_allocid_delete,
-                                                  (allocid,))
-        elif args.username:
-            tp = tcfl.ttb_client._multiprocessing_pool_c(
-                processes = len(tcfl.ttb_client.rest_target_brokers))
-            for rtb in tcfl.ttb_client.rest_target_brokers.values():
-                threads[rtb] = tp.apply_async(_allocid_delete_by_user,
-                                                  (rtb, args.username,))
-        else:
-            raise RuntimeError(
-                "Need to specify ALLOCIDs or --user USERNAME or --self;"
-                " see --help")
-        tp.close()
-        tp.join()
 
 def _rtb_allocid_extract(allocid):
     rtb = None
@@ -573,26 +481,6 @@ def _cmdline_setup(arg_subparsers):
         action = "store", default = None,
         help = "Target's names, all in the same server")
     ap.set_defaults(func = _cmdline_alloc_targets)
-
-    ap = arg_subparsers.add_parser(
-        "alloc-rm",
-        help = "Delete an existing allocation (which might be "
-        "in any state; any targets allocated to said allocation "
-        "will be released")
-    commonl.argparser_add_aka(arg_subparsers, "alloc-rm", "alloc-del")
-    commonl.argparser_add_aka(arg_subparsers, "alloc-rm", "alloc-delete")
-    ap.add_argument(
-        "-u", "--username", action = "store", default = None,
-        help = "Remove allocations by user")
-    ap.add_argument(
-        "-s", "--self", action = "store_const", dest = "username",
-        const = "self",
-        help = "Remove allocations by the logged in user")
-    ap.add_argument(
-        "allocid", metavar = "[SERVER/]ALLOCATIONID", nargs = "*",
-        action = "store", default = [],
-        help = "Allocation IDs to remove")
-    ap.set_defaults(func = _cmdline_alloc_delete)
 
 
 def _cmdline_setup_intermediate(arg_subparsers):
