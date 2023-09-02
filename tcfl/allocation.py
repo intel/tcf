@@ -27,7 +27,41 @@ logger = logging.getLogger("tcfl.allocation")
 _subsystem_setup = False
 
 
-def _server_allocs_get(_server_name: str, self: tcfl.server_c, username):
+def server_allocs_get(_server_name: str, self: tcfl.server_c,
+                      username: str = None):
+    """
+    List all allocations in a server
+
+    :param str server_name: Server's name
+
+      Note this parameter is mostly ignored; it allows the function to
+      be used with :func:`tcfl.servers.run_for_each_server`.
+
+    :param tcfl.server_c server: Object describing the server
+
+    :param str: username: Name of the user whose allocations are to be
+      removed. The special name *self* refers to the current logged in
+      user for that server.
+
+    :returns dict: dictionary keyed by Allocation ID of allocation
+      data:
+
+      >>> { ALLOCID: ALLOCDATA }
+
+      *ALLOCDATA* is a dictionary keyed by strings of fields and
+      values, fields being:
+
+      - *creator* (str): user who created the allocation
+      - *user* (str): user who owns the allocation
+      - *state* (str):  state the allocation is on
+      - *guests* (list[str]):  list of users who are guests in the allocation
+      - *reason* (str):  reason for the allocation
+      - *target_group* (str):  list of target names in the allocation,
+        sparated by commas
+      - *timestamp* (str): last use timestamp for the allocation in
+        YYYYMMDDHHMMSS format
+
+    """
     try:
         r = self.send_request("GET", "allocation/")
     except (Exception, tcfl.ttb_client.requests.HTTPError) as e:
@@ -73,7 +107,7 @@ def ls(spec, username: str, parallelization_factor: int = -4,
     import tcfl.servers
 
     return tcfl.servers.run_fn_on_each_server(
-        tcfl.server_c.servers, _server_allocs_get, username,
+        tcfl.server_c.servers, server_allocs_get, username,
         parallelization_factor = parallelization_factor,
         traces = traces)
 
