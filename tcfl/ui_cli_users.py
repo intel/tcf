@@ -180,15 +180,19 @@ def _cmdline_login(cli_args: argparse.Namespace):
         parallelization_factor = cli_args.parallelization_factor,
         traces = cli_args.traces)
     # r now is a dict keyed by server_name of tuples usernames,
-    # exception
+    # exception, traceback
     logged_count = 0
-    for server_name, ( r, e ) in r.items():
+    for server_name, ( retval, e, tb ) in r.items():
         server = servers[server_name]
         user, _password = credentials[server.aka]
         if e:
-            logger.error("%s: can't login as %s: exception: %s",
-                         server.url, user, e)
-        elif r:
+            if cli_args.traces:
+                tb = "\n" + "".join(tb)
+            else:
+                tb = ""
+            logger.error("%s: can't login as %s: exception: %s%s",
+                         server.url, user, e, tb)
+        elif retval:
             logged_count += 1
         else:
             logger.error("%s: can't login as %s: bad credentials",
@@ -221,11 +225,15 @@ def _cmdline_logout(cli_args: argparse.Namespace):
         traces = cli_args.traces)
     # r now is a dict keyed by server_name of tuples usernames,
     # exception
-    for server_name, ( _, e ) in r.items():
+    for server_name, ( _, e, tb ) in r.items():
         # we get 401 if we are logged out already...ignore
         if e and getattr(e, "status_code", None) != 401:
-            logger.error("can't log out of %s: %s",
-                         server_name, e)
+            if cli_args.traces:
+                tb = "\n" + "".join(tb)
+            else:
+                tb = ""
+            logger.error("can't log out of %s: %s%s",
+                         server_name, e, tb)
 
 
 
@@ -305,10 +313,14 @@ def _cmdline_user_list(cli_args: argparse.Namespace):
 
     r_unsorted = collections.defaultdict(dict)
     for server_name in sorted(result.keys()):
-        data, e = result[server_name]
+        data, e, tb = result[server_name]
         if e:
-            logging.error("%s: can't get users: %s",
-                          server_name, e)
+            if cli_args.traces:
+                tb = "\n" + "".join(tb)
+            else:
+                tb = ""
+            logging.error("%s: can't get users: %s%s",
+                          server_name, e, tb)
             continue
         for userid, user_data in data.items():
             r_unsorted[userid][server_name] = user_data

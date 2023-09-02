@@ -64,7 +64,7 @@ def _cmdline_alloc_ls(cli_args: argparse.Namespace):
         return
 
     table = []
-    for server_url, ( r, e ) in allocations.items():
+    for server_url, ( r, e, tb ) in allocations.items():
         for allocid, data in r.items():
             userl = []
             user = data.get('user', None)

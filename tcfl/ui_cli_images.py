@@ -307,10 +307,13 @@ def _cmdline_images_flash(cli_args: argparse.Namespace):
             uploads_by_server, targets_by_server,
             parallelization_factor = cli_args.parallelization_factor,
             traces = cli_args.traces)
-        for server_name, ( _uploaded_names, e ) in r.items():
+        for server_name, ( _uploaded_names, e, tb ) in r.items():
             if e != None:
-                tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
-                logger.error(f"{server_name}: can't upload: {e}")
+                if cli_args.traces:
+                    tb = "\n" + "".join(tb)
+                else:
+                    tb = ""
+                logger.error("%s: can't upload: %s%s", server_name, e, tb)
             else:
                 uploaded_names.update(_uploaded_names)
 
