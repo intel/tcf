@@ -58,23 +58,24 @@ def _cmdline_cookies(cli_args: argparse.Namespace):
         servers, _cookies, cli_args,
         parallelization_factor = cli_args.parallelization_factor,
         traces = cli_args.traces)
-    # r now is a dict keyed by server_name of tuples cookies, exception
+    # r now is a dict keyed by server_name of tuples cookies,
+    # exception, traceback
     if cli_args.json:
         d = {}
-        for server_name, ( cookies, _e ) in r.items():
+        for server_name, ( cookies, _e, _tb ) in r.items():
             d[server_name] = cookies
         json.dump(d, sys.stdout, indent = 4)
         print()
     elif cli_args.cookiejar:
         # Follow https://curl.se/docs/http-cookies.html
         # Note we don't keep the TTL field, so we set it at zero
-        for server_name, ( cookies, _e ) in r.items():
+        for server_name, ( cookies, _e, _tb ) in r.items():
             for cookie, value in cookies.items():
                 print(f"{server_name}\tFALSE\t/\tTRUE\t0"
                       f"\t{cookie}\t{value}")
     else:
         d = {}
-        for server_name, ( cookies, _e ) in r.items():
+        for server_name, ( cookies, _e, _tb ) in r.items():
             d[server_name] = cookies
         if len(d) == 1:	# print less info if there is only one
             commonl._dict_print_dotted(d[server_name], separator = ".")
@@ -104,8 +105,8 @@ def _cmdline_servers(cli_args: argparse.Namespace):
             parallelization_factor = cli_args.parallelization_factor,
             traces = cli_args.traces)
         # r now is a dict keyed by server_name of tuples usernames,
-        # exception
-        for server_name, ( username, _e ) in r.items():
+        # exception, traceback
+        for server_name, ( username, _e, _tb ) in r.items():
             usernames[server_name] = username if username else "n/a"
 
     servers_sorted = {}

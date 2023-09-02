@@ -21,6 +21,7 @@ There is no asynchronous method to initialize this module.
 import concurrent.futures
 import logging
 import os
+import traceback
 
 import commonl
 import tcfl.ttb_client		# COMPAT: FIXME remove
@@ -96,20 +97,25 @@ def _run_on_server(server_name, fn, *args,
     # returns a tuple retval, exception
     try:
         server = tcfl.server_c.servers[server_name]
-        return fn(server_name, server, *args, **kwargs), None
+        return fn(server_name, server, *args, **kwargs), None, None
     except Exception as e:
         # don't error this, since this might be handled by upper layers
         logger.warning("%s: exception calling %s: %s",
                        server_name, fn, e, exc_info = traces)
-        return None, e
+        return (
+            None,
+            e,
+            # we can't pickle tracebacks, so we send them as a
+            # formated traceback so we can at least do some debugging
+            traceback.format_exception(type(e), e, e.__traceback__)
+        )
 
 
 def run_fn_on_each_server(servers: dict, fn: callable, *args,
                           serialize: bool = False, traces: bool = False,
                           parallelization_factor: int = -4,
                           **kwargs):
-    """
-    Run a function on each server in parallel
+    """Run a function on each server in parallel
 
     :param callable fn: function with signature
 
@@ -130,6 +136,20 @@ def run_fn_on_each_server(servers: dict, fn: callable, *args,
 
     :param bool traces: (optional, default *True*) if log messages for
       exceptions shall include stack traces.
+
+
+    :returns dict: dictionary keyed by server URL of result information:
+
+       >>> { "SERVER.URL": [ RESULT, EXCEPTION, TRACEBACK ] }
+
+       - *RESULT*: is what the function returned for that server's URL
+         or *None* if it failed (and there is *EXCEPTION* and *TRACEBACK*)
+
+       - *EXCEPTION*: exception object; *None* if there was no exception
+
+       - *TRACEBACK* (list[str]): if there was an exception, a
+          formatted traceback for it (since the traceback object can't
+          be pickled); *None* if there was no exception
     """
 
     processes = min(
