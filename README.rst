@@ -15,9 +15,9 @@ under the terms of the Apache 2.0 licence.
 The test framework provides means to:
 
  - Discover and run one or many units, integration, and end-to-end automated
-  test cases or samples with a single command line; these test cases
-  may need no target (run on the local host) or one or
-  more targets on which to operate.
+   test cases or samples with a single command line; these test cases
+   may need no target (run on the local host) or one or
+   more targets on which to operate.
 
  - Locate, manage, and share target hardware to maximise resource efficiency.
 
@@ -42,12 +42,12 @@ execution.
 The system consists of two parts:
 
  - *tcf*: the client and test runner; this command-line utility is 
-  used to manage the test targets exported by the test target brokers
-  (servers) and to execute test cases on said targets.
+   used to manage the test targets exported by the test target brokers
+   (servers) and to execute test cases on said targets.
 
  - *ttbd*: the server; this manages test targets connected to them,
-  serving as a proxy for the test cases being run by *tcf* on behalf
-  of users.
+   serving as a proxy for the test cases being run by *tcf* on behalf
+   of users.
 
 TCF focuses only on execution, leaving reporting, coverage analysis, and
 etc. to other tools, providing means to feed data into them. It is
