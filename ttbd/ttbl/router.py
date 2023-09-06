@@ -455,7 +455,8 @@ class cisco_c(router_c):
                 f"int {','.join(f'{i}' for i in switch_ports)}",
                 # For untagged traffic use layer2, access can do a
                 # single VLAN
-                f"switchport mode access",
+                "switchport",
+                "switchport mode access",
                 f"switchport access vlan {vlan_id}",
                 # For tagged traffic; disabled for now because we
                 # can't get both untagged and tagged modes to work
