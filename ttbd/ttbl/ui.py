@@ -220,20 +220,20 @@ def _target(targetid):
     target = ttbl.config.targets.get(targetid, None)
     if target is None:
         flask.abort(404, "{targetid} not found in this server")
-    d = target.to_dict(list())
+    inventory = target.to_dict(list())
 
     # get owner
     owner = target.owner_get()
     # get type
-    t =  d.get('type', 'n/a')
+    target_type =  inventory.get('type', 'n/a')
     # get alloc info
-    alloc = d.get('_alloc', {}).get('id', 'none')
+    alloc = inventory.get('_alloc', {}).get('id', 'none')
 
     # get power info
     p_state, p_data, p_substate = target.power._get(target)
 
     # parse all the inventory to str
-    json_d = json.dumps(d, indent = 4)
+    inventory_str = json.dumps(inventory, indent = 4)
     who = ttbl.who_create(flask_login.current_user.get_id(), None)
     if who:
         acquired = target.target_is_owned_and_locked(who)
@@ -241,14 +241,15 @@ def _target(targetid):
     else:
         acquired = False
         user_is_guest = False
+
     state = {
         'power': p_state,
         'owner': owner,
         'acquired': acquired,
         'user_is_guest': user_is_guest,
-        'type': t,
-        'mac': _interconnect_values_render(d, "mac_addr", separator = " "),
-        'ip': _interconnect_values_render(d, "ipv4_addr", separator = " "),
+        'type': target_type,
+        'mac': _interconnect_values_render(inventory, "mac_addr", separator = " "),
+        'ip': _interconnect_values_render(inventory, "ipv4_addr", separator = " "),
         'alloc': alloc,
     }
     # single IPs are at least 16 chars
@@ -279,14 +280,18 @@ def _target(targetid):
 
     # more info about this tuple on the docstring of the function
     # `_get_images_paths`
-    images, paths_for_all_images_types = _get_images_paths(d)
+    images, paths_for_all_images_types = _get_images_paths(inventory)
 
     return flask.render_template(
-        'target.html', targetid = targetid, d = json_d, state = state,
+        'target.html',
+        targetid = targetid,
+        inventory_str = inventory_str,
+        state = state,
         powerls = p_data,
         images = images,
         paths_for_all_images_types = paths_for_all_images_types,
-        buttonls = button_data)
+        buttonls = button_data
+    )
 
 
 
