@@ -384,6 +384,11 @@ def menu_scroll_to_entry(
             else:
                 target.console_tx("\x1b[A")			# press arrow down
             first_scroll = False
+        # alway give some time after scrolling because it takes time
+        # and things get out of sync otherwise; it's annoying, but
+        # there is no good way around it, even if we are expecting and
+        # waiting for the right thing
+        time.sleep(0.25)
 
         skips = 4
         while skips > 0:
@@ -1111,8 +1116,8 @@ def main_menu_expect(target):
             " (eg: F2, F6, F12...)" % target.id,
             dict(target = target))
     for _ in range(10):
-        time.sleep(0.5)
         target.console.write(ansi_key_code(key_main_menu, bios_terminal))
+        time.sleep(0.25)
 
     # This means we have reached the BIOS main menu
     target.report_info("BIOS: confirming we are at toplevel menu")
@@ -1385,6 +1390,9 @@ def boot_network_pxe(target, entry = "UEFI PXEv4.*",
     top = 4
     for cnt in range(top):
         if assume_in_main_menu:
+            # reset expect engine; otherwise we might have back
+            # history and then we are out of sync
+            target.expect("")
             assume_in_main_menu = False
         else:
             main_menu_expect(target)
