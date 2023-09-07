@@ -178,26 +178,26 @@ def _targets():
     for targetid, target in ttbl.config.targets.items():
 
         target = ttbl.config.targets.get(targetid, None)
-        d = target.to_dict(list())
+        inventory = target.to_dict(list())
 
         # TODO this will work once the healthcheck discovers this info
         # disks = d.get('disks', {}).get('total_gib', 'undefined?')
         # ram = d.get('ram', {}).get('size_gib', 'undefined?')
-        owner = d.get('owner', 'available')
+        owner = inventory.get('owner', 'available')
 
-        t =  d.get('type', 'n/a')
-        if t == 'ethernet':
+        target_type =  inventory.get('type', 'n/a')
+        if target_type == 'ethernet':
             continue
 
         # For network fields, collect them and if there is more than
         # one network, prefix the network name
         # FIXME: only if ipv4_addr in fields
-        ipv4_addr = _interconnect_values_render(d, "ipv4_addr")
-        mac_addr = _interconnect_values_render(d, "mac_addr")
+        ipv4_addr = _interconnect_values_render(inventory, "ipv4_addr")
+        mac_addr = _interconnect_values_render(inventory, "mac_addr")
 
         targets[targetid] = {
             'id': targetid,
-            'type': t,
+            'type': target_type,
             'ip': ipv4_addr,
             'mac': mac_addr,
             'owner': owner,
