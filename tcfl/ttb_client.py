@@ -476,8 +476,11 @@ class rest_target_broker(object, metaclass = _rest_target_broker_mc):
             url_request = urllib.parse.urljoin(self._base_url, url)
         logger.debug("send_request: %s %s", method, url_request)
         with self.lock:
-            cookies = self.cookies
-        session = tls_var("session", requests.Session)
+            cookies = dict(self.cookies)
+        # lock keep the sessions per-host/port, otherwise the cookies
+        # will be messed up
+        session = tls_var("session" + self.parsed_url.netloc, requests.Session)
+
         retry_count = -1
         retry_ts = None
         r = None

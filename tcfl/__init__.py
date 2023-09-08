@@ -1848,8 +1848,10 @@ class server_c:
         logger.debug("send_request: %s %s", method, url_request)
         cookies = self.state_load()	# keep' em on self for reference
         with self.lock:
-            self.cookies = dict(cookies)     # to access out of the lock
-        session = tls_var("session", requests.Session)
+            self.cookies = dict(cookies)     # to access out of the
+        # lock keep the sessions per-host/port, otherwise the cookies
+        # will be messed up
+        session = tls_var("session" + self.parsed_url.netloc, requests.Session)
         retry_count = -1
         retry_ts = None
         r = None
