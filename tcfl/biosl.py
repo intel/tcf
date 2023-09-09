@@ -1275,17 +1275,20 @@ def main_boot_select_entry(target, boot_entry):
     # Now we are in the Boot Manager Menu; we need to check if
     # there is a UEFI PXEv4 entry -- if not, it means the network
     # is not enabled, so we have to go enable it
-    r = menu_scroll_to_entry(target, "Boot Manager Menu",
+    # note some places call the menu Boot Manager, others Boot Manager Menu
+    boot_manager_menu_name = target.kws.get('bios.boot_manager_menu_name',
+                                            "Boot Manager Menu")
+    r = menu_scroll_to_entry(target, boot_manager_menu_name,
                              level = "main menu")
     if not r:
         raise tcfl.tc.error_e("BIOS: can't find boot manager menu")
     entry_select(target)			# select it
-    submenu_header_expect(target, "Boot Manager Menu",
+    submenu_header_expect(target, boot_manager_menu_name,
                           canary_end_menu_redrawn = None,
                           timeout = target.kws.get('bios.boot_menu_time', 120))
     max_scrolls = target.kws.get("bios.boot_menu_max_scrolls", 60)
     r = menu_scroll_to_entry(target, boot_entry,
-                             level = "Boot Manager Menu",
+                             level = boot_manager_menu_name,
                              # yeah, some destinations have a lot...
                              max_scrolls = max_scrolls)
     if r:
