@@ -597,6 +597,28 @@ class interface(ttbl.tt_interface):
             estimated_duration = max(impl.estimated_duration, estimated_duration)
             check_period = min(impl.check_period, check_period)
             all_images += images.keys()
+            for image_name, filename in images.items():
+                # Ensure the files are accessile
+                #
+                # For files that are in automount directories, and for
+                # tools that don't really access them properly, this
+                # kinda tries a few times
+                last_e = None
+                for count in range(1, 4):
+                    try:
+                        os.stat(filename)
+                        break
+                    except Exception as e:
+                        target.log.error(
+                            "%s: can't find %s to flash in %s: retrying %s/4",
+                            target.id, image_name, filename, count)
+                        last_e = e
+                        time.sleep(count * 0.2)	# give automounters some time
+                else:
+                    target.log.error(
+                        "%s: can't find %s to flash in %s (gave up)",
+                        target.id, image_name, filename)
+                    raise last_e
             target.log.info("%s: flashing %s", target.id, image_names[impl])
             impl.flash_start(target, images, context)
 
