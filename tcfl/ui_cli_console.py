@@ -193,7 +193,16 @@ class _console_reader_c:
                     f_write_retry_eagain(self.fd, line.encode('utf-8'))
                     if '\n' in line:
                         f_write_retry_eagain(self.fd, b"\r")
-            self.fd.flush()
+            for count in range(10):
+                try:
+                    self.fd.flush()
+                    break
+                except:
+                    # sometime we get flush exceptions, just retry
+                    time.sleep(0.25)
+            else:
+                logging.error("CLI-UI: BUG, wasn't able to flush;"
+                              " some data might be missing")
             data_len = len(data)
 
         if data_len == 0:
