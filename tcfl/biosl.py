@@ -210,6 +210,7 @@ def entry_select(target, wait = 0.5):
     # select entries
     time.sleep(wait)
     target.console_tx("\r")
+    time.sleep(wait)
 
 def menu_scroll_to_entry(
         target, entry_string, has_value = False,
@@ -371,6 +372,7 @@ def menu_scroll_to_entry(
     # we just go back and go fo
     first_scroll = True
     for _ in range(max_scrolls):
+        time.sleep(0.25)
         if first_scroll != True:
             if _direction:
                 # FIXME: use get_key() -- how do we pass the terminal encoding?
@@ -420,11 +422,13 @@ def menu_scroll_to_entry(
                 # scroll up and try again; we don't try to go up and
                 # down because it confuses the state machine.
                 skips += 0.5
+                time.sleep(0.25)
                 if _direction:
                     # FIXME: use get_key() -- how do we pass the terminal encoding?
                     target.console_tx("\x1b[B")			# press arrow up
                 else:
                     target.console_tx("\x1b[A")			# press arrow down
+                time.sleep(0.25)
                 continue
             # the key always matches spaces all the way to the end, so it
             # needs to be stripped
@@ -765,10 +769,12 @@ def multiple_entry_select_one(
     last_seen_entry = None
     last_seen_entry_count = 0
     for toggle in range(0, max_scrolls):
+        time.sleep(0.25)
         if _direction:
             target.console_tx("\x1b[A")			# press arrow up
         else:
             target.console_tx("\x1b[B")			# press arrow down
+        time.sleep(0.25)
 
         target.report_info("BIOS: %s: waiting for highlighted entry" % level)
         # wait for highlighted then give it a breather to send the rest
@@ -784,8 +790,11 @@ def multiple_entry_select_one(
                 "BIOS: %s: %s: didn't find a highlighted entry, retrying"
                 % (level, select_entry))
             # tickle it
+            time.sleep(0.25)
             target.console_tx("\x1b[A")			# press arrow up
+            time.sleep(0.25)
             target.console_tx("\x1b[B")			# press arrow down
+            time.sleep(0.25)
         else:
             # nothing found, raise it
             raise tcfl.tc.error_e(
@@ -836,7 +845,9 @@ def menu_escape_to_main(target, esc_first = True):
 
     max_levels = 10	# FIXME: BIOS profile?
     if esc_first:
+        time.sleep(0.25)
         target.console_tx("\x1b")
+        time.sleep(0.25)
     #
     # We look for the Move Highlight marker that is printed at the end
     # of each menu; when we find that, then we look to see if what
@@ -867,7 +878,14 @@ def menu_escape_to_main(target, esc_first = True):
             target.report_info(
                 "BIOS: escaping to main, pressing ESC after timeout %d/%d"
                 % (level, max_levels))
+            time.sleep(0.25)
             target.console_tx("\x1b")
+            time.sleep(0.25)
+            # tickle it
+            target.console_tx("\x1b[A")			# press arrow up
+            time.sleep(0.25)
+            target.console_tx("\x1b[B")			# press arrow down
+            time.sleep(0.25)
             continue
         read = target.console.read(offset = offset)
         # then let's see if all the main menu entries are there
@@ -881,7 +899,9 @@ def menu_escape_to_main(target, esc_first = True):
         offset = target.console.size()
         target.report_info("BIOS: escaping to main, pressing ESC %d/%d"
                            % (level, max_levels))
+        time.sleep(0.25)
         target.console_tx("\x1b")
+        time.sleep(0.25)
 
     # nothing found, raise it
     raise tcfl.tc.error_e(
@@ -920,6 +940,7 @@ def dialog_changes_not_saved_expect(target, action):
     # let's be patient
     time.sleep(0.5)
     target.console_tx(action)
+    time.sleep(0.25)
 
 
 def menu_config_network_enable(target):
@@ -952,7 +973,9 @@ def menu_config_network_enable(target):
     # sic, different versions have differnt values, Disable vs Disabled vs ...
     if b"Disable" not in value:
         target.report_info("BIOS: %s: already enabled (%s)" % (entry, value))
+        time.sleep(0.25)
         target.console_tx("\x1b")	# ESC one menu up
+        time.sleep(0.25)
         return False
 
     target.report_info("BIOS: %s: enabling (was: %s)" % (entry, value))
@@ -1003,7 +1026,9 @@ def menu_config_network_disable(target):
     # sic, different versions have differnt values, Disable vs Disabled vs ...
     if b"Enable" not in value:
         target.report_info("BIOS: %s: already disabled (%s)" % (entry, value))
+        time.sleep(0.25)
         target.console_tx("\x1b")	# ESC one menu up
+        time.sleep(0.25)
         return False
     target.report_info("BIOS: %s: disabling (was: %s)" % (entry, value))
     # it's enabled, let's disable
@@ -1015,7 +1040,9 @@ def menu_config_network_disable(target):
     # hit F10 to save -- this way we don't have to deal with the
     # "changes not saved" dialog, which is very error prone
     # Need to hit ESC twice to get the "save" menu
+    time.sleep(0.25)
     target.console_tx("\x1b\x1b")
+    time.sleep(0.25)
     # Need to hit ESC twice to get the "save" menu
     bios_terminal = target.kws.get("bios.terminal_emulation", "vt100")
     target.console.write(ansi_key_code("F10", bios_terminal))
@@ -1253,7 +1280,9 @@ def boot_network_http_boot_add_entry(target, entry, url):
     bios_terminal = target.kws.get("bios.terminal_emulation", "vt100")
     target.console_tx(ansi_key_code("F10", bios_terminal))
     target.expect("Press 'Y' to save and exit")
+    time.sleep(0.25)
     target.console_tx("y")
+    time.sleep(0.25)
 
 
 def main_boot_select_entry(target, boot_entry):
