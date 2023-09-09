@@ -1120,6 +1120,21 @@ def target_qemu_pos_add(target_name,
         bsps = dict(
             x86_64 = dict(linux = True),
         ),
+        "bios.terminal_emulation": "vt100",
+        "bios.boot_time": 20,
+        # Well, QEMU spews this on the setial port when it boots, so good enough
+        "bios.boot_prompt": "\\x1b\\[2J\\x1b\\[01;01H\\x1b\\[=3h\\x1b\\[2J\\x1b\\[01;01H\\x1b\\[0m\\x1b\\[35m\\x1b\\[40m\\x1b\\[0m\\x1b\\[37m\\x1b\\[40m",
+        "bios.boot_prompt_report_backlog": 500,
+        "bios.boot_key_main_menu": "F2",
+        # note this matches the name in bios.main_level_entries.2
+        "bios.boot_manager_menu_name": "Boot Manager",
+        # watch out, these look slightly different than those of
+        # EDKII standard
+        "bios.main_level_entries.1": "Device Manager",
+        "bios.main_level_entries.2": "Boot Manager",
+        "bios.main_level_entries.3": "Boot Maintenance Manager",
+        "bios.main_level_entries.4": "Continue",
+        "bios.main_level_entries.5": "Reset",
     )
     if tags_extra:
         assert isinstance(tags_extra, dict), \
