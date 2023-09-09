@@ -633,6 +633,12 @@ def submenu_header_expect(
     wider or narrower or depending on the dialog or full  width (for a
     submenu).
 
+    However is not that easy, because depending on the terminal/BIOS
+    (eg: QEMU), it might use other chars (eg: 0xc4 instead of -) and
+    no \\ or /... so we need to stick to just look for the row of
+    ----- or (0xc40xc40xc40xc40xc40xc4)
+
+
     This function waits for the header to show up.
 
     :param tcfl.tc.target_c target: target on which to operate (uses
@@ -658,8 +664,8 @@ def submenu_header_expect(
         menu_name = menu_title
     else:
         assert isinstance(menu_title, str)
-    start_of_menu = re.compile(br"/-+\\")
-    end_of_menu = re.compile(br"\-+/")
+    start_of_menu = re.compile(br"(----+|\xc4\xc4\xc4\xc4+)")
+    end_of_menu = re.compile(br"(----+|\xc4\xc4\xc4\xc4+)")
     target.expect(start_of_menu,
                   name = menu_name + ":menu-box-start",
                   timeout = timeout)
