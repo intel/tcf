@@ -1074,8 +1074,11 @@ def bios_boot_expect(target):
     # FIXME: move to BIOS profile
     assert isinstance(target, tcfl.tc.target_c)
 
+    bios_boot_time = target.kws.get('bios.boot_time', 180)
+
     ts0 = time.time()
-    target.report_info("BIOS: waiting for main menu after power on")
+    target.report_info("BIOS: waiting for main menu after power on"
+                       f" (up to {bios_boot_time}s)")
     boot_prompt = target.kws.get("bios.boot_prompt",
                                  target.kws.get("bios_boot_prompt", None))
     if boot_prompt == None:
@@ -1094,7 +1097,7 @@ def bios_boot_expect(target):
                   # time reporting we miss the rest
                   report = report_backlog,
                   # can take a long time w/ some BIOSes
-                  timeout = target.kws.get('bios.boot_time', 180))
+                  timeout = bios_boot_time)
     target.report_data("Boot statistics %(type)s", "BIOS boot time (s)",
                        time.time() - ts0)
 
