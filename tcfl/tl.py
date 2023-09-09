@@ -473,6 +473,8 @@ def linux_ifname_by_mac(target, mac_addr: str) -> str:
 
     :raises tcfl.error_e: if MAC address not found
     """
+    assert isinstance(mac_addr, str), \
+        f"mac_addr: expected str, got {type(mac_addr)}"
     # ip -o link
     ##1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN mode DEFAULT group default qlen 1000\    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
     ##2: enp1s0: <NO-CARRIER,BROADCAST,MULTICAST,UP> mtu 1500 qdisc mq state DOWN mode DEFAULT group default qlen 1000\    link/ether 98:4f:ee:00:68:51 brd ff:ff:ff:ff:ff:ff
