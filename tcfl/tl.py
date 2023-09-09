@@ -82,9 +82,10 @@ def ansi_render_approx(s, width = 80, height = 2000):
     return r
 
 
-def ipxe_sanboot_url(target, sanboot_url, dhcp = None):
-    """
-    Use iPXE to sanboot a given URL
+def ipxe_sanboot_url(target, sanboot_url, dhcp = None,
+                     power_cycle: bool = True,
+                     precommands: list = None):
+    """Use iPXE to sanboot a given URL
 
     Given a target than can boot iPXE via a PXE boot entry (normally
     in EFI), drive it to boot iPXE and iPXE to load a sanboot URL so
@@ -92,7 +93,7 @@ def ipxe_sanboot_url(target, sanboot_url, dhcp = None):
 
     This is also used in :ref:`the iPXE Sanboot<example_efi_pxe_sanboot>`.
 
-    Requirements: 
+    Requirements:
 
     - iPXE: must have Ctrl-B configured to allow breaking into the
       console
@@ -110,15 +111,25 @@ def ipxe_sanboot_url(target, sanboot_url, dhcp = None):
       If *None*, the default is taken from the machine's inventory
       *ipxe.dhcp* setting, which defaults to *True* if not present.
 
+    :param bool power_cycle: (optional; default *True*) do power cycle
+      the target before starting; if *False*, it is assumed the target
+      is power cycled and in the BIOS main menu.
+
+    :param list[str] precomands: list of pre-commands to run before
+      launching
+
+      >>> ( "set server 192.34.12.1" )
     """
-    target.power.cycle()
+    if power_cycle:
+        target.power.cycle()
 
     boot_ic = target.kws['pos_boot_interconnect']
     mac_addr = target.kws['interconnects'][boot_ic]['mac_addr']
     tcfl.biosl.boot_network_pxe(
         target,
         # Eg: UEFI PXEv4 (MAC:4AB0155F98A1)
-        r"UEFI PXEv4 \(MAC:%s\)" % mac_addr.replace(":", "").upper().strip())
+        r"UEFI PXEv4 \(MAC:%s\)" % mac_addr.replace(":", "").upper().strip(),
+        assume_in_main_menu = not power_cycle)
 
     # can't wait also for the "ok" -- debugging info might pop in th emiddle
     target.expect("iPXE initialising devices...")
@@ -219,6 +230,10 @@ def ipxe_sanboot_url(target, sanboot_url, dhcp = None):
             target.shell.run("set %s/netmask %s" % (ifname, kws['ipv4_netmask']))
             target.shell.run("ifopen " + ifname)
 
+        if precommands:
+            for precommand in precommands:
+                target.shell.run(precommand)
+
         if sanboot_url == "skip":
             target.report_skip(
                 "not sanbooting since 'skip' was given as sanboot_url")
@@ -228,7 +243,7 @@ def ipxe_sanboot_url(target, sanboot_url, dhcp = None):
             target.send("sanboot %s" % sanboot_url)
     finally:
         target.shell.prompt_regex = prompt_orig
-    
+
 
 #! Place where the Zephyr tree is located
 # Note we default to empty string so it can be pased
