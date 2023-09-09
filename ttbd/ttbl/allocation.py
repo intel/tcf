@@ -237,8 +237,10 @@ class allocation_c(commonl.fsdb_symlink_c):
         if targets:
             _run(targets.values(), False)
 
-    def set(self, key, value, force = True):
-        return commonl.fsdb_symlink_c.set(self, key, value, force = force)
+    def set(self, *args, force = True, **kwargs):
+        # we default to forcing
+        return commonl.fsdb_symlink_c.set(
+            self, *args, force = force, **kwargs)
 
     def state_set(self, new_state):
         """
