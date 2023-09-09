@@ -856,8 +856,8 @@ def menu_escape_to_main(target, esc_first = True):
     for entry in main_level_entries:
         regexl.append("\[[0-9]+;[0-9]+H" + entry)
     main_menu_regex = re.compile(".*".join(regexl))
+    offset = target.console.size()
     for level in range(max_levels):
-        offset = target.console.size()
         # All menus print this after printing, so this is how we know
         # the menu has redrawn
         try:
@@ -878,6 +878,7 @@ def menu_escape_to_main(target, esc_first = True):
             # we don't do this, things dont' sync up properly
             time.sleep(5)
             return
+        offset = target.console.size()
         target.report_info("BIOS: escaping to main, pressing ESC %d/%d"
                            % (level, max_levels))
         target.console_tx("\x1b")
