@@ -25,13 +25,22 @@
         <th>target</td>
         <th>user</td>
         <th>priority</td>
-        <th>actions</td>
       </tr>
     </thead>
     <tbody>
         {% for k, v in allocs.items() %}
-            <tr>
-                <td>{{ k }}</td>
+        <tr>
+
+                <td>
+                  <div class = "tooltip">
+                    {# FIXME: we need fixed font on this one #}
+                    <a href = "{{v.server_url}}/allocation/{{ k }}">{{ k }}</a>
+                    <span class = "tooltiptext">
+                      Manipulate this allocation and/or targets
+                    </span>
+                  </div>
+                </td>
+
                 {% if v.state == 'active'%}
                     <td style='color: green;'>{{ v.state }}</td>
                 {% else %}
@@ -74,21 +83,6 @@
                 </td>
                 
                 <td>{{v.priority}}</td>
-                <td>
-                    <!-- FIXME: to save horizonzal space, replace with
-                         a trashcan icon next to the ALLOCID in col
-                         #1? ask to confirm to avoid confusions -->
-                    <button class='acquire' onclick='js_alloc_remove("{{k}}")'>remove</button>
-                    <!-- FIXME: replace with a hyperlink on the ALLOCID in col #1? -->
-                    <button>control panel</button>
-                    <!-- FIXME: in general, we could replace most
-                         fields in tables that are going to be long
-                         with two fields fieldname and fieldname_short
-                         so that fieldname is displayed in a tooltip
-                         and fieldname_short is always displayed and
-                         this way tables would be consistently in
-                         size? -->
-                </td>
             </tr>
         {% endfor %}
     </tbody>

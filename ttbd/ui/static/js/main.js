@@ -189,6 +189,116 @@ async function js_buttons(targetid, action, component) {
     window.location.reload()
 }
 
+function common_error_check(r) {
+
+    if (r.status == 401) {
+        alert(
+            'oops, seems that you are not logged in. Please log in to' +
+            ' acquire machines (top right corner)'
+        );
+        return true
+    }
+
+    if (!r.ok) {
+        alert(
+            'something went wrong: ' + response_text
+        );
+        $('#loading').empty();
+        $('#loading').append(
+            '<b><label style="color: red;">FAIL</label></b>'
+        );
+        window.location.reload();
+        return true
+    }
+
+    return false
+}
+
+
+/*
+* Remove a guest from an allocation
+*
+* @param {allocid} str -> allocation from which to remove the guest
+* @param {selector_id} str -> select tag html id which selected the user
+*
+* return {void}
+*/
+async function js_alloc_guest_add(allocid, input_field_id) {
+
+    $('.diagnostics').empty();
+
+    // the selector_id element in the HTML document has picked up something
+    let input_field_item = document.getElementById(input_field_id);
+    console.log('DEBUG 1')
+    if (input_field_item == null) {
+        // this means do nothing
+        return
+    }
+    console.log('DEBUG 2')
+    let user_name = input_field_item.value;
+
+    console.log('DEBUG user_name is ' + user_name)
+
+    let r = await fetch('/ttb-v2/allocation/' + allocid + '/' + user_name, {
+        method: 'PATCH',
+    });
+
+    if (common_error_check(r)) {
+        return
+    }
+
+    $('#loading').empty();
+    $('#loading').append(
+        '<b><label style="color: green;">SUCCESS</label></b>'
+    );
+
+    window.location.reload()
+}
+
+
+/*
+* Remove a guest from an allocation
+*
+* @param {allocid} str -> allocation from which to remove the guest
+* @param {selector_id} str -> select tag html id which selected the user
+*
+* return {void}
+*/
+async function js_alloc_guest_remove(allocid, selector_id) {
+
+    $('.diagnostics').empty();
+
+    // the selector_id element in the HTML document has picked up something
+    let selected_item = document.getElementById(selector_id);
+    if (selected_item == null) {
+        // this means do nothing
+        return
+    }
+    let user_name = selected_item.value;
+
+    if (user_name.value == 'None') {
+        // this means do nothing
+        return
+    }
+
+    let r = await fetch('/ttb-v2/allocation/' + allocid + '/' + user_name, {
+        method: 'DELETE',
+    });
+
+    if (common_error_check(r)) {
+        return
+    }
+
+    $('#loading').empty();
+    $('#loading').append(
+        '<b><label style="color: green;">SUCCESS</label></b>'
+    );
+
+    window.location.reload()
+}
+
+
+
 /*
 * make a flashing call given a version and an image type
 *

@@ -68,6 +68,7 @@ import logging
 import json
 import os
 import packaging.version
+import werkzeug
 
 import flask
 import flask_login
@@ -110,6 +111,14 @@ image_suffix = {}
 #: >>>     '/my/cool/images/of/type/%(type)s',
 #: >>> ]
 image_path_prefixes = []
+
+
+# FIXME: need to unify this, since ttbd uses it too
+def flask_logi_abort(http_code, message, **kwargs):
+    logging.info(message, **kwargs)
+    response = flask.jsonify({ "_message": message })
+    response.status_code = http_code
+    raise werkzeug.exceptions.HTTPException(response = response)
 
 
 
@@ -300,6 +309,47 @@ def _target(targetid):
         paths_for_all_images_types = paths_for_all_images_types,
         buttonls = button_data
     )
+
+
+
+@bp.route('/allocation/<allocid>', methods = ['GET'])
+def _allocation(allocid):
+    # render the allocation control panel
+    calling_user = flask_login.current_user._get_current_object()
+    with ttbl.allocation.audit("ui/allocation/get",
+               calling_user = calling_user,
+               request = flask.request,
+               allocid = allocid):
+        try:
+            allocdb = ttbl.allocation.get_from_cache(allocid)
+            if not allocdb.check_query_permission(calling_user):
+                # FIXME: this should be a render of a template?
+                flask_logi_abort(400, f"{calling_user} not allowed")
+
+            # we'll collect stuff here to send up to the Jinja2 renderer
+            state = {
+                "creator": allocdb.get("creator"),
+                "owner": allocdb.get("owner"),
+                "user": calling_user.get_id(),
+                "user_is_guest": allocdb.check_userid_is_guest(
+                    calling_user.get_id()),
+                "user_is_owner_creator_admin": \
+                allocdb.check_user_is_user_creator(calling_user) \
+                or allocdb.check_user_is_admin(calling_user),
+            }
+            guests = []
+            for guest in allocdb.guest_list():
+                if guest:
+                    guests.append(guest)
+
+            return flask.render_template(
+                'allocation.html',
+                allocid = allocid, state = state, guests = guests)
+
+        except Exception as e:
+            flask_logi_abort(
+                400, f"exception rendering /ui/allocation/{allocid}: {e}",
+                exc_info = True)
 
 
 
