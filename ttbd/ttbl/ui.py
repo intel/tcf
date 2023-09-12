@@ -27,30 +27,11 @@ rendering them. Images can have a lot of formats, so in order to add this layer
 of flexibility you can add some variables to the configuration that will help
 with this.
 
-- suffixes:
-    `ttbl.ui.image_suffix`:dict
-    image files can have suffixes that the image type does not include, say you
-    have a firmware binary named `bios.img` but the image type is listed as
-    `bios` in the inventory. You can create a dict in the config to solve this
-    issue. Where the key is the image type and the value is the file suffix you
-    want to add.
+- see :data:`image_sufix` for how to tweak suffixes when flashing
+  firmwares
 
-    >>> ttbl.ui.image_suffix = {
-    >>>     'fw': '.dd',
-    >>>     'os': '.iso',
-    >>> }
-
-- path prefixes:
-    `ttbl.ui.image_path_prefixes`: list
-    you can have your images almost anywhere in your file directory, this list
-    of paths helps ttbd daemon to know where to look. This supports keyword
-    expansion meaning you can have dynamic fields from the inventory in your
-    path string.
-
-    >>> ttbl.ui.image_path_prefixes = [
-    >>>     '/some/path/%(type)s',
-    >>>     '/my/cool/images/of/type/%(type)s',
-    >>> ]
+- see :data:`image_path_prefixes` for how to twek where to get images
+  for flashing firmwares
 
 - different versions of the same type of image:
     `ttbl.ui.keywords_to_ignore_when_path`: list
@@ -102,6 +83,33 @@ API_PATH = "/ttb-v"
 API_PREFIX = API_PATH + str(API_VERSION) + "/"
 
 bp = flask.Blueprint('ui', __name__, url_prefix = API_PREFIX  + '/ui')
+
+
+#: Image files can have suffixes that the image type does not include, say you
+#: have a firmware binary named `bios.img` but the image type is listed as
+#: `bios` in the inventory. You can create a dict in the config to solve this
+#: issue. Where the key is the image type and the value is the file suffix you
+#: want to add.
+#:
+#: >>> ttbl.ui.image_suffix = {
+#: >>>     'fw': '.dd',
+#: >>>     'os': '.iso',
+#: >>> }
+image_suffix = {}
+
+
+#: Where do we find image files
+#:
+#: You can have your images almost anywhere in your file directory, this list
+#: of paths helps ttbd daemon to know where to look. This supports keyword
+#: expansion meaning you can have dynamic fields from the inventory in your
+#: path string.
+#:
+#: >>> ttbl.ui.image_path_prefixes = [
+#: >>>     '/some/path/%(type)s',
+#: >>>     '/my/cool/images/of/type/%(type)s',
+#: >>> ]
+image_path_prefixes = []
 
 
 
