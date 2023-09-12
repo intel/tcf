@@ -45,12 +45,12 @@
         <h4> control panel</h4>
     </div>
     <div class='subsection'>
-    {% if state.user_is_guest %}
-        <button class='release' onclick='js_alloc_remove("{{state.alloc}}")'>remove guest</button>
-    {% elif state.acquired %}
-        <button class='release' onclick='js_alloc_remove("{{state.alloc}}")'>release</button>
-    {% else %}
+    {% if not state.acquired %}
         <button class='acquire' onclick='acquire("{{targetid}}")'>acquire</button>
+    {% elif state.user_is_guest %}
+        <button class='release' onclick='js_alloc_remove("{{state.alloc}}")'>remove guest</button>
+    {% else %}
+        <button class='release' onclick='js_alloc_remove("{{state.alloc}}")'>release</button>
     {% endif %}
         <button id='get_inventory' onclick='show_inventory()'>get inventory</button>
     </div>
