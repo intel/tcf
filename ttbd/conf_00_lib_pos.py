@@ -1115,9 +1115,9 @@ def target_qemu_pos_add(target_name,
         ( "x86_64", qemu_pc )
     ))
 
-    tags = dict(
-        bsp_models = { 'x86_64': None },
-        bsps = dict(
+    tags = {
+        "bsp_models": { 'x86_64': None },
+        "bsps": dict(
             x86_64 = dict(linux = True),
         ),
         "bios.terminal_emulation": "vt100",
@@ -1135,7 +1135,7 @@ def target_qemu_pos_add(target_name,
         "bios.main_level_entries.3": "Boot Maintenance Manager",
         "bios.main_level_entries.4": "Continue",
         "bios.main_level_entries.5": "Reset",
-    )
+    }
     if tags_extra:
         assert isinstance(tags_extra, dict), \
             "tags_extra: expected dict, got {type(tags_extra)}"
