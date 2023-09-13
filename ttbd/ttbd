@@ -1339,19 +1339,24 @@ def _target_interface(target_id, interface, call):
             with log_to_str_too(target.log, iostr):
                 method_name = flask.request.method.lower() + "_" + call
                 method = getattr(iface, method_name, None)
-                component = flask.request.form.get('component', None)
-                audit_record.kws.update(flask.request.form)
+                # we support getting arguments both from the URL and a
+                # form, with URL taking precendence
+                args = {}
+                args.update(flask.request.form.items())    # FORM
+                args.update(flask.request.args.items())    # URL
+                component = args.get('component', None)
+                audit_record.kws.update(args)
                 audit_record.kws['files'] = [ i for i in flask.request.files.keys() ]
                 if method:
                     result = method(
                         target, who_make(ticket),
                         # https://flask.palletsprojects.com/en/1.1.x/patterns/fileuploads/
-                        flask.request.form, flask.request.files,
+                        args, flask.request.files,
                         user_path)
                     iface.assert_return_type(
                         result, dict, target,
                         ttbl.tt_interface.arg_get(
-                            flask.request.form, 'component', str, True, None),
+                            args, 'component', str, True, None),
                         method_name, none_ok = False)
                 else:
                     result = iface.request_process(
@@ -1359,7 +1364,7 @@ def _target_interface(target_id, interface, call):
                         flask.request.method,
                         call,
                         # https://flask.palletsprojects.com/en/1.1.x/patterns/fileuploads/
-                        flask.request.form, flask.request.files,
+                        args, flask.request.files,
                         user_path)
             assert isinstance(result, dict), \
                 "BUG: %s: request_process() did not return a dictionary" \
