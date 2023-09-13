@@ -334,8 +334,8 @@ class channel_c(ttbl.power.daemon_c, ttbl.capture.impl_c):
 
         self.channell = []
         for channel, data in channels.items():
-            assert isinstance(channel, int) and channel > 0 and channel <= 10, \
-                "channel: channel descriptor has to be an integer 0-10," \
+            assert isinstance(channel, int) and channel >= 0 and channel <= 9, \
+                "channel: channel descriptor has to be an integer 0-9," \
                 " got %s" % type(channel)
             # matches ttbd/noyito-capture.py.transform.mode
             # verify mode and name
