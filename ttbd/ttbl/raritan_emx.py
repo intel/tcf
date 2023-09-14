@@ -218,7 +218,23 @@ class pci(ttbl.power.impl_c, ttbl.capture.impl_c): # pylint: disable = abstract-
         # So we call getState by hand (from
         # raritan/Interface.py:Interface.Method) and we extract the
         # value manually.
-        r = self._outlet.getState().powerState
+        try:
+            r = self._outlet.getState().powerState
+        except KeyError as e:
+            # this happens on some PDUs (older?) where we get an exception like
+            #
+            ##   File "/usr/lib/python3.9/site-packages/ttbl/raritan_emx.py", line 221, in get
+            ##     r = self._outlet.getState().powerState
+            ##   File "/usr/lib/python3.9/site-packages/raritan/rpc/Interface.py", line 13, in __call__
+            ##     return self.decode(rsp, self.parent.agent)
+            ##   File "/usr/lib/python3.9/site-packages/raritan/rpc/pdumodel/__init__.py", line 3640, in decode
+            ##     _ret_ = raritan.rpc.pdumodel.Outlet.State.decode(rsp['_ret_'], agent)
+            ##   File "/usr/lib/python3.9/site-packages/raritan/rpc/pdumodel/__init__.py", line 3350, in decode
+            ##     isLoadShed = json['isLoadShed'],
+            ## KeyError: 'isLoadShed'
+            obj = self._outlet.getState
+            result = obj.parent.agent.json_rpc(obj.parent.target, obj.name, {})
+            r = result['_ret_']['powerState']
 
         if r == raritan.rpc.pdumodel.Outlet.PowerState.PS_OFF:
             return False
