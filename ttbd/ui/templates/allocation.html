@@ -31,109 +31,167 @@ ttbd's /ttb-v2/ui/allocation.
 <script>hljs.highlightAll();</script>
 
 <div class='main'>
-  <div class='column-main tile'>
-    <h2>Control panel for allocation <i>{{allocid}}</i></h2>
-
-    <div class='toolbox'>
-
-      <div class='subsection'>
-
+<div class='column-main tile'>
+  <h2>Control panel for allocation <i>{{allocid}}</i></h2>
+  <details>
+    <summary>Protip!</summary>
+    <small>
+        Hover over the buttons to see what each one does!
+    </small>
+  </details>
+  <div class='toolbox'>
         {% if state.user_is_guest %}
-        <div class = "tooltip">
-          <button class = 'release' onclick = 'js_alloc_remove("{{allocid}}")'>
-            remove myself as guest
-          </button>
-          <span class = "tooltiptext">
-            You ({{ state.user }}) are a <b>guest</b> in this
-            allocation.
-            <p>You can remove yourself as a guest but you cannot
-              remove the allocation; that can only be done by its owner
-              ({{ state.owner }}), creator ({{ state.creator }}) or an
-              admin.</p>
-            <p>On the command line, you can use:
-              <pre><code class="language-bash">$ tcf guest-rm {{ state.user }}</code></pre>
+          <div class='subsection'>
+            <p>
+                You ({{ state.user }}) are a <b>guest</b> in this
+                allocation.
             </p>
-          </span>
-        </div>
+          </div>
+
+          <div class='subsection'>
+            <div class="tooltip">
+
+                <button class='release' onclick='js_alloc_remove("{{allocid}}")'>
+                    remove myself as guest
+                </button>
+
+                <span class = "tooltiptext">
+                    You ({{ state.user }}) are a <b>guest</b> in this
+                    allocation.
+                    <p>
+                        You can remove yourself as a guest but you cannot
+                        remove the allocation; that can only be done by its owner
+                        ({{ state.owner }}), creator ({{ state.creator }}) or an
+                        admin.
+                    </p>
+                    <p>
+                        On the command line, you can use:
+                        <pre><code class="language-bash">$ tcf guest-rm {{ state.user }}
+                        </code></pre>
+                    </p>
+                </span>
+            </div>
+          </div>
         {% endif %}
 
         {% if state.user_is_owner_creator_admin %}
-        <div class = "tooltip">
-          {# FIXME: this should be in red!!! kinda DANGER zone #}
-          <button class = 'release' onclick = 'js_alloc_remove("{{allocid}}")'>
-            release allocation
-          </button>
-          <span class = "tooltiptext">
-            Removes this allocation, freeing all the targets under it.
-            <p><b>THIS OPERATION CANNOT BE UNDONE.</b></p>
-            <p>Neither you nor guests will no longer have access to the
-              targets and they might be powered off or reinitialized by
-              someone else that allocates them.</p>
-            <p>You can do this because you are either an
-              administrator, the owner or the creator of the
-              allocation.</p>
-            <p>On the command line, you can use:
-              <pre><code class="language-bash">$ tcf alloc-rm {{allocid }}</code></pre>
-            </p>
-          </span>
-        </div>
+          <div class='subsection'>
+            <p> You are an owner on this allocation </p>
+          </div>
+          <div class='subsection'>
+            <div class = "tooltip">
 
-        <div class = "tooltip">
-          <button class = 'alloc_guest_add' onclick = 'js_alloc_guest_add("{{allocid}}", "alloc_guest_add_name_id")'>
-            add guest
-          </button>
-          <span class = "tooltiptext">
-            Add a guest to this allocation, so they can use the target
-            as if it was the owner or other guests.
-            <p>Guests will not be able to remove the allocation.</p>
-            <p>You can do this because you are either an
-              administrator, the owner or the creator of the
-              allocation.</p>
-            <p>On the command line, you can use:
-              <pre><code class="language-bash">$ tcf guest-add {{allocid }} <i>username</i></code></pre>
-            </p>
-          </span>
-        </div>
-        <input type = "text" id = "alloc_guest_add_name_id" name = "alloc_guest_add_name"
-               placeholder = "user name to add" required>
+                {# FIXME: this should be in red!!! kinda DANGER zone #}
+                <button style='background-color: red;'
+                        class='release' onclick='js_alloc_remove("{{allocid}}")'>
+                    release allocation
+                </button>
 
+                <span class = "tooltiptext">
+                    <p>
+                        Removes this allocation, freeing all the targets under
+                        it.
+                    </p>
+
+                    <p><mark>THIS OPERATION CANNOT BE UNDONE.</mark></p>
+                    <p>
+                        Neither you nor guests will no longer have access to
+                        the targets and they might be powered off or
+                        reinitialized by someone else that allocates them.
+                    </p>
+                    <p>
+                        You can do this because you are either an
+                        administrator, the owner or the creator of the
+                        allocation.
+                    </p>
+                    <p>
+                        On the command line, you can use:
+                        <pre><code class="language-bash">$ tcf alloc-rm {{allocid }}
+                        </code></pre>
+                    </p>
+                </span>
+            </div>
+          </div>
+          <hr>
+
+          <div class='subsection'>
+            <div class = "tooltip">
+
+                <button class = 'alloc_guest_add' onclick = 'js_alloc_guest_add("{{allocid}}", "alloc_guest_add_name_id")'>
+                    add guest
+                </button>
+
+                <span class = "tooltiptext">
+                  <p>
+                    Add a guest to this allocation, so they can use the target
+                    as if it was the owner or other guests.
+                  </p>
+
+                  <p>
+                    Guests will not be able to remove the allocation.
+                  </p>
+
+                  <p>
+                    You can do this because you are either an administrator,
+                    the owner or the creator of the allocation.
+                  </p>
+
+                  <p>
+                    On the command line, you can use:
+                    <pre><code class="language-bash">$ tcf guest-add {{allocid }} <i>username</i>
+                    </code></pre>
+                  </p>
+                </span>
+                <input type = "text" id = "alloc_guest_add_name_id" name = "alloc_guest_add_name"
+                    placeholder = "username to add" required>
+            </div>
+          </div>
 
         {% if guests %}
-        <div class = "tooltip">
-          <button class = 'remove_guest' onclick = 'js_alloc_guest_remove("{{allocid}}", "remove_guest_selector")'>
-            remove guest
-          </button>
-          <span class = "tooltiptext">
-            Remove a guest from this allocation.
-            <p>Guests will not be able to use the targets anymore.</p>
-            <p>You can do this because you are either an
-              administrator, the owner or the creator of the
-              allocation.</p>
-            <p>On the command line, you can use:
-              <pre><code class="language-bash">$ tcf guest-rm {{allocid }} <i>username</i></code></pre>
-            </p>
-          </span>
-        </div>
-        <select class = 'remove_guest_selector' id = 'remove_guest_selector'>
-          <option value = 'None'>select a guest to remove</option>
-          {% for guest in guests %}
-          <option value = '{{ guest }}'>{{ guest }}</option>
-          {% endfor %}
-        </select>
+          <div class='subsection'>
+            <div class = "tooltip">
+                <button class = 'remove_guest' onclick = 'js_alloc_guest_remove("{{allocid}}", "remove_guest_selector")'>
+                    remove guest
+                </button>
+                <span class = "tooltiptext">
+                    <p>
+                        Remove a guest from this allocation.
+                    </p>
+                    <p>Guests will not be able to use the targets anymore.</p>
+                    <p>
+                      You can do this because you are either an
+                      administrator, the owner or the creator of the
+                      allocation.
+                    </p>
+                    <p>
+                      On the command line, you can use:
+                      <pre><code class="language-bash">$ tcf guest-rm {{allocid }} <i>username</i>
+                      </code></pre>
+                    </p>
+                </span>
+            </div>
+            <select class = 'remove_guest_selector' id = 'remove_guest_selector'>
+              <option value = 'None'>select a guest to remove</option>
+              {% for guest in guests %}
+              <option value = '{{ guest }}'>{{ guest }}</option>
+              {% endfor %}
+            </select>
+          </div>
         {% else %}
-        <label>(there are no guests in this allocation)</label>
+          <div class='subsection'>
+            <label>(there are no guests in this allocation)</label>
+          </div>
         {% endif %}
 
 
 
         {% else %}
-        <div class = "tooltip">
-          <label>You </label> <span class = "tooltiptext">Logged-in
-          user {{ state.user }} </span> have no permissions to
-          manipulate this allocation (need be either the creator,
-          owner or a guest.
-        </div>
-
+            <div class = "tooltip">
+              <label>You </label> <span class = "tooltiptext">Logged-in
+              user {{ state.user }} </span> have no permissions to
+              manipulate this allocation (need be either the creator,
+              owner or admin)
+            </div>
         {% endif %}
 
       </div>

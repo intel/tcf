@@ -325,7 +325,19 @@ form {
     border-color:  #82C0CC;
 }
 
+.toolbox > .subsection > * > .release {
+    color: #fff;
+    background-color: #489FB5;
+    border-color:  #82C0CC;
+}
+
 .toolbox > .subsection > .release:hover:enabled {
+    color: #fff;
+    background-color: #16697A;
+    border-color:  #82C0CC;
+}
+
+.toolbox > .subsection > * > .release:hover:enabled {
     color: #fff;
     background-color: #16697A;
     border-color:  #82C0CC;
