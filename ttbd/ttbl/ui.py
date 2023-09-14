@@ -313,6 +313,7 @@ def _target(targetid):
 
 
 @bp.route('/allocation/<allocid>', methods = ['GET'])
+@flask_login.login_required
 def _allocation(allocid):
     # render the allocation control panel
     calling_user = flask_login.current_user._get_current_object()
