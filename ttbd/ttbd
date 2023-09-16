@@ -111,6 +111,8 @@ app = flask.Flask(
     static_folder = commonl.ttbd_locate_helper(
         'ui/static', ttbl._install.share_path),
 )
+# note down below we are going to modify app.jinja_loader.searchpath
+# so we can customize easily. Search for that...
 
 API_VERSION = 2
 API_PATH = "/ttb-v"
@@ -1733,6 +1735,8 @@ if __name__ == "__main__":
 
     ttbl.config.target_max_idle = args.target_max_idle
 
+    jinja_template_searchpath = []
+
     if args.system_wide == None:
         ttbl.config.instance_suffix = ""
         ttbl.config.instance = ""
@@ -1743,6 +1747,8 @@ if __name__ == "__main__":
         args.files_path = "/var/cache/ttbd"
         # State that stays through reboots
         args.var_state_path = "/var/lib/ttbd"
+        # FIXME: if anytime we support another root, this needs to change
+        jinja_template_searchpath.append("/etc/ttbd/html")
     else:
         ttbl.config.instance = args.system_wide
         ttbl.config.instance_suffix = "-" + args.system_wide
@@ -1750,6 +1756,23 @@ if __name__ == "__main__":
         args.files_path = "/var/cache/ttbd" + ttbl.config.instance_suffix
         # State that stays through reboots
         args.var_state_path = os.path.join("/var/lib/ttbd", args.system_wide)
+        jinja_template_searchpath.append(args.config_path + "/html")
+        # FIXME: if anytime we support another root, this needs to change
+        jinja_template_searchpath.append("/etc/ttbd/html")
+
+    # jinja template dirty hack: change the lookup order of template
+    # files so the installed ones with the package are last and the
+    # search order is:
+    #
+    # - /etc/ttbd-INSTANCE/html
+    # - /etc/ttbd/html
+    # - /usr/share/tcf/ui/templates
+    #
+    # This allows us to drop in customizations in instance or site
+    # specific directories in /etc without altering the system
+    jinja_template_searchpath += app.jinja_loader.searchpath
+    app.jinja_loader.searchpath = jinja_template_searchpath
+
     # Define things ttbl.config needs for configuring targets
     args.config_path = os.path.expanduser(args.config_path)
     args.files_path = os.path.expanduser(args.files_path)

@@ -84,7 +84,9 @@ API_PATH = "/ttb-v"
 API_PREFIX = API_PATH + str(API_VERSION) + "/"
 
 bp = flask.Blueprint('ui', __name__, url_prefix = API_PREFIX  + '/ui')
-
+# note we have modified in ttbd the template search to happen giving
+# precedence to /etc/ttbd-INSTANCE/html and /etc/ttbd/html; search for
+# jinja_template_searchpath in ../ttbd for more info
 
 #: Image files can have suffixes that the image type does not include, say you
 #: have a firmware binary named `bios.img` but the image type is listed as
