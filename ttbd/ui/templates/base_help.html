@@ -1,0 +1,56 @@
+{% extends 'base_help_content.html' %}
+
+{% block help %}
+<li>
+  <!-- default help text from ttbd/ui/templates/base_help.html;
+    -- customize me:
+    --
+    -- 1. copy to /etc/ttbd-INSTANCE/html or /etc/ttbd/html
+    -- 2. customize
+    -->
+  <div class = "tooltip">
+    get help
+    <!-- Normally you'll have here an
+      -- <a href = "http://helpdest" target = _blank>get help</a>
+      -->
+    <span class = "tooltiptext">
+      No help details have been configured for this deployment.
+
+      <p>This can be customized (by the administrators) for how to get
+        help for your local environment; administrators:
+        <ul>
+          <li>copy this
+            <i>/usr/share/tcf/ui/templates/{{
+              self._TemplateReference__context.name }}</i>
+            to <i>/etc/ttbd/html/base_help.html</i></li>
+          <li>customize for the site, setting links for real time help,
+            system support and target support</li>
+      </ul></p>
+
+      <p><u>Example</u></p>
+
+      Action items have tooltips to help you. Hover over anything
+      to discover what it does
+
+      <p>If you need to report an issue with a target, please use
+        the <mark>report issue</mark> button next to the target.</p>
+    </span>
+  </div>
+</li>
+
+<li>
+  <div class = "tooltip">
+    <!-- this link was obtained with sweat and blood: https://wiki.ith.intel.com/x/hkXKv -->
+    <a href = 'https://someticketingsystem/args?pid=74004&issuetype=1&summary=UI%20help' target = _blank>
+      report issue
+    </a>
+    <span class = "tooltiptext">
+      Report an issue with this system
+
+      <p>If you need to report an issue with a target, please use
+        the <mark>report issue</mark> button next to the target.</p>
+    </span>
+  </div>
+</li>
+
+{% endblock help %}
