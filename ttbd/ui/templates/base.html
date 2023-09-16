@@ -41,7 +41,9 @@
                   </p>
                 </span>
             </div></li>
-            <li><a href='/'>help</a></li>
+
+            {% include "base_help.html" %}
+
               {% if g.user %}
                 <li class='nav-right'>
                   <div class = "tooltip">
