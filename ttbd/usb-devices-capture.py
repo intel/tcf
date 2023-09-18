@@ -35,19 +35,19 @@
 #
 # To configure:
 #
-## 
+##
 ## usb_device_capture_py = commonl.ttbd_locate_helper(
 ##     "usb-devices-capture.py",
 ##     ttbl._install.share_path,
 ##     log = logging)
-## 
+##
 ## capture_usb_devices = ttbl.capture.generic_snapshot(
 ##     "%(id)s USB devices",
 ##     usb_device_capture_py + " %(output_file_name)s",
 ##     mimetype = "application/json", extension = ".json",
 ## )
-## 
-## 
+##
+##
 ## target = ...
 ## target.interface_add(
 ##     "capture",
@@ -72,6 +72,24 @@ def sysfs_read(fn):
     except FileNotFoundError:
         return None
 
+
+def sysfs_read_in_tree(fn):
+    """Read a sysfs file in current dir or maybe up in the tree.
+
+    Only works for /sys/devices/, so we first make the ifle as
+    absolute as we can with realpath
+
+    """
+    dirname, filename = os.path.split(os.path.realpath(fn))
+    while dirname != "/sys":
+        try:
+            with open(os.path.join(dirname, filename)) as f:
+                return f.read().strip()
+        except FileNotFoundError:
+            dirname = os.path.dirname(dirname) 	# try one dir up
+    return None
+
+
 d = {}
 procs = {}
 for entry in os.listdir("/sys/bus/usb/devices"):
@@ -87,10 +105,13 @@ for entry in os.listdir("/sys/bus/usb/devices"):
         vendor = vendor,
         bDeviceClass = sysfs_read(
             f"/sys/bus/usb/devices/{entry}/bDeviceClass"),
+
+        vendor_name = sysfs_read(f"/sys/bus/usb/devices/{entry}/vendor"),
+        product_name = sysfs_read(f"/sys/bus/usb/devices/{entry}/product"),
     )
     if serial:
         d[entry]['serial'] = serial
-
+    d[entry]['label'] = sysfs_read_in_tree(f"/sys/bus/usb/devices/{entry}/label")
     # run hooks if any available -- just start'em in parallel, we'll
     # wait for them later
     env = dict(os.environ)
