@@ -87,7 +87,23 @@
             <tbody>
               {% for k, v in powerls.items() %}
               <tr>
-                <td>{{k}}</td>
+
+                <td>
+                  {# if no description, don't add a tootip to avoid
+                     polluting the interface #}
+                  {% if v.description %}
+                  <div class = "tooltip">
+                    {{ k }}
+                    <span class = "tooltiptext">
+                      {{ v.description }}
+                    </span>
+                  </div>
+                  {% else %}
+                  {{ k }}
+                  {% endif %}
+                </td>
+
+
                 {% if v.state == False %}
                   <td>
                     <span style='color: red;'>off</span>
