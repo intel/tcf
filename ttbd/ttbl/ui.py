@@ -375,7 +375,8 @@ def _target(targetid):
 
     # more info about this tuple on the docstring of the function
     # `_get_images_paths`
-    images, paths_for_all_images_types = _get_images_paths(inventory)
+    images, paths_for_all_images_types = \
+        _get_images_paths(target, inventory, kws)
 
     # get console information for target.html to render
     consoles = dict(inventory.get('interfaces', {}).get('console', {}))
@@ -436,7 +437,7 @@ def _allocation(allocid):
 
 
 
-def _get_images_paths(inventory: dict):
+def _get_images_paths(target: ttbl.test_target, inventory: dict, kws: dict):
     '''
     this function process the interfaces.images property
     from the inventory and extends on it by adding new fields:
@@ -509,6 +510,14 @@ def _get_images_paths(inventory: dict):
         if not 'last_name' in images[image_type]:
             images[image_type]['last_name'] = 'no record of last flashed image'
             images[image_type]['last_short_name'] = '-'
+
+        # let's add description, if present
+        path = f"interfaces.images.{image_type}"
+        kws['key'] = path
+        description = target_description_get(target, path)
+        if description:
+            description = commonl.kws_expand(description, kws)
+            images[image_type]['description'] = description
 
         # dict that contains all paths for each image type
         file_list = dict()

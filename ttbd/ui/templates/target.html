@@ -184,24 +184,23 @@
 
         <div class='subsection'>
             <div class = "tooltip">
-                <p style='margin: 0;'>ⓘ&nbsp;</p>
-                <span class = "tooltiptext">
-                  This will flash:
-                  <span style='color: blue;'>
+              <button id='flash-button'
+                      onclick='js_images_flash(
+                               "{{targetid}}",
+                               "flash_images_version_for_all",
+                               "{% for image_type in images.keys() %}{{image_type}}:{%endfor%}",
+                               "{% for image_info in images.values() %}{{image_info.suffix}}:{%endfor%}"
+                               )'>flash firmware</button>
+              <span class = "tooltiptext">
+                This flashes
+                <span style='color: blue;'>
                   {% for image_type in images.keys() %}
-                    {{image_type}},
+                  {{image_type}},
                   {% endfor %}
-                  </span>
-                  on the target
                 </span>
+                on the target
+              </span>
             </div>
-            <button id='flash-button'
-                onclick='js_images_flash(
-                    "{{targetid}}",
-                    "flash_images_version_for_all",
-                    "{% for image_type in images.keys() %}{{image_type}}:{%endfor%}",
-                    "{% for image_info in images.values() %}{{image_info.suffix}}:{%endfor%}"
-                    )'>flash firmware</button>
             <select class='list_versions' id='flash_images_version_for_all'>
                 {% for path in paths_for_all_images_types %}
                     <option value={{path.paths}}>{{path.short_name}}</option>
@@ -222,7 +221,20 @@
             <tbody>
               {% for image_type, image_info in images.items() %}
               <tr>
-                <td>{{image_type}}</td>
+                <td>
+                  {# if no description, don't add a tootip to avoid
+                     polluting the interface #}
+                  {% if image_info.description %}
+                  <div class = "tooltip">
+                    {{image_type}}
+                    <span class = "tooltiptext">
+                      {{ image_info.description }}
+                    </span>
+                  </div>
+                  {% else %}
+                  {{image_type}}
+                  {% endif %}
+                </td>
                 <td>
                     <div class = "tooltip">
                         <small>
