@@ -67,12 +67,14 @@ import glob
 import logging
 import json
 import os
-import packaging.version
+import re
 import werkzeug
 
 import flask
 import flask_login
+import packaging.version
 
+import commonl
 import ttbl
 import ttbl.config
 import ttbl.allocation
@@ -113,6 +115,42 @@ image_suffix = {}
 #: >>>     '/my/cool/images/of/type/%(type)s',
 #: >>> ]
 image_path_prefixes = []
+
+
+
+#: Add some descriptions for inventory items
+#:
+#: This allows specifying descriptions that are missing on the
+#: inventory for things such as components that can be used by UIs.
+#:
+#: >>> ttbl.ui.inventory_descriptions = {
+#: >>>     "interfaces.images.bios": (
+#: >>>         "Flashes the system's BIOS"
+#: >>>     ),
+#: >>>     "interfaces.power.AC": (
+#: >>>         "Controls main power to the SUT via PDU"
+#: >>>         " '%%(instrumentation.%%(%(key)s.instrument)s.name)s'"
+#: >>>     ),
+#: >>>     re.compile("interfaces.power.tuntap-*"): (
+#: >>>         "Controls a virtual network switch so a SUT implemented"
+#: >>>         " via a virtual machine can communicate with other SUTs or VMs"
+#: >>>     ),
+#: >>>     "interfaces.power.ttyS0": (
+#: >>>         "Serial line tape recorder for the BIOS/OS serial console;"
+#: >>>         " records all output from the serial port as soon as it"
+#: >>>         " is powered on so no output is lost"
+#: >>>     ),
+#: >>> }
+#:
+#: Keys can be a name of an interface entry for which the UI will ask
+#: for descriptions or a regular expression.
+#:
+#: Descriptions are a simple text which can include *%(FIELD)[ds]*
+#: from the inventory, with the special *key* string representing the
+#: key that was matched. Use a double %% to delay expansion to a
+#: second pass.
+inventory_descriptions = {}
+
 
 
 # FIXME: need to unify this, since ttbd uses it too
@@ -229,6 +267,37 @@ def _targets():
     return flask.render_template('targets.html', targets = targets)
 
 
+
+def target_description_get(
+        target: ttbl.test_target, key: str, default = None) -> str:
+    """
+    Find a description field for an inventory key
+
+    If there is an inventory key named *key.description*, that will be
+    returned; otherwise, if a *key* is found in
+    :data:`ttbl.ui.inventory_descriptions`, that will be used.
+
+    :param ttbl.target_c target: target for which to find the
+      description
+
+    :param str key: name of the key for which we are looking ofr a description
+
+    :returns str: string with a description or *None* if no
+      description available.
+    """
+    description = target.property_get(key + ".description", None)
+    if description != None:
+        return description
+    for k, v in inventory_descriptions.items():
+        if isinstance(k, re.Pattern):
+            if k.match(key):
+                return v
+        if k == key:
+            return v
+    return default
+
+
+
 @bp.route('/target/<targetid>', methods = ['GET'])
 def _target(targetid):
     '''
@@ -250,7 +319,14 @@ def _target(targetid):
 
     # get power info
     p_state, p_data, p_substate = target.power._get(target)
-
+    kws = target.kws_collect()
+    for component in p_data:
+        path = f"interfaces.power.{component}"
+        kws['key'] = path
+        description = target_description_get(target, path)
+        if description:
+            description = commonl.kws_expand(description, kws)
+            p_data[component]['description'] = description
     # parse all the inventory to str
     inventory_str = json.dumps(inventory, indent = 4)
     who = ttbl.who_create(flask_login.current_user.get_id(), None)
