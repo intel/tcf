@@ -1,46 +1,34 @@
-{% extends 'base.html' %}
+{% extends 'login_content.html' %}
 
-{% block title %} login {% endblock %}
-
-{% block head %}{% endblock %}
-
-{% block navbar %}{% endblock %}
-
-{% block content %}
+{% block login %}
+<!-- default from ttbd/ui/templates/login.html;
+  -- customize me:
+  --
+  -- 1. copy to /etc/ttbd-INSTANCE/html or /etc/ttbd/html
+  -- 2. customize
+  -->
 <div class='main'>
-<div class='column-main tile'>
-<h2>login</h2>
-<p>welcome to ttbdweb</p>
-<form action="login" method="post">
-<table border="0">
-  <tbody>
-    <tr>
-      <td>username:</td>
-      <td>
-        <input type="text" name="username" size="40" autocorrect="off"
-            spellcheck="false" autocapitalize="none" autofocus="true">
-      </td>
-    </tr>
-    <tr>
-      <td>password:</td>
-      <td>
-        <input type="password" name="password" size="40">
-      </td>
-    </tr>
-    </tbody>
-</table>
-<input type="submit" value="login">
-</form>
+  <div class='column-main tile'>
+    <form action="login" method="post">
+      <table border="0">
+        <tbody>
+          <tr>
+            <td>username:</td>
+            <td>
+              <input type="text" name="username" size="40" autocorrect="off"
+                     spellcheck="false" autocapitalize="none" autofocus="true">
+            </td>
+          </tr>
+          <tr>
+            <td>password:</td>
+            <td>
+              <input type="password" name="password" size="40">
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      <input type="submit" value="login">
+    </form>
+  </div>
 </div>
-
-<div class='column-sidebar'>
-  <small>useful links</small>
-  <ul>
-    <li><a href=''>link</a></li>
-    <li><a href=''>help</a></li>
-    <li><a href=''>useful</a></li>
-  </ul>
-</div>
-
-</div>
-{% endblock %}
+{% endblock login %}
