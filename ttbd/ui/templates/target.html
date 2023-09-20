@@ -60,21 +60,55 @@
     </div>
     <hr>
     {% if state.acquired %}
-        <div class='subsection'>
+
+       <div class='subsection'>
+
+          <div class = "tooltip">
             <button onclick='power("{{ targetid }}", "on", "all")'>
-                power on
+              power on
             </button>
+            <span class = "tooltiptext">
+              Power on all the components in the power rail
+
+              <p>All the components in the power rail are powered on
+                in order (expand the <i>components</i> section to the
+                right to see the power rail).</p>
+            </span>
+          </div>
+
+          <div class = "tooltip">
             <button onclick='power("{{ targetid }}", "off", "all")'>
                 power off
             </button>
+            <span class = "tooltiptext">
+              Power off all the components in the power rail
+
+              <p>All the components in the power rail are powered off
+                in reverse order (expand the <i>components</i> section
+                to the right to see the power rail).</p>
+            </span>
+          </div>
+
+          <div class = "tooltip">
             <button onclick='power("{{ targetid }}", "cycle", "all")'>
                 power cycle
             </button>
-            <button class='minor' onclick="toggle('power-ls')">components  <i class="arrow down"></i></button>
-            <button class='minor' onclick="toggle('buttons-ls')">
-              buttons, jumpers and relays <i class="arrow down"></i>
-            </button>
-        </div>
+            <span class = "tooltiptext">
+              Power cycle all the components in the power rail
+
+              <p>All the components in the power rail are powered off
+                in reverse order and then powered on (expand
+                the <i>components</i> section to the right to see
+                the power rail).</p>
+            </span>
+          </div>
+
+          <button class='minor' onclick="toggle('power-ls')">components  <i class="arrow down"></i></button>
+          <button class='minor' onclick="toggle('buttons-ls')">
+            buttons, jumpers and relays <i class="arrow down"></i>
+          </button>
+       </div>
+
         <div class='subsection' id='power-ls' style="display: none;">
           <table id='t-powerls' class='row-border hover'>
             <thead>
