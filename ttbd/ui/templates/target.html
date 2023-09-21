@@ -228,12 +228,31 @@
             </tbody>
           </table>
         </div>
+        <div class='subsection' id='loading'></div>
         <hr>
         <div class='subsection'>
-            <button>console wall</button>
+            <h4>consoles</h4>
         </div>
-        <div class='subsection' id='loading'>
-        </div>
+        {% for console in consoles.keys() %}
+            <div class='console-container'>
+                <div class='console-options'>
+                    <button onclick='toggle("console-wrapper-{{console}}"); terminal_create("console-{{console}}", "{{targetid}}", "{{console}}");'>
+                          {{console}} <i class="arrow down"></i>
+                    </button>
+                    <button onclick='js_console_enable("{{targetid}}", "{{console}}", "enable")'>enable</button>
+                    <button onclick='js_console_enable("{{targetid}}", "{{console}}", "disable")'>disable</button>
+                    <a class='download-button' href='/ttb-v2/targets/{{targetid}}/console/read?component={{console}}' download='console-{{targetid}}-{{console}}.txt'>download ⇓</a>
+                    <small>|</small>
+                    <small>bytes read: <label id='console-read-bytes-{{console}}' style='color: blue;'>0</label></small>
+                    <small>---</small>
+                    <small>last restart: <label id='console-generation-{{console}}' style='color: green;'>0</label></small>
+                </div>
+            </div>
+            <div class='console-wrapper' id='console-wrapper-{{console}}' style="display: none;">
+                <div class='console' id='console-{{console}}'></div>
+            </div>
+        {%endfor%}
+
         {% else %}
         <!-- the current user is not the owner, so they can't do
              anything, grey it out -->
