@@ -545,3 +545,61 @@ hr {
     height: 2em;
     margin-top: 0em;
 }
+
+
+/*
+ * this was the most annoying thing ever, so when we create a term with xterm,
+ * a buch of canvas and other child elements are added to our main div, all of
+ * the canvas inherit a top margin of 1.5em, making the terminal look 1.5em off
+ * the main div creating an ugly black margin. Summing up it looked
+ * odd/weird/bad.
+ *
+ * After a bit of fighting I found this (new to me) css selector. It will
+ * select all canvas starting with 'xterm-' and remove the margin.
+ */
+.console canvas[class^='xterm-'] {
+    margin: 0;
+}
+
+
+.console-container {
+    display: flex;
+}
+
+.console-options {
+    display: block;
+    width: 100%;
+}
+
+.margin-left {
+    margin-left: auto;
+}
+
+
+.download-button {
+    border: 1px #adadad solid;
+    padding: 0em 1em;
+    background-color: white;
+}
+
+.download-button:link {
+    text-decoration: none;
+    color: black;
+}
+
+.download-button:visited {
+    text-decoration: none;
+    color: black;
+}
+
+.download-button:hover {
+    text-decoration: none;
+    color: white;
+    background-color: #d58512;
+    border-color: #985f0d;
+}
+
+.download-button:active {
+    text-decoration: none;
+    color: black;
+}
