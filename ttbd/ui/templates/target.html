@@ -6,7 +6,11 @@
 <script type="text/javascript" src="{{url_for('static', filename = 'js/main.js')}}"></script>
 <script src="{{url_for('static', filename = 'js/jquery-3.6.4.slim.min.js')}}" integrity="sha256-a2yjHM4jnF9f54xUQakjZGaqYs/V1CYvWpoqZzC2/Bw=" crossorigin="anonymous"></script>
 <link rel="stylesheet" href="{{url_for('static', filename = 'css/jquery.dataTables.css')}}"/>
+
 <script src="{{url_for('static', filename = 'js/jquery.dataTables.js')}}"></script>
+
+<script src="{{url_for('static', filename = 'js/xterm.js')}}"></script>
+<link rel="stylesheet" href="{{url_for('static', filename = 'css/xterm.css')}}"/>
 
 {% endblock %}
 
@@ -34,7 +38,7 @@
     </form>
 </dialog>
 
-    <! -- {{ state  }} -->
+    <!-- {{ state  }} -->
 
 <div class='main'>
 <div class='column-main tile'>
@@ -42,7 +46,7 @@
 
 <div class='toolbox'>
     <div class='subsection'>
-        <h4> control panel</h4>
+        <h3> control panel</h3>
     </div>
     <div class='subsection'>
     {% if not state.acquired %}
