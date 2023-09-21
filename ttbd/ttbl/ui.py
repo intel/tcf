@@ -301,6 +301,9 @@ def _target(targetid):
     # `_get_images_paths`
     images, paths_for_all_images_types = _get_images_paths(inventory)
 
+    # get console information for target.html to render
+    consoles = dict(inventory.get('interfaces', {}).get('console', {}))
+
     return flask.render_template(
         'target.html',
         targetid = targetid,
@@ -308,6 +311,7 @@ def _target(targetid):
         state = state,
         powerls = p_data,
         images = images,
+        consoles = consoles,
         paths_for_all_images_types = paths_for_all_images_types,
         buttonls = button_data
     )
