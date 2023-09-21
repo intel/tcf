@@ -10,3 +10,7 @@
 - tool: highlight.js
   source: https://highlightjs.org/
   SPDX-License-Headey: BSD 3-Clause License
+
+- tool: xterm.js
+  source: https://github.com/xtermjs/xterm.js
+  SPDX-License-Headey: MIT
