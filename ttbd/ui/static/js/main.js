@@ -413,3 +413,161 @@ function show_inventory() {
     const inventory = document.getElementById('inventory');
     inventory.showModal();
 }
+
+
+/*
+ * Create a terminal and make a loop calling `terminal_get_content` every n
+ * (200) miliseconds
+ *
+ * @param {div_id} str  -> div id where you want to terminal created
+ * @param {targetid} str -> target id from where you read consoles
+ * @param {terminal} str -> name console you want to enable
+ *
+ * @return {void}
+ *
+ */
+function terminal_create(div_id, targetid, terminal) {
+
+    /* clean div, in case there is already a terminal there*/
+    $('#' + div_id).empty();
+
+    /* create new terminal, here we can specify the terminal configuration, we
+     * also add a message telling the user that the console has been enabled */
+    let term = new window.Terminal({
+        cursorBlink: true,
+        fontFamily: 'monospace'
+    });
+    term.open(document.getElementById(div_id));
+    term.write('\x1b[37;40m \n\r\r\nconsole was started;\r\r\n\n\x1b[0m');
+
+    /* here we loop calling the terminal_get_content function every n
+     * miliseconds */
+    let bytes_read_so_far = 0;
+    let terminal_generation = 0;
+    setInterval(async function() {
+
+        let read_information_d = await terminal_get_content(
+            term, targetid, terminal, bytes_read_so_far);
+
+        let tmp_terminal_generation = read_information_d['stream-gen-offset'].split(' ')[0];
+        let max_bytes_read = read_information_d['stream-gen-offset'].split(' ')[1];
+
+        let bytes_label = document.getElementById('console-read-bytes-' + terminal);
+        let generation_label = document.getElementById('console-generation-' + terminal);
+
+        /* compare new terminal generation to old one if it changed the
+         * terminal was disable and enabled since our last request so we need
+         * to reset everything */
+        if (tmp_terminal_generation != terminal_generation) {
+            if (terminal_generation != 0) {
+                term.write('\x1b[37;40m \n\r\r\nWARNING: console was restarted;\r\r\n\n\x1b[0m');
+            }
+            terminal_generation = tmp_terminal_generation;
+            generation_label.textContent = terminal_generation;
+            bytes_read_so_far = 0;
+            return
+        }
+
+        /* check if what we got from the response is 0, if it is it means we
+         * are up to date, no need to do anything, let's just make sure the
+         * label `bytes_read` says the correct amount and try the next
+         * iteration */
+        if(read_information_d['content-length'] == 0) {
+            bytes_read_so_far = parseInt(max_bytes_read);
+            bytes_label.textContent = bytes_read_so_far;
+            return
+        }
+
+        /*
+         * we read the amount of bytes we have from the label bytes_label in
+         * the html,  we then sum the length of the last request, this gives us
+         * the number of bytes we have actually read
+         */
+        bytes_read_so_far = parseInt(bytes_label.textContent);
+        bytes_read_so_far += parseInt(read_information_d['content-length']);
+        bytes_label.textContent = bytes_read_so_far;
+
+    }, 200);
+}
+
+
+/*
+ * Make a http request to the server to read the console.
+ *
+ * You can specify may specify an offset if needed to. Go to ttbl/console.py
+ * for more info
+ *
+ * @param {term} window.Terminal -> object created by xterm, this is the
+ *      terminal object where you want to write the content
+ * @param {targetid} str -> target id from where you read consoles
+ * @param {terminal} str -> name console you want to enable
+ * @param {offset} int -> offset you want to read the terminal from. Go to
+ *      ttbl/console.py for more info
+ *
+ * @return {dict} -> {
+ *      'content-length': content_length,
+ *      'stream-gen-offset': generation
+ *  }
+ *
+ *  content-length:str: is the content length of the bytes received, we get
+ *  this from the response header
+ *
+ *  stream-gen-offset:list: two elements, first is the generation of the
+ *  terminal (go to ttbl/consoles.py for more info), the second one is the max
+ *  ammount of bytes available in  that terminal.
+ *
+ */
+async function terminal_get_content(term, targetid, terminal, offset) {
+    // curl -sk cookies.txt -k -X GET https://SERVERNAME:5000/ttb-v2/targets/TARGETNAME/console/read \
+    // -d component=ssh0 -d offset=10
+    let r = await fetch('/ttb-v2/targets/' + targetid + '/console/' + 'read?' + new URLSearchParams({
+        'component': terminal,
+        'offset': offset,
+    }));
+
+    let b = await r.text();
+    term.write(b);
+
+    let content_length = r.headers.get('Content-Length');
+    let generation = r.headers.get('X-Stream-Gen-Offset');
+
+    return {
+        'content-length': content_length,
+        'stream-gen-offset': generation
+    }
+}
+
+
+/**
+ * Enable or disable a console given its name and targetid
+ *
+ * @param {targetid} str -> target id from where you want enable/disable the
+ *      consoles
+ * @param {terminal} str -> name console you want to enable
+ * @param {enable} str -> what action you want to perform in the console, just
+ *      this two options: enable/disable
+ *
+ * @return {void}
+ */
+async function js_console_enable(targetid, terminal, enable) {
+    let data = new URLSearchParams();
+    data.append('component', terminal);
+
+    let r = await fetch('/ttb-v2/targets/' + targetid + '/console/' + enable, {
+      method: 'PUT',
+      body: data,
+    });
+
+    let b = await r.text();
+    if (r.status != 200) {
+        alert(
+            'there was an issue enabling or disabling the console:' +
+            terminal + '\n' + b
+        );
+        return
+    }
+
+    /* FIXME we need to add a better way to display this type of messages to
+     * the user, so we do not rely on alerts */
+    alert('SUCCESS; ' + terminal + ' ' + enable + 'd');
+}
