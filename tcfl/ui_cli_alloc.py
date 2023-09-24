@@ -233,7 +233,7 @@ def _cmdline_alloc_rm(cli_args: argparse.Namespace):
     if cli_args.allocid:
         retval = 0
         for allocid in cli_args.allocid:
-            r = tcfl.ui_cli.run_fn_on_each_server(
+            r, _ = tcfl.ui_cli.run_fn_on_each_server(
                 tcfl.server_c.servers,
                 _alloc_rm_by_allocid, cli_args, allocid,
                 return_details = True)
@@ -244,7 +244,7 @@ def _cmdline_alloc_rm(cli_args: argparse.Namespace):
                              allocid)
         return retval
     if cli_args.username:
-        r = tcfl.ui_cli.run_fn_on_each_server(
+        r, _ = tcfl.ui_cli.run_fn_on_each_server(
             tcfl.server_c.servers,
             _alloc_rm_by_username, cli_args, return_details = True)
         if all(i[0] == 0 for i in r.values()):

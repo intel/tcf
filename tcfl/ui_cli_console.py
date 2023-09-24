@@ -769,7 +769,7 @@ def _cmdline_console_write(cli_args: argparse.Namespace):
         cli_args.offset, cli_args.crlf, cli_args.max_backoff_wait,
         cli_args.interactive, cli_args.press_enter, cli_args.msvcrt,
         only_one = True,
-        iface = "console", extensions_only = [ "console" ])
+        iface = "console", extensions_only = [ "console" ])[0]
 
 
 
@@ -807,7 +807,7 @@ def _cmdline_console_read(cli_args: argparse.Namespace):
         cli_args.console, cli_args.offset, cli_args.output, cli_args.follow,
         cli_args.max_backoff_wait, cli_args.timestamp,
         only_one = True,
-        iface = "console", extensions_only = [ "console" ])
+        iface = "console", extensions_only = [ "console" ])[0]
 
 
 
@@ -964,7 +964,7 @@ def _cmdline_console_ls(cli_args: argparse.Namespace):
     return tcfl.ui_cli.run_fn_on_each_targetspec(
         _console_ls, cli_args,
         only_one = True,
-        iface = "console", extensions_only = [ "console" ])
+        iface = "console", extensions_only = [ "console" ])[0]
 
 
 
@@ -976,7 +976,7 @@ def _cmdline_console_disable(cli_args: argparse.Namespace):
     return tcfl.ui_cli.run_fn_on_each_targetspec(
         _console_disable, cli_args, cli_args.console,
         only_one = True,
-        iface = "console", extensions_only = [ "console" ])
+        iface = "console", extensions_only = [ "console" ])[0]
 
 
 
@@ -988,7 +988,7 @@ def _cmdline_console_enable(cli_args: argparse.Namespace):
     return tcfl.ui_cli.run_fn_on_each_targetspec(
         _console_enable, cli_args, cli_args.console,
         only_one = True,
-        iface = "console", extensions_only = [ "console" ])
+        iface = "console", extensions_only = [ "console" ])[0]
 
 
 
@@ -1046,7 +1046,7 @@ def _cmdline_console_setup(cli_args: argparse.Namespace):
         _console_setup, cli_args,
         cli_args.console, cli_args.reset, cli_args.parameters, verbosity,
         only_one = True,
-        iface = "console", extensions_only = [ "console" ])
+        iface = "console", extensions_only = [ "console" ])[0]
 
 
 

@@ -55,7 +55,7 @@ def _cmdline_power_on(cli_args: argparse.Namespace):
 
     return tcfl.ui_cli.run_fn_on_each_targetspec(
         _power_on_by_target, cli_args, cli_args,
-        iface = "power", extensions_only = [ 'power' ])
+        iface = "power", extensions_only = [ 'power' ])[0]
 
 
 
@@ -71,7 +71,7 @@ def _cmdline_power_off(cli_args: argparse.Namespace):
 
     return tcfl.ui_cli.run_fn_on_each_targetspec(
         _power_off_by_target, cli_args, cli_args,
-        iface = "power", extensions_only = [ 'power' ])
+        iface = "power", extensions_only = [ 'power' ])[0]
 
 
 
@@ -87,7 +87,7 @@ def _cmdline_power_cycle(cli_args: argparse.Namespace):
 
     return tcfl.ui_cli.run_fn_on_each_targetspec(
         _power_cycle_by_target, cli_args, cli_args,
-        iface = "power", extensions_only = [ 'power' ])
+        iface = "power", extensions_only = [ 'power' ])[0]
 
 
 # this is a very loose match in the format, so we can easily support
@@ -123,7 +123,7 @@ def _cmdline_power_sequence(cli_args: argparse.Namespace):
 
     return tcfl.ui_cli.run_fn_on_each_targetspec(
         _power_sequence_by_target, cli_args, cli_args,
-        iface = "power", extensions_only = [ 'power' ])
+        iface = "power", extensions_only = [ 'power' ])[0]
 
 
 
@@ -136,10 +136,10 @@ def _cmdline_power_get(cli_args: argparse.Namespace):
         print(f"{target.id}: {'on' if r == True else 'off'}")
         sys.stdout.flush()
 
-    r = tcfl.ui_cli.run_fn_on_each_targetspec(
+    retval, _ = tcfl.ui_cli.run_fn_on_each_targetspec(
         _power_get_by_target, cli_args, cli_args,
         iface = "power", extensions_only = [ 'power' ])
-    return r
+    return retval
 
 
 def _cmdline_power_list(cli_args: argparse.Namespace):
@@ -187,7 +187,7 @@ def _cmdline_power_list(cli_args: argparse.Namespace):
 
     return tcfl.ui_cli.run_fn_on_each_targetspec(
         _power_list_by_target, cli_args, cli_args,
-        iface = "power", extensions_only = [ 'power' ])
+        iface = "power", extensions_only = [ 'power' ])[0]
 
 
 

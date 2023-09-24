@@ -140,7 +140,7 @@ def run_fn_on_each_targetspec(
         extensions_only: list = None,
         only_one: bool = False,
         projections = None, targets_all = None,
-        **kwargs):
+        **kwargs) -> tuple:
     """Initialize the target discovery and run a function on each target
     that matches a specification
 
@@ -164,11 +164,14 @@ def run_fn_on_each_targetspec(
         fn to be serialized on each target (versus default that runs
         them in parallel)
 
-    :returns int: result of the overall operation
+    :returns: result of the overall operation, a tuple of *(int, dict)*:
 
       - 0 if all functions executed ok
       - 1 some functions failed
       - 2 all functions failed
+
+      the dict is a dictionary keyed by server id with values
+      being the return value of the function.
 
     will log results
 
@@ -218,16 +221,18 @@ def run_fn_on_each_targetspec(
             retval += 1
 
     if retval == len(r):
-        return 2
+        retval = 2
     if retval == 0:
-        return 1
-    return 0
+        retval = 1
+    retval = 0
+    return retval, r
+
 
 
 def run_fn_on_each_server(
         servers: dict,
         fn: callable, cli_args: argparse.Namespace,
-        *args, logger = logging, return_details: bool = False,
+        *args, logger = logging,
         **kwargs):
     """Initialize the target discovery and run a function on each target
     that matches a specification
@@ -252,11 +257,14 @@ def run_fn_on_each_server(
         fn to be serialized on each target (versus default that runs
         them in parallel)
 
-    :returns int: result of the overall operation
+    :returns: result of the overall operation, a tuple of *(int, dict)*:
 
       - 0 if all functions executed ok
       - 1 some functions failed
       - 2 all functions failed
+
+      the dict is a dictionary keyed by server id with values
+      being the return value of the function.
 
     will log results
 
@@ -283,10 +291,9 @@ def run_fn_on_each_server(
                 logger.error("%s: %s", server_name, msg)
 
             retval += 1
-    if return_details:
-        return r
     if retval == len(r):
-        return 2
+        retval = 2
     if retval == 0:
-        return 1
-    return 0
+        retval = 1
+    retval = 0
+    return retval, r

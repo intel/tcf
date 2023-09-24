@@ -383,7 +383,7 @@ def _cmdline_images_read(cli_args: argparse.Namespace):
         cli_args.image, cli_args.filename, cli_args.offset, cli_args.length,
         only_one = True,
         targets_all = cli_args.all,
-        iface = "images", extensions_only = [ 'images' ])
+        iface = "images", extensions_only = [ 'images' ])[0]
 
 
 
@@ -423,7 +423,7 @@ def _cmdline_image_write(cli_args: argparse.Namespace):
         cli_args.image, cli_args.data,
         only_one = True,
         targets_all = cli_args.all,
-        iface = "images", extensions_only = [ 'images' ])
+        iface = "images", extensions_only = [ 'images' ])[0]
 
 
 

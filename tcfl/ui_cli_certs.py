@@ -58,7 +58,7 @@ def _cmdline_certs_get(cli_args: argparse.Namespace):
     return tcfl.ui_cli.run_fn_on_each_targetspec(
         _certs_get, cli_args, cli_args,
         only_one = True,
-        iface = "certs", extensions_only = [ "certs" ])
+        iface = "certs", extensions_only = [ "certs" ])[0]
 
 
 
@@ -70,7 +70,7 @@ def _cmdline_certs_remove(cli_args: argparse.Namespace):
     return tcfl.ui_cli.run_fn_on_each_targetspec(
         _certs_remove, cli_args, cli_args,
         only_one = True,
-        iface = "certs", extensions_only = [ "certs" ])
+        iface = "certs", extensions_only = [ "certs" ])[0]
 
 
 
@@ -81,7 +81,7 @@ def _cmdline_certs_list(cli_args: argparse.Namespace):
     return tcfl.ui_cli.run_fn_on_each_targetspec(
         _certs_list, cli_args, cli_args,
         only_one = True,
-        iface = "certs", extensions_only = [ "certs" ])
+        iface = "certs", extensions_only = [ "certs" ])[0]
 
 
 
