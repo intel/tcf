@@ -84,14 +84,14 @@ def _capture_ls(target: tcfl.tc.target_c, verbosity: int):
         json.dump(d, sys.stdout, skipkeys = True, indent = True)
 
 
-
 def _cmdline_capture_ls(cli_args: argparse.Namespace):
     verbosity = tcfl.ui_cli.logger_verbosity_from_cli(logger, cli_args)
 
-    return tcfl.ui_cli.run_fn_on_each_targetspec(
+    retval, _ = tcfl.ui_cli.run_fn_on_each_targetspec(
         _capture_ls, cli_args, verbosity,
         only_one = True,
         iface = "capture", extensions_only = [ "capture" ])
+    return retval
 
 
 

@@ -44,7 +44,7 @@ def _cmdline_tunnel_add(cli_args: argparse.Namespace):
         _tunnel_add, cli_args,  cli_args,
         only_one = True,
         iface = "tunnel", extensions_only = [ "tunnel" ],
-        projections = [ "interconnects" ])
+        projections = [ "interconnects" ])[0]
 
 
 
@@ -58,7 +58,7 @@ def _cmdline_tunnel_rm(cli_args: argparse.Namespace):
         _tunnel_rm, cli_args, cli_args,
         only_one = True,
         iface = "tunnel", extensions_only = [ "tunnel" ],
-        projections = [ "interconnects" ])
+        projections = [ "interconnects" ])[0]
 
 
 
@@ -79,7 +79,7 @@ def _cmdline_tunnel_ls(cli_args: argparse.Namespace):
         _tunnel_list_by_target, cli_args, cli_args,
         only_one = True,
         iface = "tunnel", extensions_only = [ "tunnel" ],
-        projections = [ "interconnects" ])
+        projections = [ "interconnects" ])[0]
 
 
 
