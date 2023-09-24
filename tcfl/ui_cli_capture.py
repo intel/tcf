@@ -95,6 +95,42 @@ def _cmdline_capture_ls(cli_args: argparse.Namespace):
 
 
 
+def _capture_stop(target: tcfl.tc.target_c, capturer: str):
+    return target.capture.stop(capturer)
+
+
+def _cmdline_capture_stop(cli_args: argparse.Namespace):
+    verbosity = tcfl.ui_cli.logger_verbosity_from_cli(logger, cli_args)
+
+    retval, r = tcfl.ui_cli.run_fn_on_each_targetspec(
+        _capture_stop, cli_args, cli_args.capturer,
+        iface = "capture", extensions_only = [ "capture" ])
+
+    # r is keyed by { TARGET: { STREAMNAME: FILENAME } }
+    if verbosity == 0 or verbosity == 1:
+        import tabulate
+        headers = [
+            "Target",
+            "Stream",
+            "Filename",
+        ]
+        table = []
+        for targetid, ( data, e ) in list(r.items()):
+            for stream, filename in data.items():
+                table.append([ targetid, stream, filename ])
+        print(tabulate.tabulate(table, headers = headers))
+        return
+    if verbosity == 2:
+        commonl.data_dump_recursive(r)
+    elif verbosity == 3:
+        import pprint
+        pprint.pprint(r, indent = True)
+    elif verbosity >= 4:
+        import json
+        json.dump(r, sys.stdout, indent = True)
+
+
+
 def cmdline_setup_intermediate(arg_subparser):
 
     ap = arg_subparser.add_parser(
@@ -103,3 +139,12 @@ def cmdline_setup_intermediate(arg_subparser):
     tcfl.ui_cli.args_verbosity_add(ap)
     tcfl.ui_cli.args_targetspec_add(ap, targetspec_n = 1)
     ap.set_defaults(func = _cmdline_capture_ls)
+
+    ap = arg_subparser.add_parser(
+        "capture-stop", help = "stop capturing")
+    tcfl.ui_cli.args_verbosity_add(ap)
+    tcfl.ui_cli.args_targetspec_add(ap, targetspec_n = 1)
+    ap.add_argument(
+        "capturer", metavar = "CAPTURER-NAME", action = "store",
+        type = str, help = "Name of capturer that should stop")
+    ap.set_defaults(func = _cmdline_capture_stop)
