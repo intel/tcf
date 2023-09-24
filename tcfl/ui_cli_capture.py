@@ -119,7 +119,8 @@ def _cmdline_capture_stop(cli_args: argparse.Namespace):
             for stream, filename in data.items():
                 table.append([ targetid, stream, filename ])
         print(tabulate.tabulate(table, headers = headers))
-        return
+        return retval
+
     if verbosity == 2:
         commonl.data_dump_recursive(r)
     elif verbosity == 3:
@@ -128,6 +129,7 @@ def _cmdline_capture_stop(cli_args: argparse.Namespace):
     elif verbosity >= 4:
         import json
         json.dump(r, sys.stdout, indent = True)
+    return retval
 
 
 
