@@ -1019,25 +1019,6 @@ def _cmdline_capture_stop(args):
         for stream_name, file_name in r.items():
             print(f"{stream_name}: {file_name}")
 
-def _cmdline_capture_list(args):
-    state_to_str = {
-        False: "not capturing",
-        True: "capturing",
-        None: "ready"
-    }
-    with msgid_c("cmdline"):
-        target = tc.target_c.create_from_cmdline_args(args, iface = "capture")
-        capturers_data = target.capture._capturers_data_get()
-        capturers = target.capture.list()
-        for name, state in capturers.items():
-            streams = capturers_data[name].get('stream', {})
-            l = [
-                name + ":" + data.get('mimetype', "mimetype-n/a")
-                for name, data in streams.items()
-            ]
-            print(f"{name} ({state_to_str[state]}): {' '.join(l)}")
-
-
 def cmdline_setup(argsp):
     ap = argsp.add_parser("capture", help = "Generic capture; takes a"
                           " snapshot or captures for given SECONDS"
@@ -1086,8 +1067,3 @@ def cmdline_setup(argsp):
     ap.add_argument("capturer", metavar = "CAPTURER-NAME", action = "store",
                     type = str, help = "Name of capturer that should stop")
     ap.set_defaults(func = _cmdline_capture_stop)
-
-    ap = argsp.add_parser("capture-ls", help = "List available capturers")
-    ap.add_argument("target", metavar = "TARGET", action = "store", type = str,
-                    default = None, help = "Target's name or URL")
-    ap.set_defaults(func = _cmdline_capture_list)
