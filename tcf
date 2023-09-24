@@ -286,6 +286,8 @@ if __name__ == "__main__":
 
     tcfl.tc.argp_setup(arg_subparsers)
 
+    import tcfl.ui_cli_capture
+    tcfl.ui_cli_capture.cmdline_setup_intermediate(arg_subparsers)
     tcfl.tc.target_ext_capture.cmdline_setup(arg_subparsers)
     tcfl.tc.target_ext_buttons._cmdline_setup(arg_subparsers)
     import tcfl.ui_cli_console
