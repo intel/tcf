@@ -1012,13 +1012,6 @@ def _cmdline_capture_get(args):
                 break
             time.sleep(args.wait)
 
-def _cmdline_capture_stop(args):
-    with msgid_c("cmdline"):
-        target = tc.target_c.create_from_cmdline_args(args, iface = "capture")
-        r = target.capture.stop(args.capturer)
-        for stream_name, file_name in r.items():
-            print(f"{stream_name}: {file_name}")
-
 def cmdline_setup(argsp):
     ap = argsp.add_parser("capture", help = "Generic capture; takes a"
                           " snapshot or captures for given SECONDS"
@@ -1059,11 +1052,3 @@ def cmdline_setup(argsp):
                     action = "store_true", default = False,
                     help = "Read any changes from the last download")
     ap.set_defaults(func = _cmdline_capture_get)
-
-    ap = argsp.add_parser("capture-stop", help = "stop capturing, discarding "
-                          "the capture")
-    ap.add_argument("target", metavar = "TARGET", action = "store", type = str,
-                    default = None, help = "Target's name or URL")
-    ap.add_argument("capturer", metavar = "CAPTURER-NAME", action = "store",
-                    type = str, help = "Name of capturer that should stop")
-    ap.set_defaults(func = _cmdline_capture_stop)
