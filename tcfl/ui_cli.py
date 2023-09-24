@@ -109,7 +109,7 @@ def args_targetspec_add(
         "quotes (eg: 'ram.size_gib >= 2 and not type:\"^qemu.*\"')")
 
 
-def logger_verbosity_from_cli(log, cli_args):
+def logger_verbosity_from_cli(log, cli_args: argparse.Namespace) -> int:
     """
     Set a loggers verbosity based on what the command line (-v and -q) said
 
@@ -118,6 +118,7 @@ def logger_verbosity_from_cli(log, cli_args):
     :param argparser.Namespace: command line arguments parsed with
       :mod:`argparse`; was given options *verbosity* and *quietosity*
       with :func:`args_verbosity_add`
+    :returns int: verbosity level
     """
     verbosity = cli_args.verbosity - cli_args.quietosity
     levels = [ logging.ERROR, logging.WARNING, logging.INFO, logging.DEBUG ]
@@ -126,6 +127,7 @@ def logger_verbosity_from_cli(log, cli_args):
     if verbosity >= len(levels):
         verbosity = len(levels) - 1
     log.setLevel(levels[verbosity])
+    return cli_args.verbosity - cli_args.quietosity
 
 
 def run_fn_on_each_targetspec(
