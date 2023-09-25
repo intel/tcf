@@ -1,4 +1,4 @@
-#! /usr/bin/python3
+#! /usr/bin/env python3
 #
 # Copyright (c) 2014-2023 Intel Corporation
 #
@@ -19,7 +19,9 @@ learn more about them):
 
 import argparse
 import logging
+import os
 import sys
+import time
 
 import commonl
 import tcfl.tc
@@ -154,6 +156,8 @@ def _cmdline_capture_start(cli_args: argparse.Namespace):
         ]
         table = []
         for targetid, ( data, _e ) in list(r.items()):
+            if not data:
+                continue
             capturing = False
             for stream, filename in data.items():
                 if stream == "capturing":	# special case
@@ -171,6 +175,36 @@ def _cmdline_capture_start(cli_args: argparse.Namespace):
     elif verbosity >= 4:
         import json
         json.dump(r, sys.stdout, indent = True)
+    return retval
+
+
+
+def _capture_get(target: tcfl.tc.target_c, capturer: str, prefix: str,
+                 follow: bool, wait: float):
+
+    if not prefix:
+        prefix = target.id + "."
+
+    while True:
+        r = target.capture.get(capturer, prefix = prefix, follow = follow)
+        for stream_name, file_name in r.items():
+            stat_info = os.stat(file_name)
+            print(f"{stream_name}: {file_name} [{stat_info.st_size}B]")
+        if not follow:
+            break
+        time.sleep(wait)
+
+    return target.capture.start(capturer)
+
+
+
+def _cmdline_capture_get(cli_args: argparse.Namespace):
+    verbosity = tcfl.ui_cli.logger_verbosity_from_cli(logger, cli_args)
+
+    retval, r = tcfl.ui_cli.run_fn_on_each_targetspec(
+        _capture_get, cli_args, cli_args.capturer,
+        cli_args.prefix, cli_args.follow, cli_args.wait,
+        iface = "capture", extensions_only = [ "capture", "store" ])
     return retval
 
 
@@ -201,3 +235,25 @@ def cmdline_setup_intermediate(arg_subparser):
         "capturer", metavar = "CAPTURER-NAME", action = "store",
         type = str, help = "Name of capturer that should stop")
     ap.set_defaults(func = _cmdline_capture_stop)
+
+    ap = arg_subparser.add_parser(
+        "capture-get",
+        help = "stop capturing and get the result to a file")
+    tcfl.ui_cli.args_verbosity_add(ap)
+    tcfl.ui_cli.args_targetspec_add(ap, targetspec_n = 1)
+    ap.add_argument(
+        "capturer", metavar = "CAPTURER-NAME", action = "store", type = str,
+        help = "Name of capturer whose streams are to be downloaded")
+    ap.add_argument(
+        "--prefix", action = "store", type = str, default = None,
+        help = "Prefix for downloaded files")
+    ap.add_argument(
+        "--wait", action = "store", metavar = 'SECONDS', type = float,
+        default = 2,
+        help = "When --follow, time to wait between downloads"
+        " [%(default).1f seconds]")
+    ap.add_argument(
+        "--follow",
+        action = "store_true", default = False,
+        help = "Read any changes from the last download")
+    ap.set_defaults(func = _cmdline_capture_get)

@@ -580,6 +580,7 @@ class extension(tc.target_extension_c):
                     f"capturer '{capturer}': unknown stream '{stream_name}'"
                     f" (available: {' '.join(streams_data.keys())}")
         r = {}
+        first_e = None
         for stream_name, stream_data in streams_data.items():
             if streams and stream_name not in streams:
                 continue
@@ -602,7 +603,12 @@ class extension(tc.target_extension_c):
                                          offset = offset, append = follow)
                 r[stream_name] = dst_file_name
             except tc.exception as e:
+                if not first_e:
+                    first_e = e
                 tc.result_c.report_from_exception(self.target.testcase, e)
+        if not r and first_e != None:
+            # did we find no streams and some issues?
+            raise first_e
         return r
 
 
@@ -988,23 +994,6 @@ def _cmdline_capture(args):
             print(f"{capturer}: downloaded stream {stream_name} -> {file_name}")
 
 
-def _cmdline_capture_get(args):
-    # FIXME: add --continue to use offset to get from the same files
-    with msgid_c("cmdline"):
-        target = tc.target_c.create_from_cmdline_args(args, iface = "capture")
-        if args.prefix:
-            prefix = args.prefix
-        else:
-            prefix = target.id + "."
-        while True:
-            r = target.capture.get(args.capturer, prefix = prefix,
-                                   follow = args.follow)
-            for stream_name, file_name in r.items():
-                print(f"{stream_name}: {file_name}")
-            if not args.follow:
-                break
-            time.sleep(args.wait)
-
 def cmdline_setup(argsp):
     ap = argsp.add_parser("capture", help = "Generic capture; takes a"
                           " snapshot or captures for given SECONDS"
@@ -1021,20 +1010,3 @@ def cmdline_setup(argsp):
                     type = str, default = [], nargs = "*",
                     help = "Specify stream(s) to download (default all)")
     ap.set_defaults(func = _cmdline_capture)
-
-    ap = argsp.add_parser("capture-get",
-                          help = "stop capturing and get the result to a file")
-    ap.add_argument("target", metavar = "TARGET", action = "store", type = str,
-                    default = None, help = "Target's name or URL")
-    ap.add_argument("capturer", metavar = "CAPTURER-NAME", action = "store",
-                    type = str, help = "Name of capturer that should stop")
-    ap.add_argument("--prefix", action = "store", type = str, default = None,
-                    help = "Prefix for downloaded files")
-    ap.add_argument("--wait", action = "store", metavar = 'SECONDS',
-                    type = float, default = 2,
-                    help = "When --follow, time to wait between downloads"
-                    " [%(default).1f seconds]")
-    ap.add_argument("--follow",
-                    action = "store_true", default = False,
-                    help = "Read any changes from the last download")
-    ap.set_defaults(func = _cmdline_capture_get)
