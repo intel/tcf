@@ -132,6 +132,48 @@ def _cmdline_capture_stop(cli_args: argparse.Namespace):
     return retval
 
 
+def _capture_start(target: tcfl.tc.target_c, capturer: str):
+    return target.capture.start(capturer)
+
+
+def _cmdline_capture_start(cli_args: argparse.Namespace):
+    verbosity = tcfl.ui_cli.logger_verbosity_from_cli(logger, cli_args)
+
+    retval, r = tcfl.ui_cli.run_fn_on_each_targetspec(
+        _capture_start, cli_args, cli_args.capturer,
+        iface = "capture", extensions_only = [ "capture" ])
+
+    # r is keyed by { TARGET: { STREAMNAME: FILENAME } }
+    if verbosity == 0 or verbosity == 1:
+        import tabulate
+        headers = [
+            "Target",
+            "Capturing",
+            "Stream",
+            "Filename",
+        ]
+        table = []
+        for targetid, ( data, _e ) in list(r.items()):
+            capturing = False
+            for stream, filename in data.items():
+                if stream == "capturing":	# special case
+                    capturing = filename
+                    continue
+                table.append([ targetid, capturing, stream, filename ])
+        print(tabulate.tabulate(table, headers = headers))
+        return retval
+
+    if verbosity == 2:
+        commonl.data_dump_recursive(r)
+    elif verbosity == 3:
+        import pprint
+        pprint.pprint(r, indent = True)
+    elif verbosity >= 4:
+        import json
+        json.dump(r, sys.stdout, indent = True)
+    return retval
+
+
 
 def cmdline_setup_intermediate(arg_subparser):
 
@@ -141,6 +183,15 @@ def cmdline_setup_intermediate(arg_subparser):
     tcfl.ui_cli.args_verbosity_add(ap)
     tcfl.ui_cli.args_targetspec_add(ap, targetspec_n = 1)
     ap.set_defaults(func = _cmdline_capture_ls)
+
+    ap = arg_subparser.add_parser(
+        "capture-start", help = "Start capturing")
+    tcfl.ui_cli.args_verbosity_add(ap)
+    tcfl.ui_cli.args_targetspec_add(ap, targetspec_n = 1)
+    ap.add_argument(
+        "capturer", metavar = "CAPTURER-NAME", action = "store",
+        type = str, help = "Name of capturer that should start")
+    ap.set_defaults(func = _cmdline_capture_start)
 
     ap = arg_subparser.add_parser(
         "capture-stop", help = "stop capturing")
