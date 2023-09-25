@@ -988,13 +988,6 @@ def _cmdline_capture(args):
             print(f"{capturer}: downloaded stream {stream_name} -> {file_name}")
 
 
-def _cmdline_capture_start(args):
-    with msgid_c("cmdline"):
-        target = tc.target_c.create_from_cmdline_args(args, iface = "capture")
-        r = target.capture.start(args.capturer)
-        for stream_name, file_name in r.items():
-            print(f"{stream_name}: {file_name}")
-
 def _cmdline_capture_get(args):
     # FIXME: add --continue to use offset to get from the same files
     with msgid_c("cmdline"):
@@ -1028,13 +1021,6 @@ def cmdline_setup(argsp):
                     type = str, default = [], nargs = "*",
                     help = "Specify stream(s) to download (default all)")
     ap.set_defaults(func = _cmdline_capture)
-
-    ap = argsp.add_parser("capture-start", help = "start capturing")
-    ap.add_argument("target", metavar = "TARGET", action = "store", type = str,
-                    default = None, help = "Target's name or URL")
-    ap.add_argument("capturer", metavar = "CAPTURER-NAME", action = "store",
-                    type = str, help = "Name of capturer that should start")
-    ap.set_defaults(func = _cmdline_capture_start)
 
     ap = argsp.add_parser("capture-get",
                           help = "stop capturing and get the result to a file")
