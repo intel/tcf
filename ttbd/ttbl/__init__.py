@@ -1,4 +1,4 @@
-#! /usr/bin/python3
+#! /usr/bin/env python3
 #
 # Copyright (c) 2017 Intel Corporation
 #
@@ -3049,7 +3049,15 @@ class device_resolver_c:
                              spec, origin, " ".join(devicel))
         return devicel
 
-    sysfs_tty_globs = [ "tty*", "tty/tty*" ]
+    sysfs_tty_globs = [
+        # this catches when a tty device is in the top level, such as
+        # USB devices specified just a a serial number; if a USB
+        # device specifies a single serial port, this makes it work
+        "*/tty*", "*/tty/tty*",
+        # this catches a tty device that is a subdevice (eg, in a USB
+        # device interface)
+        "tty*", "tty/tty*"
+    ]
 
     def ttys_find_by_spec(self):
         """
