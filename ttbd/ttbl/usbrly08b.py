@@ -1,4 +1,4 @@
-#! /usr/bin/python3
+#! /usr/bin/env python3
 #
 # Copyright (c) 2017 Intel Corporation
 #
@@ -17,8 +17,7 @@ import ttbl
 import ttbl.things
 
 class rly08b(ttbl.tt_interface_impl_c):
-    """
-    A power control implementation for the USB-RLY08B relay controller
+    """A power control implementation for the USB-RLY08B relay controller
 
     https://www.robot-electronics.co.uk/htm/usb_rly08btech.htm.
 
@@ -57,8 +56,30 @@ class rly08b(ttbl.tt_interface_impl_c):
 
       replug your hubs so the rule is set.
 
-    :param str serial_number: Serial number of the relay's control
-      device.
+    :param str device_spec: device to attach to.
+
+      It can be a USB serial number:
+
+      >>> "00023456"
+
+      or
+
+      >>> "usb,#00023456"
+
+      a TTY device path:
+
+      >>> "/dev/ttyS3"
+
+      or a more complex specification with the USB fields, since the
+      USB Vendor and Product IDs are 1a86:7523, we can match any:
+
+      >>> "usb,idVendor=04d8,idProduct=ffee,##:1.0"
+
+      note we need to specify the USB interface (:1.0) and it'll
+      complain if it finds more than one
+
+      See :class:`ttbl.device_resolver_c` for more details
+
 
     :param int relay: number of the relay to control (1-8)
 
@@ -71,13 +92,15 @@ class rly08b(ttbl.tt_interface_impl_c):
     # backend to cut in the number of open file handles
     backend = None
 
-    def __init__(self, serial_number):
-        assert isinstance(serial_number, str)
+    def __init__(self, device_spec: str):
+        assert isinstance(device_spec, str)
         ttbl.tt_interface_impl_c.__init__(self, "USBRLY08b")
-        self.serial_number = serial_number
-        self.upid_set("USBRLY08b", serial_number = serial_number)
+        self.device_spec = device_spec
+        self.upid_set("USBRLY08b", device_spec = device_spec)
 
-    def _command(self, cmd, states = None, get_state = False):
+
+    def _command(self, target: ttbl.test_target,
+                 cmd, states = None, get_state = False):
         """
         Execute a command, maybe get a reponse and relay states
 
@@ -121,44 +144,15 @@ class rly08b(ttbl.tt_interface_impl_c):
             cmds = [ cmd ]
         else:
             cmds = cmd
-        response = []
-        ports = serial.tools.list_ports.comports()
-        port = None
-        for port in ports:
-            if not hasattr(port, "vid"):
-                # old library compat, list looks like:
-                # [
-                #     ('/dev/ttyACM2', 'ttyACM2', 'USB VID:PID=2341:0042 SNR=95730333937351308131'),
-                #     ('/dev/ttyACM0', 'ttyACM0', 'USB VID:PID=2341:0042 SNR=957303339373517172D1'),
-                #     ('/dev/ttyACM1', 'ttyACM1', 'USB VID:PID=04d8:ffee SNR=00026189')
-                # ]
-                device = port[0]
-                tty = port[1]
-                extra = port[2]
-                r = re.compile(
-                    "USB VID:PID=(?P<vid>[0-9a-fA-F]+):(?P<pid>[0-9a-fA-F]+)"
-                    " SNR=(?P<snr>.*)$")
-                m = r.match(extra)
-                if not m:
-                    continue
-                d = m.groupdict()
-                vid = int(d['vid'], 16)
-                pid = int(d['pid'], 16)
-                serial_number = d['snr']                    
-            else:
-                device = port.device
-                vid = port.vid
-                pid = port.pid
-                serial_number = port.serial_number
-            
-            if vid == 0x04d8 and pid == 0xffee \
-               and serial_number == self.serial_number:
-                break
-        else:
-            raise self.not_found_e("Cannot find USB-RLY8B with serial %s"
-                                   % self.serial_number)
 
-        with serial.Serial(device, baudrate = 9600,
+        device_resolver = ttbl.device_resolver_c(
+            target, self.device_spec,
+            f"instrumentation.{self.upid_index}.device_spec")
+        tty_dev = device_resolver.tty_find_by_spec()
+            
+        response = []
+
+        with serial.Serial(tty_dev, baudrate = 9600,
                            bytesize = serial.EIGHTBITS,
                            parity = serial.PARITY_NONE,
                            stopbits = serial.STOPBITS_ONE,
@@ -197,8 +191,8 @@ class pc(rly08b, ttbl.power.impl_c):
     Power control implementation that uses a relay to close/open a
     circuit on on/off
 
-    :param str usb_serial_number: USB serial number of the USBRLY08b
-      board to use
+    :param str device_spec: see :class:`rly08b`
+
     :param int relay: relay number to work on (1-8), maching the
        numbers printed in the PCB.
 
@@ -211,30 +205,26 @@ class pc(rly08b, ttbl.power.impl_c):
 
     Other parameters as to :class:ttbl.power.impl_c.
     """
-    def __init__(self, usb_serial_number, relay, resilient = False, **kwargs):
+    def __init__(self, device_spec: str, relay, resilient = False, **kwargs):
         assert isinstance(relay, int) and relay >= 1 or relay <= 8, \
             "relay: relay number is a number 1 - 8, " \
             f"matching the relay number in the PCB; got {type(relay)}"
         self.relay = relay
-        rly08b.__init__(self, usb_serial_number)
         ttbl.power.impl_c.__init__(self, **kwargs)
-        self.upid_set(
-            f"USBRLY08b at USB#{usb_serial_number}",
-            name = "USBRLY08b",
-            usb_serial_number = usb_serial_number)
+        rly08b.__init__(self, device_spec)
         self.resilient = resilient
 
     def on(self, target, _component):
         # 0x64 is all relays on (see _command()); thus first relay
         # (#1) + 0x64 -> 0x65 turn relay #1 on
         cmd = 0x64 + self.relay
-        rs = self._command(cmd, get_state = True)[-1]
+        rs = self._command(target, cmd, get_state = True)[-1]
         rl = struct.unpack('<' + 'B' *len(rs), rs)
         r = rl[0]
         if not r & (1 << (self.relay - 1)):
             raise RuntimeError("USB-RLY08B[%s] failed to power on relay #%d"
                                " (returned 0x%02x)"
-                               % (self.serial_number, self.relay, r))
+                               % (self.device_spec, self.relay, r))
 
     def off(self, target, _component):
         # Okie, this is quite a hack -- when we try to power it off,
@@ -246,26 +236,26 @@ class pc(rly08b, ttbl.power.impl_c):
         # the device being quirky.
         cmd = 0x6e + self.relay
         try:
-            rs = self._command(cmd, get_state = True)[-1]
+            rs = self._command(target, cmd, get_state = True)[-1]
             rl = struct.unpack('<' + 'B' *len(rs), rs)
             r = rl[0]
             if r & (1 << (self.relay - 1)):
                 raise RuntimeError("USB-RLY08B[%s] failed to power off "
                                    "relay #%d (returned 0x%02x)"
-                                   % (self.serial_number, self.relay, r))
+                                   % (self.device_spec, self.relay, r))
         except self.not_found_e:
             target.log.log(8, "USB-RLY08B[%s] not found, assuming relay "
                            "#%d powered off"
-                           % (self.serial_number, self.relay))
+                           % (self.device_spec, self.relay))
 
     def get(self, target, _component):
         cmd = 0x5b
         try:
-            rs = self._command(cmd)[-1]
+            rs = self._command(target, cmd)[-1]
             rl = struct.unpack('<' + 'B' *len(rs), rs)
             r = rl[0]
             target.log.log(8, "USB-RLY08B[%s] status 0x%02x"
-                           % (self.serial_number, r))
+                           % (self.device_spec, r))
             if r & (1 << (self.relay - 1)):
                 return True
             else:
@@ -275,11 +265,11 @@ class pc(rly08b, ttbl.power.impl_c):
                 # If it is not connected, it is off
                 target.log.warning("USB-RLY08B[%s] not found, assuming"
                                    " relay #%d powered off"
-                                   % (self.serial_number, self.relay))
+                                   % (self.device_spec, self.relay))
                 return False
             target.log.warning("USB-RLY08B[%s] not found, no status for"
                                " relay #%d"
-                               % (self.serial_number, self.relay))
+                               % (self.device_spec, self.relay))
             return None
 
 
@@ -301,8 +291,7 @@ class plugger(rly08b,		 # pylint: disable = abstract-method
 
     This uses a :class:`rly08b` relay bank to do the switching.
 
-    :param str serial_number: USB serial number of the USB-RLY8B
-        device used to control
+    :param str device_spec: see :class:`rly08b`
 
     :param int bank: bank of relays to use; bank 0 are relays 1-4,
         bank 1 are relays 5-8. Note below for connection information.
@@ -445,8 +434,7 @@ class plugger(rly08b,		 # pylint: disable = abstract-method
     implements the USB plugging/unplugging (in this case we use bank 1
     of relays, from 5 to 8)
     """
-    def __init__(self, serial_number, bank):
-        self.serial_number = serial_number
+    def __init__(self, device_spec: str, bank):
         self.bank = bank
         if bank == 0:
             self.vcc = 4
@@ -464,9 +452,9 @@ class plugger(rly08b,		 # pylint: disable = abstract-method
             raise RuntimeError("unknown bank number %s "
                                "(only 0 or 1 available)" % bank)
         # 0 is ignored, we don't use an specific relay in this mode
-        rly08b.__init__(self, serial_number)
         ttbl.things.impl_c.__init__(self)
         ttbl.power.impl_c.__init__(self)
+        rly08b.__init__(self, device_spec)
 
     def plug(self, target, _thing):	# pylint: disable = missing-docstring
         # Connect terminals C and NC (Host B), disconnecting NO (Host A)
@@ -474,6 +462,7 @@ class plugger(rly08b,		 # pylint: disable = abstract-method
 
         # Turn the vcc, dm, dn, gnd off so they switch to Host B
         response = self._command(
+            target,
             [
                 0x6e + self.vcc, 0x6e + self.dp,
                 0x6e + self.dm, 0x6e + self.gnd
@@ -481,11 +470,11 @@ class plugger(rly08b,		 # pylint: disable = abstract-method
         # Verify the states match
         state = ord(response[-1])
         target.log.info("USB-RLY08B[%s/%d] status after plug 0x%02x"
-                        % (self.serial_number, self.bank, state))
+                        % (self.device_spec, self.bank, state))
         if state & self.mask:
             raise RuntimeError("USB-RLY08B[%s] failed to plug (powering "
                                "off ports %d|%d|%d|%d, state 0x%02x)"
-                               % (self.serial_number,
+                               % (self.device_spec,
                                   self.vcc, self.dp, self.dm, self.gnd,
                                   state & self.mask))
 
@@ -494,6 +483,7 @@ class plugger(rly08b,		 # pylint: disable = abstract-method
 
         # Turn the vcc, dm, dn, gnd off so they switch to Host B
         response = self._command(
+            target,
             [
                 0x64 + self.vcc, 0x64 + self.dp,
                 0x64 + self.dm, 0x64 + self.gnd
@@ -501,11 +491,11 @@ class plugger(rly08b,		 # pylint: disable = abstract-method
         # Verify the states match
         state = ord(response[-1])
         target.log.info("USB-RLY08B[%s/%d] status after unplug 0x%02x"
-                        % (self.serial_number, self.bank, state))
+                        % (self.device_spec, self.bank, state))
         if state & self.mask != self.mask:
             raise RuntimeError("USB-RLY08B[%s] failed to unplug (powering "
                                "off ports %d|%d|%d|%d, state 0x%02x)"
-                               % (self.serial_number,
+                               % (self.device_spec,
                                   self.vcc, self.dp, self.dm, self.gnd,
                                   state & self.mask))
 
@@ -521,17 +511,17 @@ class plugger(rly08b,		 # pylint: disable = abstract-method
     def get(self, target, _thing = None):
         cmd = 0x5b
         try:
-            rs = self._command(cmd)[-1]
+            rs = self._command(target, cmd)[-1]
             rl = struct.unpack('<' + 'B' *len(rs), rs)
             r = rl[0]
             target.log.info("USB-RLY08B[%s/%d] status 0x%02x"
-                            % (self.serial_number, self.bank, r))
+                            % (self.device_spec, self.bank, r))
             # watch out: off (False) means connected to Host-A
             return bool(r & self.mask == self.mask)
         except self.not_found_e:
             # If it is not connected, it is off
             target.log.log(8, "USB-RLY08B[%s] not found, assuming bank "
                            "%d connected to Host-B"
-                           % (self.serial_number, self.bank))
+                           % (self.device_spec, self.bank))
             return False
 
