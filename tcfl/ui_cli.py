@@ -201,7 +201,7 @@ def run_fn_on_each_targetspec(
         logger.error(
             f"No targets match the specification (might be disabled, try -a):"
             f" {' '.join(cli_args.target)}")
-        return 0
+        return 0, {}
 
     # r is a dictionaky of ( result, exception ) keyed by targetid
     retval = 0
