@@ -218,9 +218,10 @@ class interface(ttbl.tt_interface):
     def _allocate_hook(self, target, iface_name, allocdb):
         # initalize certificates once allocated, so they are available
         # to all the components that might need them
-        cert_path = os.path.join(target.state_dir, "certificates")
-        cert_client_path = os.path.join(target.state_dir, "certificates_client")
-        self._setup_maybe(target, cert_path, cert_client_path)
+
+        # we don't really do anything here; we defer setting up in
+        # case we create any certificate with put_certificates() below
+        pass
 
 
     def _release_hook(self, target, force):
