@@ -18,6 +18,26 @@ The interface to the target is the :class:`ttbl.things.interface`,
 which delegates on the the different *thing* drivers
 (:class:`ttbl.things.impl_c`) the implementation of the methodology to
 plug or unplug the targets.
+
+
+You can declare that a target connects to another one with the
+following language:
+
+>>> target_qu_02x = ttbl.test_target.get('qu-02x')
+>>>
+>>> class connector_object_c(ttbl.things.impl_c):
+>>>     # object that implements physical target connection
+>>>
+>>> target_qu_02x.interface_add(
+>>>    "things",
+>>>    ttbl.things.interface(**{
+>>>        "qu-03y": connector_object_c(...args...),
+>>>    })
+>>> )
+
+Note the thing's name: (*qu-03y*) is an existing target that can be
+connected to *qu-02x*.
+
 """
 
 import ttbl.config
@@ -139,7 +159,7 @@ class interface(ttbl.tt_interface):
 
     def get_get(self, target, who, args, _files, _user_path):
         """
-        Plug *thing* into *target*
+        Get plug state of *thing* into *target*
 
         The user who is plugging must own this target *and* the thing.
         """
