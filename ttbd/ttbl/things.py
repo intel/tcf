@@ -48,10 +48,9 @@ class impl_c(ttbl.tt_interface_impl_c):
         # themselves when they are released
         thing = ttbl.test_target.get(component)
         assert thing != None, \
-            "%s: thing '%s' for target '%s' has to be an" \
-            " existing target" % (target.id, name, target.id)
+            f"{target.id}: thing '{component}' has to be an existing target"
         thing.thing_to.add(target)
-        publish_dict = target.tags['interfaces'][iface_name][component]['type'] = thing.type
+        target.tags['interfaces'][iface_name][component]['type'] = thing.type
 
 
     def plug(self, target, thing):
