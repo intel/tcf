@@ -209,6 +209,52 @@ def _cmdline_capture_get(cli_args: argparse.Namespace):
 
 
 
+def _capture(target: tcfl.tc.target_c, cli_args: argparse.Namespace):
+    capturer = cli_args.capturer
+    capturers = target.capture.list()
+    if capturer not in target.kws['interfaces'].get('capture', {}):
+        raise RuntimeError(f"{capturer}: unknown capturer: {capturers}")
+    streaming = capturers[capturer]
+    if cli_args.prefix:
+        prefix = cli_args.prefix
+    else:
+        prefix = target.id + "."
+    if streaming == None:
+        # snapshot
+        print(f"{capturer}: taking snapshot")
+        target.capture.start(capturer)
+        print(f"{capturer}: downloading capture")
+        r = target.capture.get(capturer, prefix = prefix)
+    elif streaming == False:
+        # not snapshot, start, wait, stop, get
+        print(f"{capturer}: non-snapshot capturer was stopped, starting")
+        target.capture.start(cli_args.capturer)
+        print(f"{capturer}: capturing for {cli_args.wait} seconds")
+        time.sleep(cli_args.wait)
+        print(f"{capturer}: stopping capture")
+        target.capture.stop(cli_args.capturer)
+        print(f"{capturer}: downloading capture")
+        r = target.capture.get(capturer, prefix = prefix)
+    elif streaming == True:
+        print(f"{capturer}: capturing for {cli_args.wait} seconds")
+        time.sleep(cli_args.wait)
+        print(f"{capturer}: stopping capture")
+        target.capture.stop(cli_args.capturer)
+        print(f"{capturer}: downloading capture")
+        r = target.capture.get(capturer, prefix = prefix)
+    for stream_name, file_name in r.items():
+        print(f"{capturer}: downloaded stream {stream_name} -> {file_name}")
+
+def _cmdline_capture(cli_args: argparse.Namespace):
+    tcfl.ui_cli.logger_verbosity_from_cli(logger, cli_args)
+
+    retval, _r = tcfl.ui_cli.run_fn_on_each_targetspec(
+        _capture, cli_args, cli_args,
+        iface = "capture", extensions_only = [ "capture", "store" ])
+    return retval
+
+
+
 def cmdline_setup_intermediate(arg_subparser):
 
     ap = arg_subparser.add_parser(
@@ -257,3 +303,24 @@ def cmdline_setup_intermediate(arg_subparser):
         action = "store_true", default = False,
         help = "Read any changes from the last download")
     ap.set_defaults(func = _cmdline_capture_get)
+
+    ap = arg_subparser.add_parser(
+        "capture", help = "Generic capture; takes a snapshot or captures"
+        " for given SECONDS (default 5) and downloads captured data")
+    tcfl.ui_cli.args_verbosity_add(ap)
+    tcfl.ui_cli.args_targetspec_add(ap, targetspec_n = 1)
+    ap.add_argument(
+        "capturer", metavar = "CAPTURER-NAME", action = "store",
+        type = str, help = "Name of capturer where to capture from")
+    ap.add_argument(
+        "--prefix", action = "store", type = str, default = None,
+        help = "Prefix for downloaded files")
+    ap.add_argument(
+        "--wait",
+        action = "store", metavar = 'SECONDS', type = float, default = 5,
+        help = "How long to wait between starting and stopping")
+    ap.add_argument(
+        "--stream", action = "append", metavar = 'STREAM-NAME',
+        type = str, default = [], nargs = "*",
+        help = "Specify stream(s) to download (default all)")
+    ap.set_defaults(func = _cmdline_capture)
