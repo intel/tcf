@@ -210,6 +210,11 @@ def _cmdline_capture_get(cli_args: argparse.Namespace):
 
 
 def _capture(target: tcfl.tc.target_c, cli_args: argparse.Namespace):
+
+    logger = logging.getLogger(cli_args.capturer)
+    cli_args.verbosity += 2	# default to informational messages
+    tcfl.ui_cli.logger_verbosity_from_cli(logger, cli_args)
+
     capturer = cli_args.capturer
     capturers = target.capture.list()
     if capturer not in target.kws['interfaces'].get('capture', {}):
@@ -221,33 +226,31 @@ def _capture(target: tcfl.tc.target_c, cli_args: argparse.Namespace):
         prefix = target.id + "."
     if streaming == None:
         # snapshot
-        print(f"{capturer}: taking snapshot")
+        logger.info("taking snapshot")
         target.capture.start(capturer)
-        print(f"{capturer}: downloading capture")
+        logger.warning("downloading capture")
         r = target.capture.get(capturer, prefix = prefix)
     elif streaming == False:
         # not snapshot, start, wait, stop, get
-        print(f"{capturer}: non-snapshot capturer was stopped, starting")
+        logger.info("non-snapshot capturer was stopped, starting")
         target.capture.start(cli_args.capturer)
-        print(f"{capturer}: capturing for {cli_args.wait} seconds")
+        logger.info(f"capturing for {cli_args.wait} seconds")
         time.sleep(cli_args.wait)
-        print(f"{capturer}: stopping capture")
+        logger.info("stopping capture")
         target.capture.stop(cli_args.capturer)
-        print(f"{capturer}: downloading capture")
+        logger.warning("downloading capture")
         r = target.capture.get(capturer, prefix = prefix)
     elif streaming == True:
-        print(f"{capturer}: capturing for {cli_args.wait} seconds")
+        logger.info(f"capturing for {cli_args.wait} seconds")
         time.sleep(cli_args.wait)
-        print(f"{capturer}: stopping capture")
+        logger.info("stopping capture")
         target.capture.stop(cli_args.capturer)
-        print(f"{capturer}: downloading capture")
+        logger.warning("downloading capture")
         r = target.capture.get(capturer, prefix = prefix)
     for stream_name, file_name in r.items():
-        print(f"{capturer}: downloaded stream {stream_name} -> {file_name}")
+        logger.warning(f"downloaded stream {stream_name} -> {file_name}")
 
 def _cmdline_capture(cli_args: argparse.Namespace):
-    tcfl.ui_cli.logger_verbosity_from_cli(logger, cli_args)
-
     retval, _r = tcfl.ui_cli.run_fn_on_each_targetspec(
         _capture, cli_args, cli_args,
         iface = "capture", extensions_only = [ "capture", "store" ])
