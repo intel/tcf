@@ -36,6 +36,12 @@ class impl_c(ttbl.tt_interface_impl_c):
     - this might be controlling a mechanical device which
       plugs/unplugs a cable
     """
+    def __init__(self, name: str = None):
+        if name == None:
+            name = type(self).__name__
+        ttbl.tt_interface_impl_c.__init__(self, name = name)
+        self.upid_set(name)
+
     def target_setup(self, target, iface_name, component):
         # for each thing we added, we are going to tell them they
         # are a thing to this target, so they can unplug
