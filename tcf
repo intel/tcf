@@ -323,7 +323,8 @@ if __name__ == "__main__":
     tcfl.tc.target_ext_debug._cmdline_setup(arg_subparsers)
     tcfl.tc.target_ext_fastboot._cmdline_setup(arg_subparsers)
     tcfl.tc.target_ext_store._cmdline_setup(arg_subparsers)
-    tcfl.tc.target_ext_things._cmdline_setup(arg_subparsers)
+    import tcfl.ui_cli_things
+    tcfl.ui_cli_things.cmdline_setup_intermediate(arg_subparsers)
 
     # extra stuff that is not adding to the API, just to the command
     # line interface
