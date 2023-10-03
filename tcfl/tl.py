@@ -153,12 +153,32 @@ def ipxe_sanboot_url(target, sanboot_url, dhcp = None,
     time.sleep(0.3)
     target.console.write("\x02\x02")	# use this iface so expecter
     time.sleep(0.3)
-    target.expect("Ctrl-B", timeout = 250)
-    target.console.write("\x02\x02")	# use this iface so expecter
-    time.sleep(0.3)
-    target.console.write("\x02\x02")	# use this iface so expecter
-    time.sleep(0.3)
-    target.expect("iPXE>")
+    # in some circumstances, some iPXEs fail to chainload, or get
+    # stuff from a different NIC than the one they were loaded from --
+    r = target.expect(
+        re.compile(
+            "(?P<what>"
+            # normal message we expect, a 'press Ctrl-B for shell'
+            "Ctrl-B"
+            # error message -> still we can hit s for the iPXE shell
+            "|Chainloading failed, hit 's' for the iPXE shell"
+            ")"),
+        timeout = 250)
+    # r is a dict with a single key (name of the matching thing) and
+    # info about the match. because we gave it a regex with named
+    # groups, we'll get a groupdict entry:
+    data, = r.values()	# note the comma! works because we have a single item
+    what = data.get('groupdict', {}).get('what', None)
+    if what != None:
+        if b"Chainloading failed, hit 's' for the iPXE shell" in what:
+            target.console.write("s")
+            target.expect("iPXE>")
+        else:	# just send Ctrl-B
+            target.console.write("\x02\x02")
+            time.sleep(0.3)
+            target.console.write("\x02\x02")
+            time.sleep(0.3)
+            target.expect("iPXE>")
     prompt_orig = target.shell.prompt_regex
     try:
         #
