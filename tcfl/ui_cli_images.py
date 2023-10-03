@@ -160,7 +160,7 @@ def _images_flash_upload(server_name, _server,
 def _images_flash(target, image_spec_per_target, uploaded_names, timeout):
     # flash the parsed/resolved images in @image_spec_per_target for
     # this target, maybe translating the name from @uploaded_names
-    images, _upload, soft = image_spec_per_target[target.id][0]
+    images, _upload, soft = image_spec_per_target[target.fullid][0]
     image_spec = " ".join(f"{k}:{v}" for k, v in images.items())
     ts0 = time.time()
     # if we have uploaded the files, they might have a slightly
