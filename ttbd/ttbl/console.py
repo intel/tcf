@@ -22,6 +22,7 @@ import signal
 import socket
 import stat
 import struct
+import subprocess
 import sys
 import time
 import tty
@@ -1734,3 +1735,96 @@ class logfile_c(impl_c):
         else:
             file_name = self.logfile_name
         return self._size(target, component, file_name) != None
+
+
+
+class command_output_c(impl_c):
+    """A console that streams the output of a process run in the server
+
+    This is useful to report diagnostics that run on the server.
+
+    :params str|list[str] cmdline: Command to execute
+
+      Can be a string or list of strings; *%(FIELD)[sd]* are expanded
+      from the target's inventory.
+
+    .. warning:: Make sure publishing the output does not open
+                 users to internals from the system's operation
+
+    This console can be read from but not written. The command is
+    executed every time the console is read, so if called too
+    often and is heavy on load, it will generate system load.
+
+    This console can't be enabled/disabled and reports always enabled.
+
+    >>> target.interface_impl_add(
+    >>>     "console",
+    >>>     "ls_log",
+    >>>     ttbl.console.command_output_c("ls -l")
+    >>> )
+
+    """
+    def __init__(self, cmdline: list, **kwargs):
+        impl_c.__init__(self, **kwargs)
+        if isinstance(cmdline, str):
+            self.cmdline = cmdline.split()
+        else:
+            commonl.assert_list_of_strings(cmdline, "cmdline", "args")
+            self.cmdline = cmdline
+            cmdline = " ".join(cmdline)
+        self.upid_set(
+            f"console for seeing output of command {cmdline}",
+            cmdline = cmdline,
+        )
+
+    # console interface
+
+    def setup(self, target, component, parameters):
+        return
+
+    def size(self, target, component):
+        return 0
+
+
+    def read(self, target, component, _offset):
+        kws = target.kws_collect(self)
+        kws['component'] = component
+        cmdline = []
+        for i in self.cmdline:
+            cmdline.append(commonl.kws_expand(i, kws))
+        outfile = os.path.join(target.state_dir, f"console-{component}.read")
+        with open(outfile, "w") as of:
+            subprocess.run(
+                cmdline,
+                shell = False,
+                timeout = 20,
+                check = False,
+                text = True,
+                stdout = of,
+                stderr = subprocess.STDOUT)
+        return dict(
+            stream_file = outfile,
+            # everytime we run this we print a different generation
+            # since the content might have changed, so let's just get
+            # the current time with us precission
+            stream_generation = int(time.time() * 1000000),
+            stream_offset = 0,
+        )
+
+
+    def write(self, _target, component, _data):
+        raise RuntimeError(f"{component}: console is read only")
+
+
+    # we do nothing when we enable/disable
+    def enable(self, _target, _component):
+        pass
+
+    def disable(self, target, _component):
+        pass
+
+
+    # power and console interface
+    def state(self, target, component):
+        # this is always "enabled"
+        return True
