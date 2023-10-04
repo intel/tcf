@@ -260,15 +260,6 @@ if __name__ == "__main__":
     tcfl.ui_cli_alloc.cmdline_setup(arg_subparsers)
     tcfl.tc.target_ext_alloc._cmdline_setup(arg_subparsers)
 
-    arg_parser_target_release = arg_subparsers.add_parser(
-        "release", help = "Release ownership of a target")
-    arg_parser_target_release.add_argument(
-        "-f", "--force", action = "store_true", default = False,
-        help = "Force release of a target you don't own (only admins)")
-    arg_parser_target_release.add_argument(
-        "target", metavar = "TARGET", action = "store", default = None,
-        nargs = "+", help = "Target's name or URL")
-    arg_parser_target_release.set_defaults(func = ttb_client.rest_target_release)
 
 
     import tcfl.ui_cli_power

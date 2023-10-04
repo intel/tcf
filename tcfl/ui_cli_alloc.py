@@ -257,6 +257,20 @@ def _cmdline_alloc_rm(cli_args: argparse.Namespace):
 
 
 
+def _release(target: tcfl.tc.target_c):
+    logger.info("%s: releasing", target.id)
+    target.release()
+    logger.warning("%s: released", target.id)
+
+def _cmdline_release(cli_args: argparse.Namespace):
+    verbosity = tcfl.ui_cli.logger_verbosity_from_cli(logger, cli_args)
+
+    retval, r = tcfl.ui_cli.run_fn_on_each_targetspec(
+        _release, cli_args)
+    return retval
+
+
+
 def cmdline_setup(arg_subparser):
     pass
 
@@ -303,6 +317,16 @@ def cmdline_setup_intermediate(arg_subparser):
         help = "Allocation IDs to remove")
     ap.set_defaults(func = _cmdline_alloc_rm)
 
+
+    ap = arg_subparser.add_parser(
+        "release",
+        help = "Release targets from allocation;" \
+        " note the allocations might still be active, but" \
+        " the released targets won't be usable from there"
+    )
+    tcfl.ui_cli.args_verbosity_add(ap)
+    tcfl.ui_cli.args_targetspec_add(ap)
+    ap.set_defaults(func = _cmdline_release)
 
 
 def cmdline_setup_advanced(arg_subparser):
