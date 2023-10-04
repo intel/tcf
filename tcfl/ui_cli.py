@@ -104,9 +104,11 @@ def args_targetspec_add(
         "target",
         metavar = "TARGETSPEC", action = "store",
         nargs = nargs,
-        help = "Target's name/s or a general target specification "
-        "which might include values from the inventory, etc, in single"
-        "quotes (eg: 'ram.size_gib >= 2 and not type:\"^qemu.*\"')")
+        help = "Target's name/s or a general target specification"
+        " which might include values from the inventory, etc, in single"
+        " quotes (eg: \"id:'STR'\" for all targets with STR in the name"
+        " or \"ram.size_gib >= 2 and not type:'^qemu.*'\" for all"
+        " machines with more than 2GiB of memory and not of QEMU type)")
 
 
 def logger_verbosity_from_cli(log, cli_args: argparse.Namespace) -> int:
