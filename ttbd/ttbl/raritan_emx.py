@@ -209,7 +209,7 @@ class pci(ttbl.power.impl_c, ttbl.capture.impl_c): # pylint: disable = abstract-
         self._outlet.setPowerState(
             raritan.rpc.pdumodel.Outlet.PowerState.PS_OFF)
 
-    def get(self, _target, _component):
+    def get(self, target, component):
         # We cannot call self._outlet.getState() directly--there seems
         # to be a compat issue between this version of the API in the
         # unit I tested with and what this API expects, with a missing
@@ -235,6 +235,14 @@ class pci(ttbl.power.impl_c, ttbl.capture.impl_c): # pylint: disable = abstract-
             obj = self._outlet.getState
             result = obj.parent.agent.json_rpc(obj.parent.target, obj.name, {})
             r = result['_ret_']['powerState']
+        except raritan.rpc.HttpException as e:
+            # We sometimes get network errors but
+            # we don't want them to cause the whole initialziation
+            # sequence to fail, so return no state.
+            #
+            # FIXME: retry this?
+            target.log.error(f"power/{component}: network error: {e}")
+            return None
 
         if r == raritan.rpc.pdumodel.Outlet.PowerState.PS_OFF:
             return False
