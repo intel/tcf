@@ -297,6 +297,19 @@ def target_description_get(
     return default
 
 
+def _target_power_get(target: ttbl.test_target, kws: dict):
+    # get power info
+    p_state, p_data, p_substate = target.power._get(target)
+    for component in p_data:
+        path = f"interfaces.power.{component}"
+        kws['key'] = path
+        description = target_description_get(target, path)
+        if description:
+            description = commonl.kws_expand(description, kws)
+            p_data[component]['description'] = description
+    return p_state, p_data, p_substate
+
+
 
 @bp.route('/target/<targetid>', methods = ['GET'])
 def _target(targetid):
@@ -308,7 +321,10 @@ def _target(targetid):
     target = ttbl.config.targets.get(targetid, None)
     if target is None:
         flask.abort(404, "{targetid} not found in this server")
+    # FIXME: these two are always the same, we shall be able to
+    # coalesce them
     inventory = target.to_dict(list())
+    kws = target.kws_collect()
 
     # get owner
     owner = target.owner_get()
@@ -317,16 +333,6 @@ def _target(targetid):
     # get alloc info
     alloc = inventory.get('_alloc', {}).get('id', 'none')
 
-    # get power info
-    p_state, p_data, p_substate = target.power._get(target)
-    kws = target.kws_collect()
-    for component in p_data:
-        path = f"interfaces.power.{component}"
-        kws['key'] = path
-        description = target_description_get(target, path)
-        if description:
-            description = commonl.kws_expand(description, kws)
-            p_data[component]['description'] = description
     # parse all the inventory to str
     inventory_str = json.dumps(inventory, indent = 4)
     who = ttbl.who_create(flask_login.current_user.get_id(), None)
@@ -338,7 +344,6 @@ def _target(targetid):
         user_is_guest = False
 
     state = {
-        'power': p_state,
         'owner': owner,
         'acquired': acquired,
         'user_is_guest': user_is_guest,
@@ -351,6 +356,12 @@ def _target(targetid):
     short_field_maybe_add(state, 'ip', 16)
     # single MACs are at least 18 chars
     short_field_maybe_add(state, 'mac', 18)
+
+    if hasattr(target, "power"):
+        p_state, p_data, p_substate = target.power._get(target, kws)
+        state['power'] = p_state
+    else:
+        p_data = {}
 
     #
     # Provive button data for the UI to display, if wanted/needed
