@@ -60,3 +60,9 @@ target_local.interface_add(
         usb_devices = capture_usb_devices,
     )
 )
+target_local.interface_add(
+    "console",
+    # empty console that can be expanded later as needed by site
+    # specific code
+    ttbl.console.interface()
+)
