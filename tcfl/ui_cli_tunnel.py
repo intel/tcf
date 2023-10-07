@@ -33,12 +33,13 @@ import tcfl.ui_cli
 logger = logging.getLogger("ui_cli_tunnel")
 
 
-def _cmdline_tunnel_add(cli_args: argparse.Namespace):
 
-    def _tunnel_add(target, cli_args):
-        server_port = target.tunnel.add(
-            cli_args.port, cli_args.ip_addr, cli_args.protocol)
-        print(f"{target.rtb.parsed_url.hostname}:{server_port}")
+def _tunnel_add(target, cli_args):
+    server_port = target.tunnel.add(
+        cli_args.port, cli_args.ip_addr, cli_args.protocol)
+    print(f"{target.rtb.parsed_url.hostname}:{server_port}")
+
+def _cmdline_tunnel_add(cli_args: argparse.Namespace):
 
     return tcfl.ui_cli.run_fn_on_each_targetspec(
         _tunnel_add, cli_args,  cli_args,
@@ -48,11 +49,11 @@ def _cmdline_tunnel_add(cli_args: argparse.Namespace):
 
 
 
-def _cmdline_tunnel_rm(cli_args: argparse.Namespace):
+def _tunnel_rm(target, cli_args):
+    target.tunnel.remove(
+        cli_args.port, cli_args.ip_addr, cli_args.protocol)
 
-    def _tunnel_rm(target, cli_args):
-        target.tunnel.remove(
-            cli_args.port, cli_args.ip_addr, cli_args.protocol)
+def _cmdline_tunnel_rm(cli_args: argparse.Namespace):
 
     return tcfl.ui_cli.run_fn_on_each_targetspec(
         _tunnel_rm, cli_args, cli_args,
@@ -62,18 +63,18 @@ def _cmdline_tunnel_rm(cli_args: argparse.Namespace):
 
 
 
-def _cmdline_tunnel_ls(cli_args: argparse.Namespace):
+def _tunnel_list_by_target(target, _cli_args):
+    for local_port, data in  target.tunnel.list().items():
+        if not isinstance(data, dict):
+            continue
+        try:
+            print(f"{data['protocol']}"
+                  f" {target.rtb.parsed_url.hostname}:{local_port}"
+                  f" {data['ip_addr']}:{data['port']}")
+        except KeyError:
+            pass	# ignore, bad data stored
 
-    def _tunnel_list_by_target(target, _cli_args):
-        for local_port, data in  target.tunnel.list().items():
-            if not isinstance(data, dict):
-                continue
-            try:
-                print(f"{data['protocol']}"
-                      f" {target.rtb.parsed_url.hostname}:{local_port}"
-                      f" {data['ip_addr']}:{data['port']}")
-            except KeyError:
-                pass	# ignore, bad data stored
+def _cmdline_tunnel_ls(cli_args: argparse.Namespace):
 
     return tcfl.ui_cli.run_fn_on_each_targetspec(
         _tunnel_list_by_target, cli_args, cli_args,
