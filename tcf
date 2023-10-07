@@ -283,9 +283,9 @@ if __name__ == "__main__":
     tcfl.tc.target_ext_buttons._cmdline_setup(arg_subparsers)
     import tcfl.ui_cli_console
     tcfl.ui_cli_console._cmdline_setup_advanced(arg_subparsers)
+
     import tcfl.ui_cli_tunnel
     tcfl.ui_cli_tunnel.cmdline_setup(arg_subparsers)
-    tcfl.tc.target_ext_tunnel.cmdline_setup(arg_subparsers)
 
     tcfl.ui_cli_alloc.cmdline_setup_intermediate(arg_subparsers)
     tcfl.tc.target_ext_alloc._cmdline_setup_intermediate(arg_subparsers)
