@@ -87,7 +87,7 @@ def _cmdline_tunnel_ls(cli_args: argparse.Namespace):
 def cmdline_setup(argsp):
 
     ap = argsp.add_parser(
-        f"tunnel-add{tcfl.ui_cli.commands_new_suffix}",
+        f"tunnel-add",
         help = "create an IP tunnel")
     tcfl.ui_cli.args_verbosity_add(ap)
     tcfl.ui_cli.args_targetspec_add(ap, targetspec_n = 1)
@@ -104,7 +104,7 @@ def cmdline_setup(argsp):
     ap.set_defaults(func = _cmdline_tunnel_add)
 
     ap = argsp.add_parser(
-        f"tunnel-rm{tcfl.ui_cli.commands_new_suffix}",
+        f"tunnel-rm",
         help = "remove an existing IP tunnel")
     tcfl.ui_cli.args_verbosity_add(ap)
     tcfl.ui_cli.args_targetspec_add(ap, targetspec_n = 1)
@@ -121,7 +121,7 @@ def cmdline_setup(argsp):
     ap.set_defaults(func = _cmdline_tunnel_rm)
 
     ap = argsp.add_parser(
-        f"tunnel-ls{tcfl.ui_cli.commands_new_suffix}",
+        f"tunnel-ls",
         help = "List existing IP tunnels")
     tcfl.ui_cli.args_verbosity_add(ap)
     tcfl.ui_cli.args_targetspec_add(ap, targetspec_n = 1)
