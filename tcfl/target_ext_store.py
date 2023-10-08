@@ -285,41 +285,6 @@ def _cmdline_store_delete(args):
                                                       extensions_only = "store")
         target.store.delete(args.remote_filename)
 
-def _cmdline_store_list(args):
-    with msgid_c("cmdline"):
-        target = tc.target_c.create_from_cmdline_args(
-            args, extensions_only = "store", iface = "store")
-        if not args.filename:
-            args.filename = None
-        data = target.store.list2(path = args.path, filenames = args.filename,
-                                  digest = args.digest)
-        # this assumes v2 of the call, which if talking to a v1 server
-        # will convert the data to v2 format
-        if args.verbosity == 0:
-            # simple one entry per line
-            for file_name, file_data in sorted(data.items()):
-                print(file_name, ' '.join(f"{k}:{v}" for k, v in file_data.items()))
-        elif args.verbosity == 1:
-            headers = [
-                "Name",
-                "Type",
-                "Aliases",
-                "Hash " + (args.digest if args.digest else "(default)"),
-            ]
-            entries = []
-            for file_name, file_data in data.items():
-                entry = [ file_name, file_data['type'] ]
-                entry.append(file_data.get("aliases", ""))
-                entry.append(file_data.get("digest", ""))
-                bisect.insort(entries, entry)
-            print(tabulate.tabulate(entries, headers = headers))
-        elif args.verbosity == 2:
-            commonl.data_dump_recursive(data)
-        elif args.verbosity == 3:
-            pprint.pprint(data)
-        elif args.verbosity >= 4:
-            print(json.dumps(data, skipkeys = True, indent = 4))
-
 
 def _cmdline_setup(arg_subparsers):
 
@@ -354,27 +319,3 @@ def _cmdline_setup(arg_subparsers):
     ap.add_argument("remote_filename", action = "store",
                     help = "Path to remote file to delete")
     ap.set_defaults(func = _cmdline_store_delete)
-
-    ap = arg_subparsers.add_parser("store-ls",
-                                   help = "List files stored in the server")
-    ap.add_argument(
-        "-v", dest = "verbosity", action = "count", default = 1,
-        help = "Increase verbosity of information to display "
-        "(-v is a table , "
-        "-vv hierarchical, -vvv Python format, -vvvv JSON format)")
-    ap.add_argument(
-        "-q", dest = "quietosity", action = "count", default = 0,
-        help = "Decrease verbosity of information to display "
-        "(none is a table, -q list of shortname, url and username, "
-        "-qq the hostnames, -qqq the shortnames"
-        "; all one per line")
-    ap.add_argument("target", metavar = "TARGET", action = "store",
-                    default = None, help = "Target name")
-    ap.add_argument("--path", metavar = "PATH", action = "store",
-                    default = None, help = "Path to list")
-    ap.add_argument("--digest", action = "store",
-                    default = None, help = "Digest to use"
-                    " (zero, md5, sha256 [default], sha512)")
-    ap.add_argument("filename", nargs = "*", action = "store",
-                    default = [], help = "Files to list (defaults to all)")
-    ap.set_defaults(func = _cmdline_store_list)

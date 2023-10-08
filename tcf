@@ -284,6 +284,8 @@ if __name__ == "__main__":
     import tcfl.ui_cli_console
     tcfl.ui_cli_console._cmdline_setup_advanced(arg_subparsers)
 
+    import tcfl.ui_cli_store
+    tcfl.ui_cli_store.cmdline_setup_intermediate(arg_subparsers)
     import tcfl.ui_cli_tunnel
     tcfl.ui_cli_tunnel.cmdline_setup(arg_subparsers)
 
