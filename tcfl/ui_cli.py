@@ -141,6 +141,7 @@ def run_fn_on_each_targetspec(
         # COMPAT: removing list[str] so we work in python 3.8
         extensions_only: list = None,
         only_one: bool = False,
+        one_per_server: bool = False,
         projections = None, targets_all = None,
         **kwargs) -> tuple:
     """Initialize the target discovery and run a function on each target
@@ -191,7 +192,9 @@ def run_fn_on_each_targetspec(
     r = tcfl.targets.run_fn_on_each_targetspec(
         fn, cli_args.target, *args,
         iface = iface, ifaces = ifaces, extensions_only = extensions_only,
-        only_one = only_one, projections = projections,
+        only_one = only_one,
+        one_per_server = one_per_server,
+        projections = projections,
         targets_all = targets_all,
         verbosity = cli_args.verbosity - cli_args.quietosity,
         # if the args don't have parallelization factor, this is a
@@ -219,7 +222,7 @@ def run_fn_on_each_targetspec(
             if targetid in msg:	# don't print target/id...
                 logger.error(msg + tb)
             else:			# ...if already there
-                logger.error("%s: %s" + tb, targetid, msg)
+                logger.error(targetid + ": " + msg + tb)
             retval += 1
 
     if retval == len(r):
