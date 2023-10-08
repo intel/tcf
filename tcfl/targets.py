@@ -504,6 +504,7 @@ def run_fn_on_each_targetspec(
         ifaces: list = None,
         extensions_only: list = None,
         only_one: bool = False,
+        one_per_server: bool = False,
         projections = None, targets_all = False, verbosity = 0,
         parallelization_factor: int = -4,
         pool_type: type = concurrent.futures.ThreadPoolExecutor,
@@ -523,6 +524,13 @@ def run_fn_on_each_targetspec(
     :param bool only_one: (optional; default *False*) ensure the
       target specification resolves to a single target, complain
       otherwise.
+
+    :param bool one_per_server: (optional; default *False*) if *True*,
+      when running over multiple targets, will pick only one target
+      per server.
+
+      This is useful to do operations that are wide for the server but
+      driven via a target interface (eg: storage management).
 
     :param list[str] projections: list of fields to download from the
       inventory; normally this function tries to download as little a
@@ -570,6 +578,7 @@ def run_fn_on_each_targetspec(
     Note this function is exactly the same as
     :func:'tcfl.ui_cli.run_fn_on_each_targetspec`; however they differ
     on the return value.
+
     """
     import tcfl.tc
 
@@ -607,6 +616,20 @@ def run_fn_on_each_targetspec(
         targetids = discovery_agent.rts_fullid_sorted
         if not targetids:
             return {}
+
+        if one_per_server:
+	    # run only on one target per server -> filter the list to
+	    # only pick one target per server
+            filtered_targetids = []
+            seen_servers = set()
+            for targetid in targetids:
+                rt = discovery_agent.rts_flat[targetid]
+                server = rt['server']
+                if server in seen_servers:
+                    continue
+                seen_servers.add(server)
+                filtered_targetids.append(targetid)
+            targetids = filtered_targetids
 
         if only_one and len(targetids) > 1:
             raise RuntimeError(
