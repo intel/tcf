@@ -439,6 +439,9 @@ function terminal_create(div_id, targetid, terminal) {
     });
     term.open(document.getElementById(div_id));
     term.write('\x1b[37;40m \n\r\r\nconsole was started;\r\r\n\n\x1b[0m');
+    term.onData(async function(data) {
+        await terminal_send_keystroke(targetid, terminal, data);
+    });
 
     /* here we loop calling the terminal_get_content function every n
      * miliseconds */
@@ -487,7 +490,7 @@ function terminal_create(div_id, targetid, terminal) {
         bytes_read_so_far += parseInt(read_information_d['content-length']);
         bytes_label.textContent = bytes_read_so_far;
 
-    }, 200);
+    }, 300);
 }
 
 
@@ -534,6 +537,54 @@ async function terminal_get_content(term, targetid, terminal, offset) {
     return {
         'content-length': content_length,
         'stream-gen-offset': generation
+    }
+}
+
+
+/**
+ * Send a keystroke/string as an http request to an specified console.
+ *
+ * This is called by func:terminal_create`
+ *      term.onData(async function(data) {
+ *          await terminal_send_keystroke(targetid, terminal, data);
+ *      });
+ *
+ * This basically adds a listener to the terminal and will pass any char the
+ * user sends.
+ *
+ * Got the idea from here http://hostiledeveloper.com/2017/05/02/something-useless-terminal-in-your-browser.html
+ *
+ * @param {targetid} str -> target id from where you want to send the string to
+ * @param {terminal} str -> name console you want to send the string to
+ * @param {keystroke} str -> string you want to send to the terminal
+ *
+ * @return {void}
+ */
+async function terminal_send_keystroke(targetid, terminal, keystroke) {
+
+    let data = new URLSearchParams();
+    data.append('component', terminal);
+    keystroke = keystroke.toString()
+
+    if (/^[0-9]*$/.test(keystroke)) {
+        // the keystroke is a number, we need to add the '"' to not trip the
+        // js and have him send a integer
+        data.append('data', '\"' + keystroke + '\"');
+    } else {
+        data.append('data', keystroke);
+    }
+    let r = await fetch('/ttb-v2/targets/' + targetid + '/console/write', {
+        method: 'PUT',
+        body: data,
+    });
+    let b = await r.text();
+    if (r.status != 200) {
+        /* FIXME we need to add a better way to display this type of messages
+         * to the user, so we do not rely on alerts */
+        alert(
+            'ERROR: could not write to the terminal. Due to: ' + '\n' + b
+        );
+        return
     }
 }
 
