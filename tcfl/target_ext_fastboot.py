@@ -72,34 +72,3 @@ class extension(tc.target_extension_c):
         self.target.report_info("listed: %s" % r['commands'],
                                 { 'diagnostics': r['diagnostics'] })
         return r['commands']
-
-
-def _cmdline_fastboot(args):
-    with msgid_c("cmdline"):
-        target = tc.target_c.create_from_cmdline_args(args, iface = "fastboot")
-        target.fastboot.run(args.command_name, *args.parameters)
-
-def _cmdline_fastboot_list(args):
-    with msgid_c("cmdline"):
-        target = tc.target_c.create_from_cmdline_args(args, iface = "fastboot")
-        r = target.fastboot.list()
-        for command, params in r.items():
-            print(("%s: %s" % (command, params)))
-
-
-def _cmdline_setup(argsp):
-    ap = argsp.add_parser("fastboot", help = "Run a fastboot command")
-    ap.add_argument("target", metavar = "TARGET", action = "store", type = str,
-                    default = None, help = "Target's name or URL")
-    ap.add_argument("command_name", metavar = "COMMAND", action = "store",
-                    type = str, help = "Name of the command to run")
-    ap.add_argument("parameters", metavar = "PARAMETERS", action = "store",
-                    nargs = "*", default = [],
-                    help = "Parameters to the fastboot command")
-    ap.set_defaults(func = _cmdline_fastboot)
-
-    ap = argsp.add_parser("fastboot-ls", help = "List allowed fastboot "
-                          "commands")
-    ap.add_argument("target", metavar = "TARGET", action = "store", type = str,
-                    default = None, help = "Target's name or URL")
-    ap.set_defaults(func = _cmdline_fastboot_list)
