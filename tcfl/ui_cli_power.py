@@ -194,7 +194,7 @@ def _cmdline_power_list(cli_args: argparse.Namespace):
 def _cmdline_setup(arg_subparser):
 
     ap = arg_subparser.add_parser(
-        f"power-on{tcfl.ui_cli.commands_new_suffix}",
+        "power-on",
         help = "Power on target's power rail (or individual components)")
     ap.add_argument(
         "--component", "-c",
@@ -212,7 +212,7 @@ def _cmdline_setup(arg_subparser):
     ap.set_defaults(func = _cmdline_power_on)
 
     ap = arg_subparser.add_parser(
-        f"power-off{tcfl.ui_cli.commands_new_suffix}",
+        "power-off",
         help = "Power off target's power rail (or individual components)")
     tcfl.ui_cli.args_verbosity_add(ap)
     tcfl.ui_cli.args_targetspec_add(ap)
@@ -230,7 +230,7 @@ def _cmdline_setup(arg_subparser):
     ap.set_defaults(func = _cmdline_power_off)
 
     ap = arg_subparser.add_parser(
-        f"power-cycle{tcfl.ui_cli.commands_new_suffix}",
+        "power-cycle",
         help = "Power cycle target's power rail (or individual components)")
     tcfl.ui_cli.args_verbosity_add(ap)
     tcfl.ui_cli.args_targetspec_add(ap)
@@ -252,7 +252,7 @@ def _cmdline_setup(arg_subparser):
     ap.set_defaults(func = _cmdline_power_cycle)
 
     ap = arg_subparser.add_parser(
-        f"power-sequence{tcfl.ui_cli.commands_new_suffix}",
+        "power-sequence",
         help = "Execute a power sequence")
     tcfl.ui_cli.args_verbosity_add(ap)
     tcfl.ui_cli.args_targetspec_add(ap, targetspec_n = 1)
@@ -269,7 +269,7 @@ def _cmdline_setup(arg_subparser):
     ap.set_defaults(func = _cmdline_power_sequence)
 
     ap = arg_subparser.add_parser(
-        f"power-ls{tcfl.ui_cli.commands_new_suffix}",
+        "power-ls",
         help = "List power rail components and their state"
         "; increase verbosity of information to display "
         "(default displays state of non-explicit components,"
@@ -280,7 +280,7 @@ def _cmdline_setup(arg_subparser):
     ap.set_defaults(func = _cmdline_power_list)
 
     ap = arg_subparser.add_parser(
-        f"power-get{tcfl.ui_cli.commands_new_suffix}",
+        "power-get",
         help = "Print target's power state."
         "A target is considered *on* when all of its power rail"
         "components are on; fake power components report power state as"
