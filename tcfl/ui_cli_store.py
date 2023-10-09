@@ -15,7 +15,17 @@ learn more about them):
 
     $ tcf store-ls TARGETs
 
+- Upload files to server's user storage area::
 
+    $ tcf store-upload TARGETs REMOTEFILENAME LOCALFILENAME
+
+- Download files from the server's user storage area::
+
+    $ tcf store-dnload TARGETs REMOTEFILENAME LOCALFILENAME
+
+- Remove files from the server's user storage area::
+
+    $ tcf store-rm TARGETs REMOTEFILENAME
 """
 
 import argparse
@@ -39,12 +49,6 @@ def _store_ls(target: tcfl.tc.target_c, cli_args: argparse.Namespace):
         digest = cli_args.digest)
     return r
 
-
-def _gather(target: tcfl.tc.target_c, targets_by_server: dict):
-    servername = target.rt['server']
-    if servername not in targets_by_server:
-        targets_by_server[servername] = target.fullid
-    return 0
 
 def _cmdline_store_ls(cli_args: argparse.Namespace):
 
@@ -143,6 +147,56 @@ def _cmdline_store_ls(cli_args: argparse.Namespace):
 
 
 
+def _store_upload(target: tcfl.tc.target_c, cli_args: argparse.Namespace):
+    logger.info("%s: uploading %s -> %s", target.rt['server_aka'],
+                cli_args.local_filename, cli_args.remote_filename)
+    target.store.upload(cli_args.remote_filename, cli_args.local_filename)
+    logger.warning("%s: uploaded %s -> %s", target.rt['server_aka'],
+                   cli_args.local_filename, cli_args.remote_filename)
+
+def _cmdline_store_upload(cli_args: argparse.Namespace):
+    tcfl.ui_cli.logger_verbosity_from_cli(logger, cli_args)
+    retval, _r =  tcfl.ui_cli.run_fn_on_each_targetspec(
+        _store_upload, cli_args, cli_args,
+        one_per_server = True,
+        iface = "store", extensions_only = [ "store" ])
+    return retval
+
+
+
+def _store_rm(target: tcfl.tc.target_c, cli_args: argparse.Namespace):
+    target.store.delete(cli_args.remote_filename)
+    logger.warning("%s: deleted %s", target.rt['server_aka'],
+                   cli_args.remote_filename)
+
+def _cmdline_store_rm(cli_args: argparse.Namespace):
+    tcfl.ui_cli.logger_verbosity_from_cli(logger, cli_args)
+    retval, _r =  tcfl.ui_cli.run_fn_on_each_targetspec(
+        _store_rm, cli_args, cli_args,
+        one_per_server = True,
+        iface = "store", extensions_only = [ "store" ])
+    return retval
+
+
+
+def _store_dnload(target: tcfl.tc.target_c, cli_args: argparse.Namespace):
+    logger.info("%s: dpwnloading %s -> %s", target.rt['server_aka'],
+                cli_args.remote_filename, cli_args.local_filename)
+    target.store.dnload(cli_args.remote_filename, cli_args.local_filename)
+    logger.warning("%s: downloaded %s -> %s", target.rt['server_aka'],
+                   cli_args.remote_filename, cli_args.local_filename)
+
+def _cmdline_store_dnload(cli_args: argparse.Namespace):
+    tcfl.ui_cli.logger_verbosity_from_cli(logger, cli_args)
+    retval, _r =  tcfl.ui_cli.run_fn_on_each_targetspec(
+        _store_dnload, cli_args, cli_args,
+        only_one = True,	# see comments in cmdline_setup_intermediate()
+        one_per_server = True,
+        iface = "store", extensions_only = [ "store" ])
+    return retval
+
+
+
 def cmdline_setup_intermediate(argsp):
 
     ap = argsp.add_parser(
@@ -161,3 +215,42 @@ def cmdline_setup_intermediate(argsp):
         "filename", nargs = "*", action = "store",
         default = [], help = "Files to list (defaults to all)")
     ap.set_defaults(func = _cmdline_store_ls)
+
+    ap = argsp.add_parser(
+        "store-upload",
+        help = "Upload a local file to the server")
+    tcfl.ui_cli.args_verbosity_add(ap)
+    tcfl.ui_cli.args_targetspec_add(ap)
+    ap.add_argument(
+        "remote_filename", action = "store",
+        help = "Name of remote file"
+        " (note the file will be stored in a user specific area)")
+    ap.add_argument(
+        "local_filename", action = "store",
+        help = "Path to local file to upload")
+    ap.set_defaults(func = _cmdline_store_upload)
+
+    ap = argsp.add_parser(
+        "store-rm",
+        help = "Remove a file from the server")
+    tcfl.ui_cli.args_verbosity_add(ap)
+    tcfl.ui_cli.args_targetspec_add(ap)
+    ap.add_argument(
+        "remote_filename", action = "store",
+        help = "Name of the remote file to remove")
+    ap.set_defaults(func = _cmdline_store_rm)
+
+    ap = argsp.add_parser(
+        "store-dnload",
+        help = "Download a file from the server")
+    tcfl.ui_cli.args_verbosity_add(ap)
+    # we allow only one target, so that we don't parallelize by
+    # mistake and override files with the same name, yadah yadah
+    tcfl.ui_cli.args_targetspec_add(ap, targetspec_n = 1)
+    ap.add_argument(
+        "remote_filename", action = "store",
+        help = "Path to remote file in user's storage area")
+    ap.add_argument(
+        "local_filename", action = "store",
+        help = "Filename to which to save the locally")
+    ap.set_defaults(func = _cmdline_store_dnload)
