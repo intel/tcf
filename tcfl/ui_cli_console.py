@@ -861,7 +861,8 @@ def _cmdline_console_wall(cli_args: argparse.Namespace):
             print("Collected info for console " + name)
 
     if not consolel:
-        print("No targets supporting console interface found")
+        print("No targets supporting console interface found"
+              " (might be disabled, try -a)", file = sys.stderr)
         return
 
     # Compute how many rows and columns we'll need to host all the
