@@ -27,7 +27,7 @@ import logging
 import tcfl.tc
 import tcfl.ui_cli
 
-logger = logging.getLogger("ui_cli_capture")
+logger = logging.getLogger("ui_cli_things")
 
 
 def _thing_ls(target: tcfl.tc.target_c):
