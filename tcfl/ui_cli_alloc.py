@@ -233,7 +233,7 @@ def _cmdline_alloc_rm(cli_args: argparse.Namespace):
     if cli_args.allocid:
         retval = 0
         for allocid in cli_args.allocid:
-            r, _ = tcfl.ui_cli.run_fn_on_each_server(
+            retval, r = tcfl.ui_cli.run_fn_on_each_server(
                 tcfl.server_c.servers,
                 _alloc_rm_by_allocid, cli_args, allocid)
             # r is a dict keyed by server name of tuples ( retval,
@@ -241,6 +241,7 @@ def _cmdline_alloc_rm(cli_args: argparse.Namespace):
             if all(i[0] == 0 for i in r.values()):
                 logger.error("allocation '%s' not found in any server",
                              allocid)
+                retval = 1
         return retval
     if cli_args.username:
         r, _ = tcfl.ui_cli.run_fn_on_each_server(
