@@ -20,6 +20,7 @@ the image.
 
 Requires the mtools and EDKII packages installed in your system.
 EOF
+    exit 1
 fi
 
 imgfile=${1}
