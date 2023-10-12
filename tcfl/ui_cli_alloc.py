@@ -235,8 +235,7 @@ def _cmdline_alloc_rm(cli_args: argparse.Namespace):
         for allocid in cli_args.allocid:
             r, _ = tcfl.ui_cli.run_fn_on_each_server(
                 tcfl.server_c.servers,
-                _alloc_rm_by_allocid, cli_args, allocid,
-                return_details = True)
+                _alloc_rm_by_allocid, cli_args, allocid)
             # r is a dict keyed by server name of tuples ( retval,
             # exception, traceback )
             if all(i[0] == 0 for i in r.values()):
@@ -246,7 +245,7 @@ def _cmdline_alloc_rm(cli_args: argparse.Namespace):
     if cli_args.username:
         r, _ = tcfl.ui_cli.run_fn_on_each_server(
             tcfl.server_c.servers,
-            _alloc_rm_by_username, cli_args, return_details = True)
+            _alloc_rm_by_username, cli_args)
         if all(i[0] == 0 for i in r.values()):
             logger.error("no allocations for user found")
             return 1
