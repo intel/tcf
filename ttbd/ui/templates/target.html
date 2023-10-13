@@ -133,6 +133,9 @@ $ tcf ls -vv {{ targetid}}</code> </pre></p>
               <p>All the components in the power rail are powered on
                 in order (expand the <i>components</i> section to the
                 right to see the power rail).</p>
+
+              <p>On the command line, you can use:
+                <pre><code class="language-bash">$ tcf power-on {{targetid }}</code></pre></p>
             </span>
           </div>
 
@@ -146,6 +149,9 @@ $ tcf ls -vv {{ targetid}}</code> </pre></p>
               <p>All the components in the power rail are powered off
                 in reverse order (expand the <i>components</i> section
                 to the right to see the power rail).</p>
+
+              <p>On the command line, you can use:
+                <pre><code class="language-bash">$ tcf power-off {{targetid }}</code></pre></p>
             </span>
           </div>
 
@@ -160,6 +166,10 @@ $ tcf ls -vv {{ targetid}}</code> </pre></p>
                 in reverse order and then powered on (expand
                 the <i>components</i> section to the right to see
                 the power rail).</p>
+
+              <p>On the command line, you can use:
+                <pre><code class="language-bash">$ tcf power-cycle {{targetid }}</code></pre></p>
+
             </span>
           </div>
 
@@ -293,6 +303,9 @@ $ tcf ls -vv {{ targetid}}</code> </pre></p>
                   {% endfor %}
                 </span>
                 on the target
+
+              <p>On the command line, you can use:
+                <pre><code class="language-bash">$ tcf images-flash {{ targetid }} IMGTYPE:FILENAME... </code></pre></p>
               </span>
             </div>
             <select class='list_versions' id='flash_images_version_for_all'>
