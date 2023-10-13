@@ -244,7 +244,7 @@ def _cmdline_alloc_rm(cli_args: argparse.Namespace):
                 retval = 1
         return retval
     if cli_args.username:
-        r, _ = tcfl.ui_cli.run_fn_on_each_server(
+        _, r = tcfl.ui_cli.run_fn_on_each_server(
             tcfl.server_c.servers,
             _alloc_rm_by_username, cli_args)
         if all(i[0] == 0 for i in r.values()):
