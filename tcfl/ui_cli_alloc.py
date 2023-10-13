@@ -257,16 +257,16 @@ def _cmdline_alloc_rm(cli_args: argparse.Namespace):
 
 
 
-def _release(target: tcfl.tc.target_c):
+def _release(target: tcfl.tc.target_c, cli_args: argparse.Namespace):
     logger.info("%s: releasing", target.id)
-    target.release()
+    target.release(force = cli_args.force)
     logger.warning("%s: released", target.id)
 
 def _cmdline_release(cli_args: argparse.Namespace):
     verbosity = tcfl.ui_cli.logger_verbosity_from_cli(logger, cli_args)
 
     retval, r = tcfl.ui_cli.run_fn_on_each_targetspec(
-        _release, cli_args)
+        _release, cli_args, cli_args)
     return retval
 
 
@@ -326,6 +326,9 @@ def cmdline_setup_intermediate(arg_subparser):
     )
     tcfl.ui_cli.args_verbosity_add(ap)
     tcfl.ui_cli.args_targetspec_add(ap)
+    ap.add_argument(
+        "-f", "--force", action = "store_true", default = False,
+        help = "Force release of a target you don't own (only admins)")
     ap.set_defaults(func = _cmdline_release)
 
 
