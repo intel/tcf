@@ -321,6 +321,8 @@ def _target(targetid):
     target = ttbl.config.targets.get(targetid, None)
     if target is None:
         flask.abort(404, "{targetid} not found in this server")
+
+    calling_user = flask_login.current_user._get_current_object()
     # FIXME: these two are always the same, we shall be able to
     # coalesce them
     inventory = target.to_dict(list())
@@ -330,8 +332,6 @@ def _target(targetid):
     owner = target.owner_get()
     # get type
     target_type =  inventory.get('type', 'n/a')
-    # get alloc info
-    alloc = inventory.get('_alloc', {}).get('id', 'none')
 
     # parse all the inventory to str
     inventory_str = json.dumps(inventory, indent = 4)
@@ -345,13 +345,24 @@ def _target(targetid):
 
     state = {
         'owner': owner,
+        "user": calling_user.get_id(),
         'acquired': acquired,
         'user_is_guest': user_is_guest,
         'type': target_type,
         'mac': _interconnect_values_render(inventory, "mac_addr", separator = " "),
         'ip': _interconnect_values_render(inventory, "ipv4_addr", separator = " "),
-        'alloc': alloc,
     }
+
+    # get alloc info
+    with target.lock:
+        allocdb = target._allocdb_get()
+        if allocdb == None:	# allocation was removed...shrug
+            state["creator"] = "n/a"
+            state['alloc'] = "n/a"
+        else:
+            state["creator"] =  allocdb.get("creator")
+            state['alloc'] = allocdb.allocid
+
     # single IPs are at least 16 chars
     short_field_maybe_add(state, 'ip', 16)
     # single MACs are at least 18 chars
