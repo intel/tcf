@@ -358,7 +358,7 @@ def _target(targetid):
     short_field_maybe_add(state, 'mac', 18)
 
     if hasattr(target, "power"):
-        p_state, p_data, p_substate = target.power._get(target, kws)
+        p_state, p_data, p_substate = target.power._get(target)
         state['power'] = p_state
     else:
         p_data = {}
