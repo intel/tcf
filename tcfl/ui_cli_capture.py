@@ -117,7 +117,7 @@ def _cmdline_capture_stop(cli_args: argparse.Namespace):
             "Filename",
         ]
         table = []
-        for targetid, ( data, e ) in list(r.items()):
+        for targetid, ( data, _e, _tb ) in list(r.items()):
             for stream, filename in data.items():
                 table.append([ targetid, stream, filename ])
         print(tabulate.tabulate(table, headers = headers))
@@ -155,7 +155,7 @@ def _cmdline_capture_start(cli_args: argparse.Namespace):
             "Filename",
         ]
         table = []
-        for targetid, ( data, _e ) in list(r.items()):
+        for targetid, ( data, _e, _tb ) in list(r.items()):
             if not data:
                 continue
             capturing = False

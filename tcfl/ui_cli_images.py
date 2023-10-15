@@ -65,7 +65,7 @@ def _cmdline_images_ls(cli_args: argparse.Namespace):
 
     d = {}
     targetid = None
-    for targetid, ( images, _e ) in r.items():
+    for targetid, ( images, _e, _tb ) in r.items():
         if images:
             d[targetid] = images
 
@@ -277,9 +277,9 @@ def _cmdline_images_flash(cli_args: argparse.Namespace):
     # target's inventory info
     uploads_by_server = collections.defaultdict(set)
     targets_by_server = {}
-    for targetid, ( result, e ) in image_spec_per_target.items():
+    for targetid, ( result, e, tb ) in image_spec_per_target.items():
         if e != None:
-            tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
+            tb = "\n  ".join(tb)
             logger.error(f"can't parse flashing spec '{image_spec}'"
                           f" for {targetid}: {e}\n{tb}")
             continue
@@ -334,7 +334,7 @@ def _cmdline_images_flash(cli_args: argparse.Namespace):
 
     # check errors
     retval = 0
-    for targetid, ( result, e ) in r.items():
+    for targetid, ( result, e, tb ) in r.items():
         image_specl = []
         # image_spec_per_target looks like
         #
@@ -367,7 +367,7 @@ def _cmdline_images_flash(cli_args: argparse.Namespace):
         image_spec = " ".join(image_specl)
 
         if e != None:
-            tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
+            tb = "\n  ".join(tb)
             logger.error(
                 f"{targetid}: can't flash spec '{image_spec}': {e}\n{tb}")
             retval += 1

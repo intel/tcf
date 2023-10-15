@@ -62,7 +62,7 @@ def _cmdline_store_ls(cli_args: argparse.Namespace):
     # r0 is { TARGETNAME: ( { FILENAME: FIELDS }, EXCEPTION ) }
     # transform to  { SERVER: { FILENAME: FIELDS } }
     r = {}
-    for targetid, ( filesdata, exception ) in r0.items():
+    for targetid, ( filesdata, exception, _tb ) in r0.items():
         if exception or not filesdata:	# yup, we ignore errors (reported
             continue                    # by run_fn_on_each...) and empties
         rt = tcfl.rts_flat[targetid]
