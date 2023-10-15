@@ -173,8 +173,10 @@ def run_fn_on_each_targetspec(
       - 1 some functions failed
       - 2 all functions failed
 
-      the dict is a dictionary keyed by server id with values
-      being the return value of the function.
+      the dict is a dictionary keyed by server id with values being
+      the return value of the function and possibly an exception and
+      traceback. See :func:`tcfl.targets.run_fn_on_each_targetspec`
+      for details.
 
     will log results
 
@@ -210,12 +212,11 @@ def run_fn_on_each_targetspec(
 
     # r is a dictionaky of ( result, exception ) keyed by targetid
     retval = 0
-    for targetid, ( _result, exception ) in r.items():
+    for targetid, ( _result, exception, tb ) in r.items():
         if exception != None:
             msg = str(exception.args[0])
             if cli_args.traces:
-                tb = "\n" + "".join(traceback.format_exception(
-                    type(exception), exception, exception.__traceback__))
+                tb = "\n" + "".join(tb)
             else:
                 tb = ""
 

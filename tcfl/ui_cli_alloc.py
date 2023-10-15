@@ -265,7 +265,7 @@ def _release(target: tcfl.tc.target_c, cli_args: argparse.Namespace):
 def _cmdline_release(cli_args: argparse.Namespace):
     verbosity = tcfl.ui_cli.logger_verbosity_from_cli(logger, cli_args)
 
-    retval, r = tcfl.ui_cli.run_fn_on_each_targetspec(
+    retval, _r = tcfl.ui_cli.run_fn_on_each_targetspec(
         _release, cli_args, cli_args)
     return retval
 

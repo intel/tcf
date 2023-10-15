@@ -76,6 +76,7 @@ import bisect
 import collections
 import concurrent.futures
 import logging
+import traceback
 
 import commonl.expr_parser
 import tcfl
@@ -493,7 +494,10 @@ def _run_fn_on_targetid(
                 for k, v in list(attachments.items()):
                     if isinstance(v, tcfl.tc.target_c):
                         del attachments[k]
-        return None, e
+        # we can't pickle tracebacks, so we send them as a
+        # formated traceback so we can at least do some debugging
+        tb = traceback.format_exception(type(e), e, e.__traceback__)
+        return None, e, tb
 
 
 def run_fn_on_each_targetspec(
@@ -571,8 +575,9 @@ def run_fn_on_each_targetspec(
 
     *iface* and *extensions_only* same as :meth:`tclf.tc.target_c.create`.
 
-    :returns int: 0 dictionary of tuples *( result, exception )* keyed
-      by *targetid*
+    :returns dict: 0 dictionary of tuples *( result, exception,
+      traceback )* keyed by *targetid*; *traceback* is a list of
+      strings, each a formatted trace entry.
 
 
     Note this function is exactly the same as
@@ -580,6 +585,8 @@ def run_fn_on_each_targetspec(
     on the return value.
 
     """
+    # FIXME: change keying to be ALWAYS by fullid so clients can use
+    # target.fullid to key
     import tcfl.tc
 
     assert isinstance(targets_all, bool), \
@@ -665,7 +672,10 @@ def run_fn_on_each_targetspec(
                     # _run_on_by_targetid()
                     logger.error("%s: BUG! exception: %s", targetid, e,
                                  exc_info = True)
-                    results[targetid] = ( None, e )
+                    # we can't pickle tracebacks, so we send them as a
+                    # formated traceback so we can at least do some debugging
+                    tb = traceback.format_exception(type(e), e, e.__traceback__)
+                    results[targetid] = ( None, e, tb )
                     continue
         return results
 
