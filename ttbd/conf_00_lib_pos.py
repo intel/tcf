@@ -18,8 +18,9 @@ import subprocess
 
 import ttbl
 import ttbl.dhcp
-import ttbl.qemu
 import ttbl.dnsmasq
+import ttbl.qemu
+import ttbl.rsync
 
 def nw_indexes(nw_name):
     """Return the network indexes that correspond to a one or two letter
@@ -846,9 +847,10 @@ def target_qemu_pos_add(target_name,
 
     Add to a server configuration file ``/etc/ttbd-*/conf_*.py``
 
-    >>> nw_pos_add("nwa")
+    >>> # the nw_name must be one or two letters in the set [a-zA-Z]
+    >>> nw_pos_add("na")
     >>> target = target_qemu_pos_add("qu-05a"
-    >>>                              "nwa",
+    >>>                              nw_name = "na",
     >>>                              mac_addr = "02:61:00:00:00:05",
     >>>                              ipv4_addr = "192.168.95.5",
     >>>                              ipv6_addr = "fd:00:61::05")
