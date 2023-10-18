@@ -11,6 +11,15 @@
 {% block navbar %}{% endblock %}
 
 {% block content %}
+
+{% if not targets %}
+
+<p align=center><b>No targets seem to be available</b></p>
+<p align=center>Did you <a href = "login">log-in</a>? You might have
+no permissions, use the <i>report issue</i> link above</p>
+
+{% else %}
+
 <table id='t-targets' class='display'>
 <thead>
   <tr>
@@ -23,6 +32,7 @@
   </tr>
 </thead>
 <tbody>
+
   {% for k, v in targets.items() %}
   <tr>
     <td> <a href='/ttb-v2/ui/target/{{k}}'>{{ k }}</td>
@@ -72,4 +82,5 @@ $(document).ready( function () {
 
 } );
 </script>
+{% endif %}
 {% endblock %}
