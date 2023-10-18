@@ -1247,7 +1247,11 @@ class test_target(object):
         :param ttbl.user_control.User user: descriptor of user
           who is trying to access the target.
         """
-        assert isinstance(user, ttbl.user_control.User)
+        if not isinstance(user, ttbl.user_control.User):
+            # not logged in, AnonymousUserMixin or similar which we
+            # get sent by Flask or whoever is wrapping us, which we
+            # don't want to know here.
+            return False
         if user.role_get('admin'):	# admins are always in
             return True
 
