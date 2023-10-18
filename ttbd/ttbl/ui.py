@@ -232,7 +232,10 @@ def _targets():
     relevant info and pass it to the html jinja template for it to render
     '''
     targets = {}
+    calling_user = flask_login.current_user._get_current_object()
     for targetid, target in ttbl.config.targets.items():
+        if not target.check_user_allowed(calling_user):
+            continue
 
         target = ttbl.config.targets.get(targetid, None)
         inventory = target.to_dict(list())
@@ -323,6 +326,8 @@ def _target(targetid):
         flask.abort(404, "{targetid} not found in this server")
 
     calling_user = flask_login.current_user._get_current_object()
+    if not target.check_user_allowed(calling_user):
+        flask.abort(404, "{targetid}: access not allowed")
     # FIXME: these two are always the same, we shall be able to
     # coalesce them
     inventory = target.to_dict(list())
