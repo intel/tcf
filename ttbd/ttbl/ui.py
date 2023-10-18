@@ -445,8 +445,11 @@ def _allocation(allocid):
                 "user_is_guest": allocdb.check_userid_is_guest(
                     calling_user.get_id()),
                 "user_is_owner_creator_admin": \
-                allocdb.check_user_is_user_creator(calling_user) \
-                or allocdb.check_user_is_admin(calling_user),
+                    allocdb.check_user_is_user_creator(calling_user) \
+                    or allocdb.check_user_is_admin(calling_user),
+                "user_is_owner_creator": \
+                    allocdb.check_user_is_user_creator(calling_user),
+                "user_is_admin": allocdb.check_user_is_admin(calling_user),
             }
             guests = []
             for guest in allocdb.guest_list():

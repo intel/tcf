@@ -76,7 +76,11 @@ ttbd's /ttb-v2/ui/allocation.
 
         {% if state.user_is_owner_creator_admin %}
           <div class='subsection'>
-            <p> You are an owner on this allocation </p>
+            {% if state.user_is_owner_creator %}
+            <p> You are an owner or creator of this allocation </p>
+            {% elif state.user_is_admin %}
+            <p> You are an <b>administrator</b> (not the owner or creator) </p>
+            {% endif %}
           </div>
           <div class='subsection'>
             <div class = "tooltip">
