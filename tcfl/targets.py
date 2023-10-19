@@ -480,7 +480,7 @@ def _run_fn_on_targetid(
             targetid,
             iface = iface, ifaces = ifaces, extensions_only = extensions_only,
             target_discovery_agent = discovery_agent)
-        return fn(target, *args, **kwargs), None
+        return fn(target, *args, **kwargs), None, None
     except Exception as e:
         # note we don't print/log here, we let that be done by
         # tcl.ui_cli.run_fn_on_each_targetspec(), since that
