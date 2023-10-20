@@ -422,7 +422,7 @@ def _target(targetid):
     # ttbd/ui/static/js/jquery.dataTables.js
     #
     if hasattr(target, "buttons"):
-        # buttons interface is the ame as the power interface...with
+        # buttons interface is the same as the power interface...with
         # another name :) w ignore the state and substate, because
         # they make no sense here
         _state, button_data, _substate = target.buttons._get(target)
