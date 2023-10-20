@@ -604,3 +604,15 @@ hr {
     text-decoration: none;
     color: black;
 }
+
+#reload-button {
+    background-color: transparent;
+    border: 0px;
+    color: blue;
+    font-size: 1.2em;
+}
+
+#reload-button:hover {
+    background-color: transparent;
+    text-decoration: underline;
+}

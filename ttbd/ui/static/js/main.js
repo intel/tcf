@@ -622,3 +622,51 @@ async function js_console_enable(targetid, terminal, enable) {
      * the user, so we do not rely on alerts */
     alert('SUCCESS; ' + terminal + ' ' + enable + 'd');
 }
+
+
+/*
+ * As the name states, this function will get (given a targetid) the power
+ * state of all the components in the power rail. It will also update the table
+ * where the power components are, this can be done because the state of each
+ * component is in a datacell with the id 'table-datacell-{{component}}-state'
+ *
+ * So we can quickly identify each cell based on the response of the http
+ * request /power/list.
+ *
+ * @param {targetid} str -> target id you want to read the power components
+ *                          from
+ *
+ * return {void}
+ */
+async function power_state_update_for_all_components(targetid) {
+    $('#loading-power').append(
+        '<label>refreshing state of the power rail:<br></label><progress id="progress-bar" aria-label="Content loading…"></progress></div>'
+    );
+    let r = await fetch('/ttb-v2/targets/' + targetid + '/power/list');
+    if (r.status == 401) {
+        alert(
+            'oops, seems that you are not logged in. Please log in to' +
+            ' acquire machines (top right corner)'
+        );
+        return
+    }
+    let body = await r.text();
+    if (r.status != 200) {
+        alert('there was an error reading the state of the power rail\n' + body);
+        return
+    }
+    let power_list = JSON.parse(body);
+    let power_rail = power_list['components'];
+    for (const [component, information] of Object.entries(power_rail)) {
+        let table_datacell = document.getElementById('table-datacell-' + component + '-state');
+        if (information['state'] === false) {
+            table_datacell.textContent = 'off';
+            table_datacell.style.color = 'red';
+        } else {
+            table_datacell.textContent = 'on';
+            table_datacell.style.color = 'green';
+        }
+    }
+    $('#loading-power').empty();
+}
+
