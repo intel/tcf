@@ -299,19 +299,53 @@ def target_description_get(
             return v
     return default
 
+def _target_power_get(target: ttbl.test_target, inventory: dict, kws: dict):
+    '''
+    Query the inventory to get the power rail/components of target WITHOUT
+    their states, we will get the state using a js call, since we don't want to
+    slow down the html request
 
-def _target_power_get(target: ttbl.test_target, kws: dict):
-    # get power info
-    p_state, p_data, p_substate = target.power._get(target)
-    for component in p_data:
-        path = f"interfaces.power.{component}"
+    :param ttbl.target_c target: target for which to find the
+      power components
+
+    :param dict inventory: result of doing target.to_dict(list()), we could do
+      it inside the function but we usually already have it at the point the
+      function is called. No need on querying it again.
+
+    :param dict kws: keywords, used to  get the description of power component
+
+    :return dict power_component_description:
+        power_component_description is a dict with the following format:
+            > power_component_description = {
+            >     'AC': 'AC description',
+            >     'power1': 'AC description',
+            >     'power2': 'AC description',
+            > }
+        so, key = component, value = description
+    '''
+    # we DO NOT want to get the power state of the components, meaning we
+    # do not want to run `target.power._get(target)`, because if the
+    # target has a lot of components, it will take a long way to check
+    # the status of them all. This will slow the server response. Instead
+    # we just get the components, and then with js do lazy loading to get
+    # the state.
+    power_component_description = {}
+    power_components = inventory.get('interfaces', {}).get('power', None)
+    for component_name, component_value in power_components.items():
+        if not isinstance(component_value, dict) or \
+            component_value.get('instrument', None) is None:
+            # this means that the component is not really a component, but
+            # info on the power interface. We do not want to have it in
+            # the power rail
+            continue
+        path = f"interfaces.power.{component_name}"
         kws['key'] = path
         description = target_description_get(target, path)
+        power_component_description[component_name] = None
         if description:
             description = commonl.kws_expand(description, kws)
-            p_data[component]['description'] = description
-    return p_state, p_data, p_substate
-
+            power_component_description[component_name] = description
+    return power_component_description
 
 
 @bp.route('/target/<targetid>', methods = ['GET'])
@@ -374,10 +408,9 @@ def _target(targetid):
     short_field_maybe_add(state, 'mac', 18)
 
     if hasattr(target, "power"):
-        p_state, p_data, p_substate = _target_power_get(target, kws)
-        state['power'] = p_state
+        power_component_description = _target_power_get(target, inventory, kws)
     else:
-        p_data = {}
+        power_component_description = {}
 
     #
     # Provive button data for the UI to display, if wanted/needed
@@ -413,7 +446,7 @@ def _target(targetid):
         targetid = targetid,
         inventory_str = inventory_str,
         state = state,
-        powerls = p_data,
+        powerls = power_component_description,
         images = images,
         consoles = consoles,
         paths_for_all_images_types = paths_for_all_images_types,

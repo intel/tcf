@@ -184,48 +184,45 @@ $ tcf ls -vv {{ targetid}}</code> </pre></p>
             <thead>
               <tr>
                 <th>component</th>
-                <th>state</th>
-                <th>&nbsp;</th>
+                <th>
+                    state
+                    <button id='reload-button' onclick='power_state_update_for_all_components("{{targetid}}");'><span class=reload>&#x21bb;</button>
+                </th>
+                <th>&nbsp;
+
+                </th>
               </tr>
             </thead>
             <tbody>
-              {% for k, v in powerls.items() %}
+              {% for component, description in powerls.items() %}
               <tr>
 
                 <td>
                   {# if no description, don't add a tootip to avoid
                      polluting the interface #}
-                  {% if v.description %}
+                  {% if description %}
                   <div class = "tooltip">
-                    {{ k }}
+                    {{ component }}
                     <span class = "tooltiptext">
-                      {{ v.description }}
+                      {{ description }}
                     </span>
                   </div>
                   {% else %}
-                  {{ k }}
+                  {{ component }}
                   {% endif %}
                 </td>
-
-
-                {% if v.state == False %}
-                  <td>
-                    <span style='color: red;'>off</span>
-                  </td>
-                {% else %}
-                  <td>
-                    <span style='color: green;'>on</span>
-                  </td>
-                {% endif %}
+                <td id='table-datacell-{{component}}-state'>
+                    <!-- state will go here -->
+                </td>
                 <td>
                     <div class='flex'>
-                      <button class='power-on-btn' onclick='power("{{ targetid }}", "on", "{{k}}")'>
+                      <button class='power-on-btn' onclick='power("{{ targetid }}", "on", "{{component}}")'>
                         power on
                       </button>
-                      <button class='power-off-btn' onclick='power("{{ targetid }}", "off", "{{k}}")'>
+                      <button class='power-off-btn' onclick='power("{{ targetid }}", "off", "{{component}}")'>
                         power off
                       </button>
-                      <button class='power-cycle-btn'  onclick='power("{{ targetid }}", "cycle", "{{k}}")'>
+                      <button class='power-cycle-btn'  onclick='power("{{ targetid }}", "cycle", "{{component}}")'>
                         power cycle
                       </button>
                     </div>
@@ -234,6 +231,7 @@ $ tcf ls -vv {{ targetid}}</code> </pre></p>
               {% endfor %}
             </tbody>
           </table>
+          <div class='subsection' id='loading-power'></div>
         </div>
 
         <!-- If we have button -->
@@ -511,7 +509,13 @@ $(document).ready( function () {
         searching:   false,
     });
 
-} );
+})
+
+/*
+ * let us update the power state of the power railwhen we load the page for the
+ * first time
+ */
+power_state_update_for_all_components("{{targetid}}");
 </script>
 
 {% endblock %}
