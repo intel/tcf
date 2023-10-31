@@ -2682,6 +2682,15 @@ class device_resolver_c:
         >>                              spec_prefix = "usb,#")
         >>> dr = ttbl.device_resolver_c(target, "usb,idVendor=1a86,idProduct=7523,##:1.0")
 
+        Match USB device that is connected to a controller connected
+        on PCI slot 2; in this machine, the host controller is PCI;
+        PCI exposes, when available and machine dependent, a file
+        called label that says "SLOT 2" (*SLOT%202* URL encoded); this
+        then would match that USB device when connected to the root
+        controller that is in the PCI slot labelled as "SLOT 2":
+
+        >>> dr = ttbl.device_resolver_c(target, "usb,idVendor=1a86,idProduct=7523,label=SLOT%202,##:1.0")
+
         Note how for most USB devices you might need to also specify
         the interface (with *##1.0*), since drivers attach to
         interfaces and devices might have multiple.
@@ -2710,7 +2719,6 @@ class device_resolver_c:
           - *BUS* is a bus in */sys/bus*
 
           - *usb,#SERIAL[,##USBRELATIVEPATH][,FIELD[=VALUE]][,FIELD[=VALUE]]*
-
 
             if instead of = it is :, VALUE it is considered a regex.
 
@@ -2755,6 +2763,11 @@ class device_resolver_c:
             Keys and values can be URL encoded to include weird chars
             or comma (,), = and :.
 
+            Fields will be matched against the sysfs fields in
+            */sys/bus/BUSNAME/DEVICE*; if not found there, the parent
+            will be tried until reaching */sys/devices* and call a
+            mismatch.
+
             >>> val = urllib.parse.quote("key=:,=")
 
           - */dev/SOMEDEV*
@@ -2791,9 +2804,6 @@ class device_resolver_c:
 
         - support URL form device_spec (for network based devices)
 
-        - consider, for USB devices, automatically adding :1.0 if
-          nothing is specified since drivers attach to interfaces --
-          at least for TTY?
         """
 
         assert isinstance(spec, str), \
@@ -2867,23 +2877,51 @@ class device_resolver_c:
 
 
 
-    def _match_fields_to_files(self, fields, path):
+    def _match_fields_to_files(self, fields, path_original):
         # matches dict of fields against files with the same name in
         # path
         #
         # Mostly used against sysfs directories to find devices
+        #
+        # So we start with path_original -> /sys/bus/BUSNAME/devices/DEVICETHING
+        #
+        # for each field, we test against than dir and if we don't
+        # find the file/field in there, we try one directory up, etc.
+        #
         match = False
         for match_field, match_value in fields.items():
-            try:
-                with open(path + "/" + match_field) as f:
-                    # need rstrip() to remove trailing newline
-                    value = f.read().rstrip()
-                match = self._match_value(match_value, value)
-                if not match:
-                    return False
-            except IOError as e:
-                if e.errno == errno.ENOENT:
-                    return False	# file does not exist, no match
+            path = path_original
+            while True:
+                # first path is always /sys/bus/BUSNAME/devices/DEVENTRY
+                #logging.error(f"{path_original}: checking"
+                #              f" {match_field}:{match_value} in {path}")
+                try:
+                    with open(path + "/" + match_field) as f:
+                        # need rstrip() to remove trailing newline
+                        value = f.read().rstrip()
+                    match = self._match_value(match_value, value)
+                    if not match:
+                        #logging.error(f"{path_original}: MISMATCH for"
+                        #              f" {match_field}:{match_value} in {path}")
+                        return False
+                    #logging.error(f"{path_original}: MATCHED"
+                    #              f" {match_field}:{match_value} in {path}")
+                    break	# we matched, so next field
+                except IOError as e:
+                    if e.errno != errno.ENOENT:
+                        #logging.error(f"{path_original}: error {e} matching"
+                        #              f" {match_field}:{match_value} in {path}")
+                        return False	# whatever happend, didn't
+                    # match file/field does not exist, no match, try
+                    # one levelup; note we are now checking on the
+                    # parent of this device
+                    real_path = os.path.realpath(path)
+                    path = os.path.dirname(real_path)
+                    #logging.error(f"{path_original}: going up to {path}"
+                    #              f" for {match_field}")
+                    if path == "/sys/devices":
+                        return False	# file does not exist, no match
+
         return True
 
 
