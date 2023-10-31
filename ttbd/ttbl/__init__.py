@@ -3053,6 +3053,32 @@ class device_resolver_c:
                              spec, origin, " ".join(devicel))
         return devicel
 
+
+
+    def device_find_by_spec(self, spec: str = None, origin: str = None):
+        """
+        Find a single device, complain if it is none or more than one
+
+        Otherwise, same as :meth:`devices_find_by_spec`
+        """
+        devices = self.devices_find_by_spec(spec, origin)
+        if not devices:
+            spec, origin = self.spec_get()
+            raise RuntimeError(
+                f"{self.target.id}: "
+                f"found no devices matching device spec {spec} @{origin}")
+        devicen = len(devices)
+        if devicen > 1:
+            spec, origin = self.spec_get()
+            raise RuntimeError(
+                f"{self.target.id}: "
+                f"found {devicen} devices matching device spec"
+                f" {spec} @{origin}, expected only one: "
+                + ", ".join(devices))
+        return devices[0]
+
+
+
     sysfs_tty_globs = [
         # this catches when a tty device is in the top level, such as
         # USB devices specified just a a serial number; if a USB
