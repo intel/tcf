@@ -19,6 +19,7 @@ import contextlib
 import errno
 import fcntl
 import fnmatch
+import functools
 import glob
 import ipaddress
 import json
@@ -2770,6 +2771,18 @@ class device_resolver_c:
 
             >>> val = urllib.parse.quote("key=:,=")
 
+            Special fields:
+
+            - *usb_depth* (int, >= 0): depth in the USB tree; 0 means
+              the device is connected to a root port; 1 to a hub
+              connected to a root hub; 2 to a hub connected to a
+              hub...
+
+              Eg: a product with ID 3f41 connected via two hubs
+
+              >>> spec = "usb,idProduct=3f41,usb_depth=2"
+
+
           - */dev/SOMEDEV*
 
         :param str property_name: (optional, default *None*) if
@@ -2876,6 +2889,35 @@ class device_resolver_c:
         return True
 
 
+    @functools.lru_cache(maxsize = 512)	# yep, seen systems with 512 USB devs
+    @staticmethod			# static, so shared by instances
+    def _usb_depth_count(usb_path: str) -> int:
+        # Calculate USB device's depth
+        #
+        # Note we lru_cache this, since we'll call it repeatedly to
+        # test for stuff, so it's pointless to recalculate
+        #
+        # $ ls /sys/bus/usb/devices/
+        # 1-0:1.0  2-3:1.0    3-0:1.0  3-3.1.1     ...
+        # 2-0:1.0  2-3.1:1.0  3-3      3-3.1:1.0   ...
+        # 2-3      2-3.2      3-3.1    3-3.1.1:1.0 ...
+        # 2-3.1    2-3.2:1.0  3-3:1.0  3-3.1.2     ...
+        # $ ls /sys/bus/usb/devices/
+        # 1-0:1.0  2-3:1.0    3-0:1.0  3-3.1.1     ...
+        # 2-0:1.0  2-3.1:1.0  3-3      3-3.1:1.0   ...
+        # 2-3      2-3.2      3-3.1    3-3.1.1:1.0 ...
+        # 2-3.1    2-3.2:1.0  3-3:1.0  3-3.1.2     ...
+        #
+        # Depth in the USB tree is how many periods the name has, each
+        # dot being a port in hub.
+        #
+        # take the file name from /sys/bus/usb/devices/DEVICE/MAYBESOMETHING
+        name = usb_path.split("/")[5]
+        # remove trailing :WHATEVER (USB interface info which also
+        # contains periods)
+        name = name.split(":")[0]
+        return name.count(".")
+
 
     def _match_fields_to_files(self, fields, path_original):
         # matches dict of fields against files with the same name in
@@ -2889,8 +2931,21 @@ class device_resolver_c:
         # find the file/field in there, we try one directory up, etc.
         #
         match = False
+        if path_original.startswith('/sys/bus/usb/devices'):
+            # This is USB, count its depth and expose it (0 -> N)
+            usb_depth = type(self)._usb_depth_count(path_original)
+            #logging.error(f"{path_original}: USB depth {usb_depth}")
+        else:
+            usb_depth = None
         for match_field, match_value in fields.items():
             path = path_original
+            #logging.error(f"{path_original}: checking"
+            #              f" {match_field}:{match_value}")
+            # Match "synthetic fields first" (those not in files
+            if usb_depth != None and match_field == "usb_depth" \
+               and usb_depth == int(match_value):
+                #logging.error(f"{path_original}: MATCH USB depth {usb_depth}")
+                continue
             while True:
                 # first path is always /sys/bus/BUSNAME/devices/DEVENTRY
                 #logging.error(f"{path_original}: checking"
