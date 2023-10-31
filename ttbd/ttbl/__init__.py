@@ -2692,6 +2692,13 @@ class device_resolver_c:
 
         >>> dr = ttbl.device_resolver_c(target, "usb,idVendor=1a86,idProduct=7523,label=SLOT%202,##:1.0")
 
+        Same thing, but match on the top level USB device (vs the interface):
+
+        >>> dr = ttbl.device_resolver_c(target, "usb,idVendor=1a86,idProduct=7523,label=SLOT%202,!bInterfaceClass")
+
+        This works because the top level UBS device path lacks the
+        *bInterfaceClass* file.
+
         Note how for most USB devices you might need to also specify
         the interface (with *##1.0*), since drivers attach to
         interfaces and devices might have multiple.
@@ -2719,9 +2726,10 @@ class device_resolver_c:
 
           - *BUS* is a bus in */sys/bus*
 
-          - *usb,#SERIAL[,##USBRELATIVEPATH][,FIELD[=VALUE]][,FIELD[=VALUE]]*
+          - *usb,#SERIAL[,##USBRELATIVEPATH][,FIELD[=VALUE]][,FIELD[=VALUE]][,!FIELD]*
 
-            if instead of = it is :, VALUE it is considered a regex.
+            if instead of = it is :, VALUE it is considered a
+            regex. '!FIELD' matches if the *FIELD* does not exist.
 
             - *#SERIAL* is short for *serial=SERIAL*
 
@@ -2967,6 +2975,13 @@ class device_resolver_c:
                         #logging.error(f"{path_original}: error {e} matching"
                         #              f" {match_field}:{match_value} in {path}")
                         return False	# whatever happend, didn't
+                    if match_value == None:
+                        # we are looking for this field not to exist;
+                        # the file doesn't exist, so we good
+                        #logging.error(f"{path_original}: MATCH doesn't exist"
+                        #              f" {match_field} in {path}")
+                        break		# match! file doesn't exist
+
                     # match file/field does not exist, no match, try
                     # one levelup; note we are now checking on the
                     # parent of this device
@@ -3002,6 +3017,10 @@ class device_resolver_c:
                 # shorthand #SERIAL -> serial=SERIAL
                 key = 'serial'
                 val = urllib.parse.unquote(field[1:])
+            elif field.startswith("!"):
+                # shorthand for field is missing
+                key = field[1:]
+                val = None
             elif '=' in field:
                 key, val = field.split('=', 1)
                 val = urllib.parse.unquote(val)
