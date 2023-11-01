@@ -299,6 +299,7 @@ def target_description_get(
             return v
     return default
 
+
 def _target_power_get(target: ttbl.test_target, inventory: dict, kws: dict):
     '''
     Query the inventory to get the power rail/components of target WITHOUT
