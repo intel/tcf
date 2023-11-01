@@ -349,6 +349,53 @@ def _target_power_get(target: ttbl.test_target, inventory: dict, kws: dict):
     return power_component_description
 
 
+def _target_button_get(target: ttbl.test_target, inventory: dict, kws: dict):
+    '''
+    Query the inventory to get the buttons jumpers and relays WITHOUT their
+    states, we will get the state using a js call, since we don't want to slow
+    down the html request
+
+    :param ttbl.target_c target: target for which to find the
+      buttons/relays/jumpers components
+
+    :param dict inventory: result of doing target.to_dict(list()), we could do
+      it inside the function but we usually already have it at the point the
+      function is called. No need on querying it again.
+
+    :param dict kws: keywords, used to  get the description of button component
+
+    :return dict buttons_component_description:
+        buttons_component_description is a dict with the following format:
+            > buttons_component_description = {
+            >     'button': 'button description',
+            >     'reset': 'reset description',
+            > }
+        so, key = component, value = description
+    '''
+    # we DO NOT want to get the state of the components, meaning we do not want
+    # to run `target.buttons._get(target)`, because if the target has a lot of
+    # components, it will take a long way to check the status of them all. This
+    # will slow the server response. Instead we just get the components, and
+    # then with js do lazy loading to get the state.
+    buttons_component_description = {}
+    buttons_components = inventory.get('interfaces', {}).get('buttons', None)
+    for component_name, component_value in buttons_components.items():
+        if not isinstance(component_value, dict) or \
+            component_value.get('instrument', None) is None:
+            # this means that the component is not really a component, but
+            # info on the power interface. We do not want to have it in
+            # the power rail
+            continue
+        path = f"interfaces.buttons.{component_name}"
+        kws['key'] = path
+        description = target_description_get(target, path)
+        buttons_component_description[component_name] = None
+        if description:
+            description = commonl.kws_expand(description, kws)
+            buttons_component_description[component_name] = description
+    return buttons_component_description
+
+
 @bp.route('/target/<targetid>', methods = ['GET'])
 def _target(targetid):
     '''
@@ -424,14 +471,13 @@ def _target(targetid):
     #
     if hasattr(target, "buttons"):
         # buttons interface is the same as the power interface...with
-        # another name :) w ignore the state and substate, because
-        # they make no sense here
-        _state, button_data, _substate = target.buttons._get(target)
+        # another name :)
+        buttons_component_description = _target_button_get(target, inventory, kws)
     else:
         # we send an empty dict to the template, there we will check the
         # length. If zero we will disable the button for showing the
         # buttons/relays/jumpers table
-        button_data = {}
+        buttons_component_description = {}
 
     # more info about this tuple on the docstring of the function
     # `_get_images_paths`
@@ -450,7 +496,7 @@ def _target(targetid):
         images = images,
         consoles = consoles,
         paths_for_all_images_types = paths_for_all_images_types,
-        buttonls = button_data
+        buttonls = buttons_component_description
     )
 
 
