@@ -400,23 +400,13 @@ $ tcf ls -vv {{ targetid}}</code> </pre></p>
             </div>
         {%endfor%}
 
-        {% else %}
-        <!-- the current user is not the owner, so they can't do
-             anything, grey it out -->
+    {% else %}
         <div class='subsection'>
-            <button disabled>power on</button>
-            <button disabled>power off</button>
-            <button disabled>power cycle</button>
-            <button disabled class='minor'>components  <i class="arrow down"></i></button>
-            <button disabled class='minor'>
-              buttons, jumpers and relays <i class="arrow down"></i>
-            </button>
-        </div>
-        <div class='subsection'>
-            <button disabled>flash firmware</button>
-        </div>
-        <div class='subsection'>
-            <button disabled>console wall</button>
+            <p class='info info-yellow'>
+                In order to access and utilize the full range of operations
+                available for the system, please ensure to reserve/acquire
+                it.
+            </p>
         </div>
     {% endif %}
 </div>
