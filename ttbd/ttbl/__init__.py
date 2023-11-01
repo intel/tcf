@@ -2668,7 +2668,8 @@ class device_resolver_c:
 
     def __init__(self, target: ttbl.test_target,
                  spec: str, property_name: str = None,
-                 spec_prefix: str = "usb,#"):
+                 spec_prefix: str = "usb,#",
+                 deep_match: bool = False):
         """Resolve a device specification to a list of sysfs device paths,
         TTY names, etc
 
@@ -2690,11 +2691,11 @@ class device_resolver_c:
         then would match that USB device when connected to the root
         controller that is in the PCI slot labelled as "SLOT 2":
 
-        >>> dr = ttbl.device_resolver_c(target, "usb,idVendor=1a86,idProduct=7523,label=SLOT%202,##:1.0")
+        >>> dr = ttbl.device_resolver_c(target, "usb,idVendor=1a86,idProduct=7523,deep_match,label=SLOT%202,##:1.0")
 
         Same thing, but match on the top level USB device (vs the interface):
 
-        >>> dr = ttbl.device_resolver_c(target, "usb,idVendor=1a86,idProduct=7523,label=SLOT%202,!bInterfaceClass")
+        >>> dr = ttbl.device_resolver_c(target, "usb,idVendor=1a86,idProduct=7523,deep_match,label=SLOT%202,!bInterfaceClass")
 
         This works because the top level UBS device path lacks the
         *bInterfaceClass* file.
@@ -2773,9 +2774,11 @@ class device_resolver_c:
             or comma (,), = and :.
 
             Fields will be matched against the sysfs fields in
-            */sys/bus/BUSNAME/DEVICE*; if not found there, the parent
-            will be tried until reaching */sys/devices* and call a
-            mismatch.
+            */sys/bus/BUSNAME/DEVICE*.
+
+            If deep match is enabled (via parameter or by setting
+            *deep_match* in the fields, the parents will be tried
+            until reaching */sys/devices* and call a mismatch. eg:
 
             >>> val = urllib.parse.quote("key=:,=")
 
@@ -2819,6 +2822,14 @@ class device_resolver_c:
           @spec_prefix to *usb,#* (or *usb,serial=*) which will
           convert the spec into *usb,#12345*.
 
+
+        :param bool deep_match: (optional, default *False*) when
+          enabled, enables matching of fields in parents of each
+          device. If disabled, it can be enabled by adding
+          *deep_match* as a field, eg:
+
+          >>> spec = "usb,deep_match,SOMEFIELD=VALUE..."
+
         **PENDING**
 
         - expand target' kws in device spec when present
@@ -2843,6 +2854,7 @@ class device_resolver_c:
             self.spec_prefix = spec_prefix
         else:
             self.spec_prefix = ""
+        self.deep_match = deep_match
 
     # Valid device spec absolute prefixes for relative specs
     spec_prefixes_regex = re.compile(
@@ -2982,6 +2994,12 @@ class device_resolver_c:
                         #              f" {match_field} in {path}")
                         break		# match! file doesn't exist
 
+                    # if we are not doing deep match, we can't
+                    # check the parents of this device for
+                    # matches, so we call it done here; otherwise, we
+                    # fall through
+                    if self.deep_match == False:
+                        return False
                     # match file/field does not exist, no match, try
                     # one levelup; note we are now checking on the
                     # parent of this device
@@ -3009,7 +3027,9 @@ class device_resolver_c:
         for field in fieldl:
             # we unquote with urllib, so we can put in there
             # values which have = or :
-            if field.startswith("##"):
+            if field == "deep_match":
+                self.deep_match = True
+            elif field.startswith("##"):
                 # shorthand ##SIBLING -> relative=SIBLING
                 key = 'relative'
                 val = urllib.parse.unquote(field[2:])
