@@ -427,11 +427,10 @@ def _target(targetid):
         # they make no sense here
         _state, button_data, _substate = target.buttons._get(target)
     else:
-        # FIXME: this is a hack; ideally, if no button control is
-        # available, it shall not even show the list
-        button_data = {
-            "no buttons/relays/jumpers available": None
-        }
+        # we send an empty dict to the template, there we will check the
+        # length. If zero we will disable the button for showing the
+        # buttons/relays/jumpers table
+        button_data = {}
 
     # more info about this tuple on the docstring of the function
     # `_get_images_paths`

@@ -174,9 +174,23 @@ $ tcf ls -vv {{ targetid}}</code> </pre></p>
           </div>
 
           <button class='minor' onclick="toggle('power-ls')">components  <i class="arrow down"></i></button>
-          <button class='minor' onclick="toggle('buttons-ls')">
-            buttons, jumpers and relays <i class="arrow down"></i>
-          </button>
+          {% if buttonls|length == 0 %}
+              <div class = "tooltip">
+                  <button class='minor' disabled>
+                    buttons, jumpers and relays
+                  </button>
+                <span class = "tooltiptext">
+                    <p>
+                        This machine does not have buttons, jumpers nor
+                        relays
+                    </p>
+                </span>
+              </div>
+          {% else %}
+              <button class='minor' onclick="toggle('buttons-ls')">
+                buttons, jumpers and relays <i class="arrow down"></i>
+              </button>
+          {% endif %}
        </div>
 
         <div class='subsection' id='power-ls' style="display: none;">
