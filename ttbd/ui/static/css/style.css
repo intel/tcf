@@ -415,10 +415,21 @@ button:hover:enabled {
     padding: 1em 1em;
 }
 
+.toolbox > .subsection > * > .minor {
+    background-color: #eee;
+    border-color: #eee;
+    height: 2em;
+}
+
 .toolbox > .subsection > .minor {
     background-color: #eee;
     border-color: #eee;
     height: 2em;
+}
+
+.toolbox > .subsection > * > .minor:disabled {
+    color: gray;
+    cursor: not-allowed;
 }
 
 .arrow {
