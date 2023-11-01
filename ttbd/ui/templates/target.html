@@ -255,39 +255,29 @@ $ tcf ls -vv {{ targetid}}</code> </pre></p>
             <thead>
               <tr>
                 <th>button/jumper/relay</th>
-                <th>state</th>
+                <th>
+                    state
+                    <button id='reload-button' onclick='buttons_state_update_for_all_components("{{targetid}}");'><span class=reload>&#x21bb;</button>
+                </th>
                 <th>&nbsp;</th>
               </tr>
             </thead>
             <tbody>
               <!-- buttonls comes from the data jinja2 is taking as
                    input to render in ttbl.ui._target() -->
-              {% for k, v in buttonls.items() %}
+              {% for component, description in buttonls.items() %}
               <tr>
-                <td>{{k}}</td>
-                {% if v.state == False %}
-                  <td>
-                    <span style='color: red;'>released/open/off</span>
-                  </td>
-                {% elif v.state == True %}
-                  <td>
-                    <span style='color: green;'>pressed/closed/on</span>
-                  </td>
-                {% elif v.state == None %}
-                  <td>
-                    <span style='color: gray;'>n/a</span>
-                  </td>
-                {% else %}
-                  <td>
-                    <span style='color: blak;'>unknown</span>
-                  </td>
-                {% endif %}
+                <td>{{component}}</td>
+                <td id='table-datacell-{{component}}-button-state' style='color: gray;'>
+                    <!-- state will go here -->
+                    pending...
+                </td>
                 <td>
                     <div class='flex'>
-                      <button class='button-press-btn' onclick='js_buttons("{{ targetid }}", "on", "{{k}}")'>
+                      <button class='button-press-btn' onclick='js_buttons("{{ targetid }}", "on", "{{component}}")'>
                         press/close/on
                       </button>
-                      <button class='button-release-btn' onclick='js_buttons("{{ targetid }}", "off", "{{k}}")'>
+                      <button class='button-release-btn' onclick='js_buttons("{{ targetid }}", "off", "{{component}}")'>
                         release/open/off
                       </button>
                     </div>
@@ -296,6 +286,7 @@ $ tcf ls -vv {{ targetid}}</code> </pre></p>
               {% endfor %}
             </tbody>
           </table>
+          <div class='subsection' id='loading-buttonls'></div>
         </div>
         <hr>
 
@@ -521,6 +512,7 @@ $(document).ready( function () {
  * first time
  */
 power_state_update_for_all_components("{{targetid}}");
+buttons_state_update_for_all_components("{{targetid}}");
 </script>
 
 {% endblock %}
