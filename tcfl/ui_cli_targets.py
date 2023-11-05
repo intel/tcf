@@ -1,6 +1,6 @@
-#! /usr/bin/python3
+#! /usr/bin/env python3
 #
-# Copyright (c) 2021 Intel Corporation
+# Copyright (c) 2021-23 Intel Corporation
 #
 # SPDX-License-Identifier: Apache-2.0
 #
@@ -14,8 +14,33 @@ learn more about them):
 
 - find testcases on PATHs or files::
 
-    $ tcf ls2
-    $ tcf ls2 [TARGETNAME...] [TARGETSPEC...]
+    $ tcf ls
+    $ tcf ls [TARGETNAME...] [TARGETSPEC...]
+
+- get target's inventory in JSON format::
+
+    $ tcf get TARGETNAME
+
+- get a property from the target's inventory::
+
+    $ tcf property-get TARGETNAME PROPERTYNAME
+
+- set/reset a property in the target's inventory::
+
+    $ tcf property-set TARGETSPEC PROPERTYNAME [VALUE]
+
+- set multiple properties from a JSON data set::
+
+    $ tcf patch TARGETNAME < somefile.json
+
+- enable/disable targets::
+
+    $ tcf disable [-r REASON] TARGETSPEC
+    $ tcf enable TARGETSPEC
+
+- run a basic healthcheck on targets::
+
+    $ tcf healthcheck TARGETSPEC
 
 
 """
