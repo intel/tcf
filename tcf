@@ -277,10 +277,12 @@ if __name__ == "__main__":
 
     tcfl.tc.argp_setup(arg_subparsers)
 
+    import tcfl.ui_cli_buttons
+    tcfl.ui_cli_buttons.cmdline_setup_intermediate(arg_subparsers)
+
     import tcfl.ui_cli_capture
     tcfl.ui_cli_capture.cmdline_setup_intermediate(arg_subparsers)
 
-    tcfl.tc.target_ext_buttons._cmdline_setup(arg_subparsers)
     import tcfl.ui_cli_console
     tcfl.ui_cli_console._cmdline_setup_advanced(arg_subparsers)
 
