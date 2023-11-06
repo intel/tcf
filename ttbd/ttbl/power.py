@@ -2370,6 +2370,21 @@ RUN \
         commonl.makedirs_p(run_dir)
         commonl.makedirs_p(data_dir)
 
+        if self.ssl_enabled:
+            # ensure the SSL certificate support has been enabled,
+            # since it is only done so on demand.  We do it by requesting
+            # a certificate for RPYC--this will force the server cert
+            # to be created
+            iface_cert = getattr(target, "certs", None)
+            if iface_cert == None:
+                raise RuntimeError(
+                    f"{target.id}: does not support SSL certificates! BUG?")
+            iface_cert.put_certificate(
+                target,
+                ttbl.who_daemon(),
+                { "name": "rpyc" },
+                None, None)
+
         # copy the certificates to the config dir
         shutil.copy(target.state_dir + "/certificates/ca.cert", cfg_dir)
         shutil.copy(target.state_dir + "/certificates/server.key", cfg_dir)
