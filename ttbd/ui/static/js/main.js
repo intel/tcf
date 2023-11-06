@@ -82,7 +82,8 @@ async function js_alloc_remove(allocid) {
 async function power(targetid, action, component) {
     $('.diagnostics').empty();
     $('#loading').append(
-        '<label>powering ' + action + ': ' + component+ '</label><progress id="progress-bar" aria-label="Content loading…"></progress></div>'
+        '<label>power ' + action + ': ' + component+ ' </label><progress id="progress-bar" aria-label="Content loading…"></progress></div>' +
+        '<br>'
     );
 
     // https://SERVERNAME:5000/ttb-v2/targets/TARGETNAME/power/on
@@ -143,7 +144,8 @@ async function power(targetid, action, component) {
 async function js_buttons(targetid, action, component) {
     $('.diagnostics').empty();
     $('#loading').append(
-        '<label>powering ' + action + ': ' + component+ '</label><progress id="progress-bar" aria-label="Content loading…"></progress></div>'
+        '<label>' + component + ': ' + action + ' </label><progress id="progress-bar" aria-label="Content loading…"></progress></div>' +
+        '<br>'
     );
 
     // https://SERVERNAME:5000/ttb-v2/targets/TARGETNAME/buttons/on
@@ -321,7 +323,8 @@ async function js_images_flash(targetid, select_id, image_type, suffix) {
     let selected = document.getElementById(select_id);
     let fullpath = selected.value;
     $('#loading').append(
-        '<label>flashing ' + image_type + ': ' + fullpath + '</label><progress id="progress-bar" aria-label="Content loading…"></progress></div>'
+        '<label>flashing ' + image_type + ': ' + fullpath + ' </label><progress id="progress-bar" aria-label="Content loading…"></progress></div>' +
+        '<br>'
     );
 
     let images = new Object();
@@ -640,8 +643,9 @@ async function js_console_enable(targetid, terminal, enable) {
  * return {void}
  */
 async function power_state_update_for_all_components(targetid) {
-    $('#loading-power').append(
-        '<label>refreshing state of the power rail:<br></label><progress id="progress-bar" aria-label="Content loading…"></progress></div>'
+    $('#loading').append(
+        '<label>refreshing state of the power rail:<br></label><progress id="progress-bar" aria-label="Content loading…"></progress></div>' +
+        '<br>'
     );
     let r = await fetch('/ttb-v2/targets/' + targetid + '/power/list');
     if (r.status == 401) {
@@ -668,7 +672,7 @@ async function power_state_update_for_all_components(targetid) {
             table_datacell.style.color = 'green';
         }
     }
-    $('#loading-power').empty();
+    $('#loading').empty();
 }
 
 
@@ -688,8 +692,9 @@ async function power_state_update_for_all_components(targetid) {
  * return {void}
  */
 async function buttons_state_update_for_all_components(targetid) {
-    $('#loading-buttonls').append(
-        '<label>refreshing state of the buttons:<br></label><progress id="progress-bar" aria-label="Content loading…"></progress></div>'
+    $('#loading').append(
+        '<label>refreshing state of the buttons:<br></label><progress id="progress-bar" aria-label="Content loading…"></progress></div>' +
+        '<br>'
     );
     let r = await fetch('/ttb-v2/targets/' + targetid + '/buttons/list');
     if (r.status == 401) {
@@ -716,6 +721,6 @@ async function buttons_state_update_for_all_components(targetid) {
             table_datacell.style.color = 'green';
         }
     }
-    $('#loading-buttonls').empty();
+    $('#loading').empty();
 }
 
