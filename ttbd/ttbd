@@ -1555,6 +1555,8 @@ def unauthorized():
     Called by the login manager when a user is no authorized to
     do an operation
     """
+    if flask.request.blueprint == 'ui':
+        return flask.redirect(API_PREFIX + '/ui/login')
     flask_logi_abort(401, "User unauthorized; please login")
 
 def auth_init(app):

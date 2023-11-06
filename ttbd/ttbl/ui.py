@@ -397,6 +397,7 @@ def _target_button_get(target: ttbl.test_target, inventory: dict, kws: dict):
 
 
 @bp.route('/target/<targetid>', methods = ['GET'])
+@flask_login.login_required
 def _target(targetid):
     '''
     Given a targetid get all its inventory as a dict, transform it to a
