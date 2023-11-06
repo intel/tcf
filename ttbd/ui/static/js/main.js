@@ -435,7 +435,8 @@ function terminal_create(div_id, targetid, terminal) {
      * also add a message telling the user that the console has been enabled */
     let term = new window.Terminal({
         cursorBlink: true,
-        fontFamily: 'monospace'
+        fontFamily: 'monospace',
+        convertEol: true
     });
     term.open(document.getElementById(div_id));
     term.write('\x1b[37;40m \n\r\r\nconsole was started;\r\r\n\n\x1b[0m');
