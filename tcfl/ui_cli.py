@@ -226,11 +226,12 @@ def run_fn_on_each_targetspec(
                 logger.error(targetid + ": " + msg + tb)
             retval += 1
 
-    if retval == len(r):
+    if retval == len(r):	# all failed
         retval = 2
-    if retval == 0:
-        retval = 1
-    retval = 0
+    if retval == 0:		# none failed
+        retval = 0
+    else:
+        retval = 1		# some failed
     return retval, r
 
 
