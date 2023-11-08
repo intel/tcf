@@ -2909,7 +2909,6 @@ class device_resolver_c:
         return True
 
 
-    @functools.lru_cache(maxsize = 512)	# yep, seen systems with 512 USB devs
     @staticmethod			# static, so shared by instances
     def _usb_depth_count(usb_path: str) -> int:
         # Calculate USB device's depth
@@ -2938,6 +2937,140 @@ class device_resolver_c:
         name = name.split(":")[0]
         return name.count(".")
 
+    _synth_fields_makers = {
+
+    }
+
+    @classmethod
+    def synth_fields_maker_register(cls, fn: callable):
+        """
+        Register a function that can be used to generate synthetic
+        information fields in for a /sysfs device path; these are
+        later used to match
+
+        :param callable fn: Function that will be called; it must
+          follow the pattern:
+
+          >>> def function(sys_path: str) -> dict:
+          >>>    d = dict()
+          >>>    # do some discovery on sys_path (/sys/bus/usb/devices/1-3.4)
+          >>>    # ... eg:
+          >>>    # d['mydev_capacity_mib'] = "45"
+          >>>    # d['mydev_speed_gbps'] = "2.3"
+          >>>    return d
+
+          The return field is a dictionary keyed by string of simple
+          scalar values (normally strings, others might be adde
+          later). By convention, please prefix all the keys
+          *SOMETHING_NAME* where something is a common namespace.
+
+          If it finds errors, it can raise an exception; in that case
+          the entry for the device will not be matched and will not be
+          cached when resolving with :meth:`devices_find_by_spec`
+          (which is the base for all resolving calls).
+
+          This function will be called when there is no entry in the
+          cache for a device entry in */sys/bus/BUSNAME/devices* and
+          */sys/devices* that is needed to resolve a device in
+          :meth:`devices_find_by_spec`. Those entries will also be
+          called when the device changes (replugged) since its
+          directory entry changes ctime. Changes downstream of the
+          device (eg: something it's connected to) cannot be detected
+          by this unless the directory entrie's ctime is changed.
+
+        """
+        origin = commonl.origin_get(2)
+        if fn in cls._synth_fields_makers:
+            raise ValueError(
+                f"{fn} already registered from {cls._synth_fields_makers[fn]}")
+        cls._synth_fields_makers[fn] = origin
+
+
+
+    @staticmethod
+    def synthetic_fields_make(sys_path: str) -> dict:
+        """Create descriptive fields/values for a given device
+
+        :param str sys_path: path in /sysfs of a device, either
+          /sys/bus/BUSNAME/devices/DEVICE or
+          /sys/bus/devices/SOMETHING
+
+        :returns dict: dictionary keyed by string of fields and values
+
+
+        These are cached in
+        *STATEPATH/cache/device_resolver_c._synthetic_fields_make* and
+        invalidated when the device is re-plugged (since the directory
+        entry's ctime will change).
+
+        """
+        @commonl.lru_cache_disk(
+            os.path.realpath(
+                os.path.join(
+                    # FIXME: ugh, we need a global for daemon
+                    # cache path, then this can be moved up
+                    # outside of here
+
+                    # Also, we need this defined here so state_path is defined
+                    ttbl.test_target.state_path,
+                    "..", "cache", "device_resolver_c._synthetic_fields_make"
+                )
+            ),
+            # Don't age; when the device reconnects, the cache entry
+            # will change (since the ctime in hte
+            # /sys/bus/usb/devices/DEVNAME will change) and old ones
+            # will be flushed
+            None,
+            # a fully loaded system can have lots of entries in
+	    # /sys/devices once you start dealing with parents and
+	    # stuff -- ~665 USB entries that describe around ~300USB
+            # devices and their interfaces need about 36 parent
+            # devices (PCI devices, etc) for a total of ~700 entries
+            # to cache the USB devices in a live system
+            1024,
+            exclude_exceptions = [ Exception ])
+        def _synthetic_fields_make(sys_path: str, _stat_info_st_ctime: int):
+            # _stat_info_st_ctime is there only to serve for caching, so
+            # when the same device is replugged, it ctime for its /sys dir
+            # will be different so we'll rescan it.
+
+            logging.error(f"{sys_path}: synthesizing fields for {_stat_info_st_ctime=}")
+            fields = {}
+            if sys_path.startswith('/sys/bus/usb/devices'):
+                # This is USB, count its depth and expose it (0 -> N)
+                fields['usb_depth'] = str(device_resolver_c._usb_depth_count(sys_path))
+                #logging.error(f"{sys_path}: USB depth {usb_depth}")
+
+            for fn, origin in device_resolver_c._synth_fields_makers.items():
+                logging.error(
+                    f"{sys_path}: {fn}@{origin} synthesizing fields")
+                try:
+                    new_fields = fn(sys_path)
+                    commonl.assert_dict_key_strings(new_fields,
+                                                    "synthetic fields")
+                except Exception as e:
+                    logging.error(f"{sys_path}: {fn}@{origin} errored: {e}",
+                                  exc_info = True)
+                    # raise this to bomb the creation of a cache entry
+                    # for this device and also so it fails matching,
+                    # since we don't have enough info -> we catch this
+                    # in _match_fields_to_files()
+                    raise
+                logging.error(
+                    f"{sys_path}: {fn}@{origin} synthesized {new_fields}")
+                fields.update(new_fields)
+
+            logging.error(f"{sys_path}: synthesized fields {fields}")
+            return fields
+
+        # get the ctime for the entry, since it is updated everytime
+        # this thing is plugged / hot plugged, which will force a
+        # re-generatio of the cached info
+        stat_info = os.stat(sys_path)
+
+        return _synthetic_fields_make(sys_path, stat_info.st_ctime)
+
+
 
     def _match_fields_to_files(self, fields, path_original):
         # matches dict of fields against files with the same name in
@@ -2951,29 +3084,44 @@ class device_resolver_c:
         # find the file/field in there, we try one directory up, etc.
         #
         match = False
-        if path_original.startswith('/sys/bus/usb/devices'):
-            # This is USB, count its depth and expose it (0 -> N)
-            usb_depth = type(self)._usb_depth_count(path_original)
-            #logging.error(f"{path_original}: USB depth {usb_depth}")
-        else:
-            usb_depth = None
+
+        # use this to cache, in this call the synthetic fields for
+        # each path, since we'll access it a lot and even the other
+        # cache we have would be too hard
+        fields_synth_by_path = {}
+
         for match_field, match_value in fields.items():
             path = path_original
-            #logging.error(f"{path_original}: checking"
-            #              f" {match_field}:{match_value}")
-            # Match "synthetic fields first" (those not in files
-            if usb_depth != None and match_field == "usb_depth" \
-               and usb_depth == int(match_value):
-                #logging.error(f"{path_original}: MATCH USB depth {usb_depth}")
-                continue
             while True:
                 # first path is always /sys/bus/BUSNAME/devices/DEVENTRY
                 #logging.error(f"{path_original}: checking"
                 #              f" {match_field}:{match_value} in {path}")
                 try:
-                    with open(path + "/" + match_field) as f:
-                        # need rstrip() to remove trailing newline
-                        value = f.read().rstrip()
+
+                    # synthetic fields take preference over sysfs
+                    # fields since they might have massaged them, and
+                    # if we don't match there, it's a missamtch, we
+                    # don't fall back to /sysfs
+
+                    try:
+                        fields_synth = fields_synth_by_path.setdefault(
+                            path, self.synthetic_fields_make(path))
+                    except Exception as e:
+                        # we couldn't generate extra info, so we will
+                        # bomb this entry right away and refuse to
+                        # match against it
+                        logging.error(f"{path}: synth fields generations"
+                                      " failed; no match")
+                        return False
+
+                    logging.error(f"{path}: synth fields: {fields_synth}")
+                    if match_field in fields_synth:
+                        value = fields_synth[match_field]
+                        match = self._match_value(match_value, value)
+                    else:
+                        with open(path + "/" + match_field) as f:
+                            # need rstrip() to remove trailing newline
+                            value = f.read().rstrip()
                     match = self._match_value(match_value, value)
                     if not match:
                         #logging.error(f"{path_original}: MISMATCH for"
