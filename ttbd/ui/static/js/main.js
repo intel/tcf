@@ -494,7 +494,7 @@ function terminal_create(div_id, targetid, terminal) {
         bytes_read_so_far += parseInt(read_information_d['content-length']);
         bytes_label.textContent = bytes_read_so_far;
 
-    }, 300);
+    }, 400);
 }
 
 
