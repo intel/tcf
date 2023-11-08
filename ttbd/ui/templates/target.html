@@ -121,6 +121,12 @@ $ tcf ls -vv {{ targetid}}</code> </pre></p>
     </div>
     <hr>
     {% if state.acquired %}
+        <script>
+            /* let us update the power state of the power rail when we load
+            the page for the first time */
+            power_state_update_for_all_components("{{targetid}}");
+            buttons_state_update_for_all_components("{{targetid}}");
+        </script>
 
        <div class='subsection'>
 
@@ -504,13 +510,6 @@ $(document).ready( function () {
     });
 
 })
-
-/*
- * let us update the power state of the power railwhen we load the page for the
- * first time
- */
-power_state_update_for_all_components("{{targetid}}");
-buttons_state_update_for_all_components("{{targetid}}");
 </script>
 
 {% endblock %}
