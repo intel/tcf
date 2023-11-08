@@ -379,7 +379,7 @@ $ tcf ls -vv {{ targetid}}</code> </pre></p>
         {% for console in consoles.keys() %}
             <div class='console-container'>
                 <div class='console-options'>
-                    <button onclick='toggle("console-wrapper-{{console}}"); terminal_create("console-{{console}}", "{{targetid}}", "{{console}}");'>
+                    <button onclick='toggle("console-wrapper-{{console}}"); terminal_create("console-{{console}}", "{{targetid}}", "{{console}}"); create_or_destroy_terminal_div("console-wrapper-{{console}}", "console-{{console}}");'>
                           {{console}} <i class="arrow down"></i>
                     </button>
                     <button onclick='js_console_enable("{{targetid}}", "{{console}}", "enable")'>enable</button>
