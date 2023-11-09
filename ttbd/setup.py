@@ -132,6 +132,7 @@ targets over HTTP to be controlled by the TCF client.
         # We install a local server, also a TCF config for it
         ('@sysconfigdir@/tcf', [ 'conf_local.py' ]),
         ('@prefix@/share/tcf', [
+            "device-resolver.py",
             'hw-healthmonitor/ttbd-hw-healthmonitor-driver-rebind.py',
             'setup-efi-grub2-elf.sh',
             "noyito-capture.py",
