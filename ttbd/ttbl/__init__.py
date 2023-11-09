@@ -2937,27 +2937,37 @@ class device_resolver_c:
         name = name.split(":")[0]
         return name.count(".")
 
+
+
+    # synth fields makers keyed by fuction, value a string denoting
+    # who registered them
     _synth_fields_makers = {
 
     }
 
+
     @classmethod
     def synth_fields_maker_register(cls, fn: callable):
-        """
-        Register a function that can be used to generate synthetic
-        information fields in for a /sysfs device path; these are
-        later used to match
+        """Register a function that can be used to generate
+        synthetic information fields in for a /sysfs
+        device path; these are later used to match
 
         :param callable fn: Function that will be called; it must
           follow the pattern:
 
-          >>> def function(sys_path: str) -> dict:
+          >>> def function(sys_path: str, expensive: bool) -> dict:
           >>>    d = dict()
           >>>    # do some discovery on sys_path (/sys/bus/usb/devices/1-3.4)
           >>>    # ... eg:
           >>>    # d['mydev_capacity_mib'] = "45"
           >>>    # d['mydev_speed_gbps'] = "2.3"
           >>>    return d
+
+          *expensive* is a switch that says if this is being called on
+          the cheap or expensive path; each function needs to
+          determine if they are expensive (takes a lot of resources
+          or not); if called on the expensive path, then they can
+          proceed, otherwise they need to return no fields.
 
           The return field is a dictionary keyed by string of simple
           scalar values (normally strings, others might be adde
@@ -2988,21 +2998,23 @@ class device_resolver_c:
 
 
     @staticmethod
-    def synthetic_fields_make(sys_path: str) -> dict:
-        """Create descriptive fields/values for a given device
+    def synthetic_fields_make(sys_path: str, expensive: bool) -> dict:
+        """Create descriptive
+        fields/values for a given device
 
-        :param str sys_path: path in /sysfs of a device, either
-          /sys/bus/BUSNAME/devices/DEVICE or
-          /sys/bus/devices/SOMETHING
+        :param str sys_path: path in /sys for the device
 
-        :returns dict: dictionary keyed by string of fields and values
+        :param bool expensive: if *True* we are in the path where
+          computational/IO expensive fields can be generated;
+          otherwise, we are in the cheap path.
 
+          While this is very relative, expensive paths shall stick to
+          taking five seconds, cheap way less than one second.
 
-        These are cached in
-        *STATEPATH/cache/device_resolver_c._synthetic_fields_make* and
-        invalidated when the device is re-plugged (since the directory
-        entry's ctime will change).
+        :returns dict: dict keyed by field name of values found
 
+        Note these values WILL be cached by the path of the device
+        until that device disspears/is reconnected.
         """
         @commonl.lru_cache_disk(
             os.path.realpath(
@@ -3013,7 +3025,7 @@ class device_resolver_c:
 
                     # Also, we need this defined here so state_path is defined
                     ttbl.test_target.state_path,
-                    "..", "cache", "device_resolver_c._synthetic_fields_make"
+                    "..", "cache", "device_resolver_c.synthetic_fields_make"
                 )
             ),
             # Don't age; when the device reconnects, the cache entry
@@ -3029,12 +3041,17 @@ class device_resolver_c:
             # to cache the USB devices in a live system
             1024,
             exclude_exceptions = [ Exception ])
-        def _synthetic_fields_make(sys_path: str, _stat_info_st_ctime: int):
+        def _synthetic_fields_make(sys_path: str,
+                                   expensive: bool, _stat_info_st_ctime: int):
             # _stat_info_st_ctime is there only to serve for caching, so
             # when the same device is replugged, it ctime for its /sys dir
             # will be different so we'll rescan it.
+            #
+            # So is expensive: to cache differently expensive vs cheap
 
-            logging.error(f"{sys_path}: synthesizing fields for {_stat_info_st_ctime=}")
+            cost = "expensive" if expensive else "cheap"
+            logging.error(f"{sys_path}: synthesizing {cost} fields"
+                          f" for {_stat_info_st_ctime=}")
             fields = {}
             if sys_path.startswith('/sys/bus/usb/devices'):
                 # This is USB, count its depth and expose it (0 -> N)
@@ -3043,24 +3060,24 @@ class device_resolver_c:
 
             for fn, origin in device_resolver_c._synth_fields_makers.items():
                 logging.error(
-                    f"{sys_path}: {fn}@{origin} synthesizing fields")
+                    f"{sys_path}: {fn}@{origin} synthesizing {cost} fields")
                 try:
-                    new_fields = fn(sys_path)
+                    new_fields = fn(sys_path, expensive)
                     commonl.assert_dict_key_strings(new_fields,
                                                     "synthetic fields")
                 except Exception as e:
-                    logging.error(f"{sys_path}: {fn}@{origin} errored: {e}",
-                                  exc_info = True)
+                    logging.error(f"{sys_path}: {fn}@{origin}/{cost}"
+                                  f" errored: {e}", exc_info = True)
                     # raise this to bomb the creation of a cache entry
                     # for this device and also so it fails matching,
                     # since we don't have enough info -> we catch this
                     # in _match_fields_to_files()
                     raise
                 logging.error(
-                    f"{sys_path}: {fn}@{origin} synthesized {new_fields}")
+                    f"{sys_path}: {fn}@{origin} synthesized {cost} {new_fields}")
                 fields.update(new_fields)
 
-            logging.error(f"{sys_path}: synthesized fields {fields}")
+            logging.info(f"{sys_path}: synthesized fields {fields}")
             return fields
 
         # get the ctime for the entry, since it is updated everytime
@@ -3068,11 +3085,12 @@ class device_resolver_c:
         # re-generatio of the cached info
         stat_info = os.stat(sys_path)
 
-        return _synthetic_fields_make(sys_path, stat_info.st_ctime)
+        return _synthetic_fields_make(sys_path, expensive, stat_info.st_ctime)
 
 
 
-    def _match_fields_to_files(self, fields, path_original):
+    def _match_fields_to_files(self, fields, path_original,
+                               expensive: bool = False):
         # matches dict of fields against files with the same name in
         # path
         #
@@ -3090,6 +3108,8 @@ class device_resolver_c:
         # cache we have would be too hard
         fields_synth_by_path = {}
 
+        cost = "expensive" if expensive else "cheap"
+
         for match_field, match_value in fields.items():
             path = path_original
             while True:
@@ -3105,30 +3125,36 @@ class device_resolver_c:
 
                     try:
                         fields_synth = fields_synth_by_path.setdefault(
-                            path, self.synthetic_fields_make(path))
+                            path, self.synthetic_fields_make(path, expensive))
+                        logging.debug(
+                            "%s: %s synth fields in path %s: %s",
+                            path_original, cost, path, fields_synth)
                     except Exception as e:
                         # we couldn't generate extra info, so we will
                         # bomb this entry right away and refuse to
                         # match against it
-                        logging.error(f"{path}: synth fields generations"
-                                      " failed; no match")
+                        logging.error(f"{path}: {cost} synth fields generations"
+                                      f" failed; no match: {e}")
                         return False
 
-                    logging.error(f"{path}: synth fields: {fields_synth}")
                     if match_field in fields_synth:
                         value = fields_synth[match_field]
                         match = self._match_value(match_value, value)
+                        field_type = "synth"
                     else:
                         with open(path + "/" + match_field) as f:
                             # need rstrip() to remove trailing newline
                             value = f.read().rstrip()
-                    match = self._match_value(match_value, value)
+                        field_type = "sysfs"
+                        match = self._match_value(match_value, value)
                     if not match:
-                        #logging.error(f"{path_original}: MISMATCH for"
-                        #              f" {match_field}:{match_value} in {path}")
+                        logging.debug(
+                            "%s: MISMATCH for %s %s check %s:'%s' in %s",
+                            path_original, field_type, cost, match_field, match_value, path)
                         return False
-                    #logging.error(f"{path_original}: MATCHED"
-                    #              f" {match_field}:{match_value} in {path}")
+                    logging.debug(
+                        "%s: MATCH for %s %s check %s:'%s' in %s",
+                        path_original, field_type, cost, match_field, match_value, path)
                     break	# we matched, so next field
                 except IOError as e:
                     if e.errno != errno.ENOENT:
@@ -3138,8 +3164,10 @@ class device_resolver_c:
                     if match_value == None:
                         # we are looking for this field not to exist;
                         # the file doesn't exist, so we good
-                        #logging.error(f"{path_original}: MATCH doesn't exist"
-                        #              f" {match_field} in {path}")
+                        logging.debug(
+                            "%s: MISSING for %s %s check %s:'%s' in %s",
+                            path_original, field_type, cost,
+                            match_field, match_value, path)
                         break		# match! file doesn't exist
 
                     # if we are not doing deep match, we can't
@@ -3171,12 +3199,20 @@ class device_resolver_c:
         # :return dict: keyed by field name, value being regex or
         #   string to match against
         fieldl = spec.split(",")
-        fields = { }
+        fields_cheap = { }
+        fields_expensive = { }
+        fields = None
         for field in fieldl:
             # we unquote with urllib, so we can put in there
             # values which have = or :
+            if field.startswith("+"):
+                fields = fields_expensive
+                field = field[1:]
+            else:
+                fields = fields_cheap
             if field == "deep_match":
                 self.deep_match = True
+                continue
             elif field.startswith("##"):
                 # shorthand ##SIBLING -> relative=SIBLING
                 key = 'relative'
@@ -3200,7 +3236,7 @@ class device_resolver_c:
                 val = True
             key = urllib.parse.unquote(key)
             fields[key] = val
-        return fields
+        return fields_cheap, fields_expensive
 
 
 
@@ -3264,15 +3300,20 @@ class device_resolver_c:
 
 
 
-    def devices_find_by_spec(self, spec: str = None, origin: str = None):
-        """
-        Return list of devices that match the specificatoin
+    def devices_find_by_spec(self, spec: str = None, origin: str = None,
+                             only_one: bool = False):
+        """Return list of devices that match the specificatoin
 
         Params are the same as for the class and in most cases, not
         needed, just for internal use.
 
+        :param bool only_one: short cut and return the first device
+          found; this can significantly cut resolution times if it is
+          known that only one device will be found.
+
         :returns list[str]: syfs paths to */sys/bus/BUSNAME/devices/DEVICE*,
           since those we can match with multiple things
+
         """
         if spec == None:
             spec, origin = self.spec_get()
@@ -3291,12 +3332,12 @@ class device_resolver_c:
 
         # convert spec_bus into a dict keyed by field name, value is
         # either a string or a regex to match againt
-        fields = self._match_fields_make(spec_bus)
+        fields_cheap, fields_expensive = self._match_fields_make(spec_bus)
         # the relative field is handled separately, so remove it
         # because it won't match against anything in the device
-        relative = fields.get('relative', None)
+        relative = fields_cheap.get('relative', None)
         if relative != None:
-            del fields['relative']
+            del fields_cheap['relative']
 
         # now iterate over busdir; eg, for USB, /sys/bus/usb/devices/*:
         #
@@ -3313,9 +3354,21 @@ class device_resolver_c:
         # do extra filtering later
         devicel = []
         for device_path in glob.glob(busdir + "/*"):
-            match = self._match_fields_to_files(fields, device_path)
+            match = self._match_fields_to_files(fields_cheap, device_path,
+                                                expensive = False)
             if not match:
                 continue
+
+            # Ok, there was a match -- now match against the expensive
+            # fields these are fields that to generate might require
+            # more cost, so by doing the filtering in two steps we
+            # defer the generation of the expensive fields to a
+            # reduced number of devices
+            match = self._match_fields_to_files(fields_expensive, device_path,
+                                                expensive = True)
+            if not match:
+                continue
+
             # ok, device_patch was a match -- do we have to apply relative?
             device = os.path.basename(device_path)
             if relative:
@@ -3328,7 +3381,8 @@ class device_resolver_c:
 
             else:
                 devicel.append(device_path)
-
+            if only_one:
+                break
         self.target.log.info("device paths resolved from %s @%s: %s",
                              spec, origin, " ".join(devicel))
         return devicel
