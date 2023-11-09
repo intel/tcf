@@ -120,6 +120,8 @@ for entry in os.listdir("/sys/bus/usb/devices"):
         serial_cmdline = "n/a"
     else:
         serial_cmdline = serial
+    # We have two type of discoverers: cheap and expensive, used also
+    # by the device resolver -- in here we try to invoke both
     cmdline = [ f"usb-device-discover-{vendor}-{product}",
                 entry, serial_cmdline ]
     try:

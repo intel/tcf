@@ -3520,3 +3520,11 @@ class device_resolver_c:
                 f"found {portn} (more than one!) TTYs matching device spec"
                 " {spec} @{origin}")
         return portl[0]
+
+
+# Register built-in device resolution helpers
+import ttbl.pci
+import ttbl.usb
+
+device_resolver_c.synth_fields_maker_register(ttbl.usb.synth_fields_maker)
+device_resolver_c.synth_fields_maker_register(ttbl.pci.synth_fields_maker_pexusb3s44v)
