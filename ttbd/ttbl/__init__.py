@@ -2793,6 +2793,12 @@ class device_resolver_c:
 
               >>> spec = "usb,idProduct=3f41,usb_depth=2"
 
+            - *device* (str): name of the device entry (eg: for
+              */sys/bus/usb/devices/21-3.4 this would be 21-3.4)
+
+            - *device_ancestor* (str): name of the current parent of
+               the *device* entry we are searching in; during
+               *deep_matches*, these can be any parent of *device*
 
           - */dev/SOMEDEV*
 
@@ -3110,9 +3116,13 @@ class device_resolver_c:
 
         cost = "expensive" if expensive else "cheap"
 
+        device = os.path.basename(path_original)
         for match_field, match_value in fields.items():
             path = path_original
             while True:
+                # path might have been set here when in deep_match
+                # mode to an ancestor
+                device_ancestor = os.path.basename(path)
                 # first path is always /sys/bus/BUSNAME/devices/DEVENTRY
                 #logging.error(f"{path_original}: checking"
                 #              f" {match_field}:{match_value} in {path}")
@@ -3126,6 +3136,8 @@ class device_resolver_c:
                     try:
                         fields_synth = fields_synth_by_path.setdefault(
                             path, self.synthetic_fields_make(path, expensive))
+                        fields_synth['device_ancestor'] = device_ancestor
+                        fields_synth['device'] = device
                         logging.debug(
                             "%s: %s synth fields in path %s: %s",
                             path_original, cost, path, fields_synth)
