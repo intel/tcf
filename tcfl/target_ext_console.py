@@ -660,7 +660,7 @@ class extension(tc.target_extension_c):
             self._default = self.default_property
         elif 'default' in self.aliases:
             self._default = self.aliases['default']
-        else:
+        elif self.console_list:		# ensure there are consoles...
             self._default = self.console_list[0]
 
 
