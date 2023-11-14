@@ -1,4 +1,4 @@
-#! /usr/bin/python3
+#! /usr/bin/env python3
 #
 # Copyright (c) 2021 Intel Corporation
 #
@@ -35,8 +35,16 @@ class pgm_c(ttbl.images.flash_shell_cmd_c):
     cable is plugged to another port or might be enumerated in a
     different number).
 
-    :param str usb_serial_number: USB serial number of the USB device to use
-      (USB-BlasterII or similar)
+    :params str usb_serial_number: (optional) device specification
+      (see :class:`ttbl.device_resolver_c`), eg a USB serial number
+
+      >>> usb_serial_number = "3211123"
+
+      a USB path:
+
+      >>> usb_serial_number = "usb,idVendor=34d2,idProduct=131d,bInterfaceNumber=4"
+
+      or more complex specifications are possible
 
     :param dict image_map:
 
@@ -335,12 +343,17 @@ class pgm_c(ttbl.images.flash_shell_cmd_c):
         # it on/off (rare, but could happen). Since USB Blaster I do not
         # have unique serial numbers we use a combination of usb_port
         # and sibling_serial_number to find the correct usb_path
-        if self.usb_port != None:
+
+        if self.usb_port != None:	# DEPRECATE: use device_resolver
             usb_path, _vendor, product = ttbl.usb_serial_to_path(
                 self.sibling_serial_number, self.usb_port)
         else:
-            usb_path, _vendor, product = ttbl.usb_serial_to_path(
-                self.usb_serial_number)
+            device_resolver = ttbl.device_resolver_c(
+                target, self.usb_serial_number,
+                f"instrumentation.{self.upid_index}.usb_serial_number")
+            usb_syspath = device_resolver.device_find_by_spec()
+            usb_path = os.path.basename(usb_syspath)
+            product = ttbl._sysfs_read(os.path.join(usb_syspath, "product"))
 
         if self.tcp_port:
             # server based cable name
@@ -408,7 +421,16 @@ class jtagd_c(ttbl.power.daemon_c):
 
     **Arugments**
 
-    :param str usb_serial_number: serial number of the USB Blaster II
+    :params str usb_serial_number: (optional) device specification
+      (see :class:`ttbl.device_resolver_c`), eg a USB serial number
+
+      >>> usb_serial_number = "3211123"
+
+      a USB path:
+
+      >>> usb_serial_number = "usb,idVendor=34d2,idProduct=131d,bInterfaceNumber=4"
+
+      or more complex specifications are possible
 
     :param int tcp_port: (1024 - 65536) Number of the TCP port on
       localhost where the daemon will listen
@@ -458,7 +480,8 @@ class jtagd_c(ttbl.power.daemon_c):
         cmdline = [
             self.jtagd_path,
             "--no-config",
-            "--auto-detect-filter", usb_serial_number,
+            "--auto-detect-filter",
+            "%(resolved_usb_serial_number)s",	# we'll be replaced by on()
             "--port", str(tcp_port),
             "--debug",
             "--foreground",
@@ -492,4 +515,11 @@ class jtagd_c(ttbl.power.daemon_c):
             and commonl.tcp_port_busy(self.tcp_port)
 
     def on(self, target, component):
+        device_resolver = ttbl.device_resolver_c(
+            target, self.usb_serial_number,
+            f"instrumentation.{self.upid_index}.usb_serial_number")
+        usb_syspath = device_resolver.device_find_by_spec()
+        # set this so that the command line can be expanded with the
+        # right USB serial #
+        self.kws["resolved_usb_serial_number"] = ttbl._sysfs_read(os.path.join(usb_syspath, "serial"))
         return ttbl.power.daemon_c.on(self, target, component)
