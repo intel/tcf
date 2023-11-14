@@ -3440,7 +3440,7 @@ class device_resolver_c:
         Return a list of TTY device nodes (eg: /dev/ttyUSB3) that
         match the device specification.
 
-        :returns list[str]: list of device nodes that match the
+        :returns set[str]: list of device nodes that match the
           specification at the current time
 
         Note this might change with time based on:
@@ -3455,8 +3455,10 @@ class device_resolver_c:
                                  spec, origin)
             return [ spec ]
 
-        # Ok, list all devices that match the spec
-        matching_portl = []
+        # Ok, list all devices that match the spec; note the portl is
+        # done as a set because sometimes it might find the samed
+        # device node twice (in some tty configurations)
+        matching_portl = set()
         devicel = self.devices_find_by_spec(spec, origin)
         if not devicel:
             self.target.log.info("No TTYs can be resolved to %s @%s",
@@ -3501,7 +3503,7 @@ class device_resolver_c:
                     basename = os.path.basename(i)
                     if basename == "tty":
                         continue
-                    matching_portl.append("/dev/" + basename)
+                    matching_portl.add("/dev/" + basename)
 
         # yeah, not using filter or any of those. Why? not that many
         # devices, so optimizatio is not such a huge deal (yet). Alo
@@ -3531,7 +3533,7 @@ class device_resolver_c:
                 f"{self.target.id}: "
                 f"found {portn} (more than one!) TTYs matching device spec"
                 " {spec} @{origin}")
-        return portl[0]
+        return next(iter(portl))	# get the only item in the set
 
 
 # Register built-in device resolution helpers
