@@ -237,6 +237,10 @@ $ tcf ls -vv {{ targetid}}</code> </pre></p>
                     pending...
                 </td>
                 <td>
+                  {% if 'detected' in component %}
+                  <!-- detector's state can't be changed, so don't
+                  show controls-->
+                  {% else %}
                     <div class='flex'>
                       <button class='power-on-btn' onclick='power("{{ targetid }}", "on", "{{component}}")'>
                         power on
@@ -248,6 +252,7 @@ $ tcf ls -vv {{ targetid}}</code> </pre></p>
                         power cycle
                       </button>
                     </div>
+                  {% endif %}
                 </td>
               </tr>
               {% endfor %}
