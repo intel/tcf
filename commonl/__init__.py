@@ -857,7 +857,14 @@ def lru_cache_disk(path, max_age_s, max_entries, key_maker = None,
         fn.cache = fs_cache_c(path, base_type = fsdb_file_c)
         @functools.wraps(fn)
         def wrapper(*args, **kwargs):
-            # can't use hash() because it is not stable across runs, so use mkid()
+            # can't use hash() because it is not stable across runs,
+            # so use mkid()
+            #
+            # NEVER EVER WHATSOEVER encode the args and kwargs
+            # somehwere so they can be retrieved, since we might be
+            # passing passwords so the caching index changes when the
+            # password changes -- if the user wants to do it, their
+            # problem. Here, we do not (TM).
             if key_maker == None:
                 key = mkid(json.dumps(( args, kwargs ), sort_keys = True), 20)
             else:
