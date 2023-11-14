@@ -831,8 +831,7 @@ class generic_c(impl_c):
                         raise
 
 class serial_pc(ttbl.power.socat_pc, generic_c):
-    """
-    Implement a serial port console and data recorder
+    """Implement a serial port console and data recorder
 
     This class implements two interfaces:
 
@@ -850,6 +849,17 @@ class serial_pc(ttbl.power.socat_pc, generic_c):
     - console interface: interacts with the console interface by
       exposing the data recorded in *console-NAME.read* file and
       writing to the *console-NAME.write* file.
+
+    :params str usb_serial_number: (optional) device specification
+      (see :class:`ttbl.device_resolver_c`), eg a USB serial number
+
+      >>> usb_serial_number = "3211123"
+
+      a USB path:
+
+      >>> usb_serial_number = "usb,idVendor=34d2,idProduct=131d,bInterfaceNumber=4"
+
+      or more complex specifications are possible
 
     :params str serial_file_name: (optional) name of the serial port
       file, which can be templated with *%(FIELD)s* as per
@@ -918,16 +928,13 @@ class serial_pc(ttbl.power.socat_pc, generic_c):
 
     # console interface; state() is implemented by generic_c
     def on(self, target, component):
-        if self.usb_serial_number:
-            # Get the USB Serial Number of the TTY, but it might have
-            # been updated, so maybe also from the FSDB and default to
-            # the configured one
-            usb_serial_number = target.fsdb.get(
-                f"instrumentation.{self.upid_index}.usb_serial_number",
-                self.usb_serial_number)
-            self.kws['device'] = ttbl.tty_by_usb_serial_number(usb_serial_number)
-        else:
+        if self.serial_file_name:
             self.kws['device'] = self.serial_file_name
+        else:
+            device_resolver = ttbl.device_resolver_c(
+                target, self.usb_serial_number,
+                f"instrumentation.{self.upid_index}.usb_serial_number")
+            self.kws['device'] = device_resolver.tty_find_by_spec()
         # sometimes there are lingering processes that get stuck and
         # don't release access to our device, so we just slash them
         # out and complain about it
