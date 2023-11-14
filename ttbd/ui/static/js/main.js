@@ -664,7 +664,19 @@ async function power_state_update_for_all_components(targetid) {
     let power_rail = power_list['components'];
     for (const [component, information] of Object.entries(power_rail)) {
         let table_datacell = document.getElementById('table-datacell-' + component + '-state');
-        if (information['state'] === false) {
+        if (component.includes('detected')) {
+            // a detector wants to show only detected / not detected / error (if none)
+            if (information['state'] === false) {
+                table_datacell.textContent = 'not detected';
+                table_datacell.style.color = 'red';
+            } else if (information['state'] === true) {
+                table_datacell.textContent = 'detected';
+                table_datacell.style.color = 'green';
+            } else {
+                table_datacell.textContent = 'malfunction?';
+                table_datacell.style.color = 'yellow';
+            }
+        } else if (information['state'] === false) {
             table_datacell.textContent = 'off';
             table_datacell.style.color = 'red';
         } else {
