@@ -2598,11 +2598,29 @@ def ipxe_seize(target):
     for _ in range(5):
         target.console.write("\x02\x02")	# use this iface so expecter
         time.sleep(0.3)
-    target.expect("Ctrl-B", target.kws.get('ipxe.ctrl_b_timeout', 30))
-    for _ in range(5):
-        target.console.write("\x02\x02")	# use this iface so expecter
-        time.sleep(0.3)
-
+    # FIXME: merge this tcfl.tl.ipxe_sanboot_url() -> add workaround for chainloading failed, make it use these functions
+    r = target.expect(
+        re.compile(
+            "(?P<what>"
+            # normal message we expect, a 'press Ctrl-B for shell'
+            "Ctrl-B"
+            # error message -> still we can hit s for the iPXE shell
+            "|Chainloading failed, hit 's' for the iPXE shell"
+            ")"),
+        timeout = target.kws.get('ipxe.ctrl_b_timeout', 30))
+    # r is a dict with a single key (name of the matching thing) and
+    # info about the match. because we gave it a regex with named
+    # groups, we'll get a groupdict entry:
+    data, = r.values()	# note the comma! works because we have a single item
+    what = data.get('groupdict', {}).get('what', None)
+    if what != None:
+        if b"Chainloading failed, hit 's' for the iPXE shell" in what:
+            target.console.write("s")
+        else:	# just send Ctrl-B
+            target.console.write("\x02\x02")
+            time.sleep(0.3)
+            target.console.write("\x02\x02")
+            time.sleep(0.3)
     target.expect("iPXE>")
     ts_prompt = time.time()
     target.report_data("Boot statistics %(type)s",
@@ -2727,7 +2745,7 @@ def ipxe_seize_and_boot(target, boot_ic, dhcp = None, kws = None):
             mac_addr = kws['mac_addr'].lower()
             ifstat = target.shell.run("ifstat", output = True, trim = True)
             regex = re.compile(
-                "(?P<ifname>net[0-9]+): %s using" % mac_addr,
+                "^(?P<ifname>net[0-9]+): %s using" % mac_addr,
                 re.MULTILINE)
             m = regex.search(ifstat)
             if not m:
@@ -2754,6 +2772,8 @@ def ipxe_seize_and_boot(target, boot_ic, dhcp = None, kws = None):
             # wait until we scan to install this
             target.testcase.expect_global_append(expecter_ipxe_error)
 
+            if dhcp == None:
+                dhcp = bool(target.property_get("ipxe.dhcp", True))
             if dhcp:
                 target.shell.run("dhcp " + ifname, re.compile("Configuring.*ok"))
                 target.shell.run("show %s/ip" % ifname,
