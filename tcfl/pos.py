@@ -2739,6 +2739,18 @@ def ipxe_seize_and_boot(target, boot_ic, dhcp = None, kws = None):
                 )
             ifname = m.groupdict()['ifname']
 
+            # Before we configure, disable all the network interfaces
+            # so we don't get bad routing if any are already
+            # configured; we want to only route on the in @ifname
+            # first extract all interface names and then close'em all
+            regex = re.compile(
+                "^(?P<ifname>net[0-9]+): .*$",
+                re.MULTILINE)
+            ifnames = re.findall(regex, ifstat)
+            for disable_ifname in ifnames:
+                target.shell.run(
+                    f"ifclose {disable_ifname}"
+                    "    # disable so we don't get incorrect routing")
             # wait until we scan to install this
             target.testcase.expect_global_append(expecter_ipxe_error)
 
