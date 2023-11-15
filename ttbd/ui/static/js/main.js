@@ -116,7 +116,6 @@ async function power(targetid, action, component) {
         $('#loading').append(
             '<b><label style="color: red;">FAIL</label></b>'
         );
-        window.location.reload();
         return
     }
 
@@ -125,8 +124,6 @@ async function power(targetid, action, component) {
     $('#loading').append(
         '<b><label style="color: green;">SUCCESS</label></b>'
     );
-
-    window.location.reload()
 }
 
 
