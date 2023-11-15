@@ -131,6 +131,21 @@ def ipxe_sanboot_url(target, sanboot_url, dhcp = None,
         r"UEFI PXEv4 \(MAC:%s\)" % mac_addr.replace(":", "").upper().strip(),
         assume_in_main_menu = not power_cycle)
 
+    expecter_ipxe_error = target.console.text(
+        # When iPXE prints an error, it looks like:
+        ## http://10.219.169.112/ttbd-pos/x86_64/vmlinuz-tcf-live..................
+        ## Connection timed out (http://ipxe.org/4c0a6092)
+        #
+        # So, if we find that URL, raise an error
+        re.compile(r"\(http://ipxe\.org/[0-9a-f]+\)"),
+        name = f"{target.want_name}: iPXE error",
+        timeout = 0, poll_period = 1,
+        raise_on_found = tcfl.tc.error_e("iPXE error detected")
+    )
+
+    if dhcp == None:
+        dhcp = bool(target.property_get("ipxe.dhcp", True))
+
     # can't wait also for the "ok" -- debugging info might pop in th emiddle
     target.expect("iPXE initialising devices...")
     # if the connection is slow, we have to start sending Ctrl-B's
@@ -237,8 +252,21 @@ def ipxe_sanboot_url(target, sanboot_url, dhcp = None,
             )
         ifname = m.groupdict()['ifname']
 
-        if dhcp == None:
-            dhcp = bool(target.property_get("ipxe.dhcp", True))
+        # Before we configure, disable all the network interfaces
+        # so we don't get bad routing if any are already
+        # configured; we want to only route on the in @ifname
+        # first extract all interface names and then close'em all
+        regex = re.compile(
+            "^(?P<ifname>net[0-9]+): .*$",
+            re.MULTILINE)
+        ifnames = re.findall(regex, ifstat)
+        for disable_ifname in ifnames:
+            target.shell.run(
+                f"ifclose {disable_ifname}"
+                "    # disable so we don't get incorrect routing")
+        # wait until we scan to install this
+        target.testcase.expect_global_append(expecter_ipxe_error)
+
         if dhcp:
             target.shell.run("dhcp " + ifname, re.compile("Configuring.*ok"))
             target.shell.run("show %s/ip" % ifname, "ipv4 = %s" % ipv4_addr)
@@ -262,6 +290,12 @@ def ipxe_sanboot_url(target, sanboot_url, dhcp = None,
         else:
             target.send("sanboot %s" % sanboot_url)
     finally:
+        try:
+            target.testcase.expect_global_remove(expecter_ipxe_error)
+        except KeyError:
+            # in case we excepted before installing the handler,
+            # we are ok with it
+            pass
         target.shell.prompt_regex = prompt_orig
 
 
