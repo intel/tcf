@@ -3006,6 +3006,18 @@ class device_resolver_c:
 
 
 
+    #: How many device entries we want to cache?
+    #:
+    #: We default to 2048. A fully loaded system can have lots of
+    #: entries in /sys/devices once you start dealing with parents and
+    #: stuff -- ~665 USB entries that describe around ~300USB devices
+    #: and their interfaces need about 36 parent devices (PCI devices,
+    #: etc) for a total of ~700 entries to cache the USB devices in a
+    #: live system.
+    synthetic_fields_cache_max = 2048
+
+
+
     @staticmethod
     def synthetic_fields_make(sys_path: str, expensive: bool) -> dict:
         """Create descriptive
@@ -3026,7 +3038,7 @@ class device_resolver_c:
         until that device disspears/is reconnected.
         """
         @commonl.lru_cache_disk(
-            os.path.realpath(
+            path = os.path.realpath(
                 os.path.join(
                     # FIXME: ugh, we need a global for daemon
                     # cache path, then this can be moved up
@@ -3040,15 +3052,9 @@ class device_resolver_c:
             # Don't age; when the device reconnects, the cache entry
             # will change (since the ctime in hte
             # /sys/bus/usb/devices/DEVNAME will change) and old ones
-            # will be flushed
-            None,
-            # a fully loaded system can have lots of entries in
-	    # /sys/devices once you start dealing with parents and
-	    # stuff -- ~665 USB entries that describe around ~300USB
-            # devices and their interfaces need about 36 parent
-            # devices (PCI devices, etc) for a total of ~700 entries
-            # to cache the USB devices in a live system
-            1024,
+            # will be flushed when space is needed
+            max_age_s = None,
+            max_entries = device_resolver_c.synthetic_fields_cache_max,
             exclude_exceptions = [ Exception ])
         def _synthetic_fields_make(sys_path: str,
                                    expensive: bool, _stat_info_st_ctime: int):
