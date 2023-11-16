@@ -2800,6 +2800,9 @@ class device_resolver_c:
                the *device* entry we are searching in; during
                *deep_matches*, these can be any parent of *device*
 
+            - *only_one* / *!only_one*: force to return once a device
+               is found, stop searching
+
           - */dev/SOMEDEV*
 
         :param str property_name: (optional, default *None*) if
@@ -3225,6 +3228,12 @@ class device_resolver_c:
             if field == "deep_match":
                 self.deep_match = True
                 continue
+            elif field == "only_one":
+                fields_cheap['only_one'] = True
+                continue
+            elif field == "!only_one":
+                fields_cheap['only_one'] = False
+                continue
             elif field.startswith("##"):
                 # shorthand ##SIBLING -> relative=SIBLING
                 key = 'relative'
@@ -3323,6 +3332,8 @@ class device_resolver_c:
           found; this can significantly cut resolution times if it is
           known that only one device will be found.
 
+          Default *False*, overriden by *only_one* in the device spec.
+
         :returns list[str]: syfs paths to */sys/bus/BUSNAME/devices/DEVICE*,
           since those we can match with multiple things
 
@@ -3350,6 +3361,9 @@ class device_resolver_c:
         relative = fields_cheap.get('relative', None)
         if relative != None:
             del fields_cheap['relative']
+        if "only_one" in fields_cheap:
+            only_one = fields_cheap.get("only_one", False)
+            del fields_cheap['only_one']
 
         # now iterate over busdir; eg, for USB, /sys/bus/usb/devices/*:
         #
