@@ -676,6 +676,9 @@ async function power_state_update_for_all_components(targetid) {
         } else if (information['state'] === false) {
             table_datacell.textContent = 'off';
             table_datacell.style.color = 'red';
+        } else if (information['state'] === null) {
+            table_datacell.textContent = 'n/a';
+            table_datacell.style.color = 'grey';
         } else {
             table_datacell.textContent = 'on';
             table_datacell.style.color = 'green';
@@ -725,6 +728,9 @@ async function buttons_state_update_for_all_components(targetid) {
         if (information['state'] === false) {
             table_datacell.textContent = 'off';
             table_datacell.style.color = 'red';
+        } else if (information['state'] === null) {
+            table_datacell.textContent = 'n/a';
+            table_datacell.style.color = 'grey';
         } else {
             table_datacell.textContent = 'on';
             table_datacell.style.color = 'green';
