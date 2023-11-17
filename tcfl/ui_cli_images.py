@@ -355,7 +355,7 @@ def _cmdline_images_flash(cli_args: argparse.Namespace):
         ##         RuntimeError('target2: target does not support the images interface')
         ##     )
         ## }
-        ir, ie = image_spec_per_target[targetid]
+        ir, ie, _itb = image_spec_per_target[targetid]
         if ie == None and ir != None:
             # note these ir, ie are for the result/e stored
             # image_spec_per_target[targetid] that is different to
