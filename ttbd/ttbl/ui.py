@@ -27,7 +27,7 @@ rendering them. Images can have a lot of formats, so in order to add this layer
 of flexibility you can add some variables to the configuration that will help
 with this.
 
-- see :data:`image_sufix` for how to tweak suffixes when flashing
+- see :data:`image_suffix` for how to tweak suffixes when flashing
   firmwares
 
 - see :data:`image_path_prefixes` for how to twek where to get images
