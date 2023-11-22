@@ -653,9 +653,10 @@ def _get_images_paths(target: ttbl.test_target, inventory: dict, kws: dict):
                 file_data = {}
                 file_data["short_name"] = os.path.dirname(filename)[len(prefix_formatted) + 1:]
                 dirname, basename = os.path.split(filename)
-                for keyword in ttbl.ui.keywords_to_ignore_when_path:
-                    if keyword in basename:
-                        basename = basename.split(keyword)[0]
+                if hasattr(ttbl.ui,'keywords_to_ignore_when_path'):
+                    for keyword in ttbl.ui.keywords_to_ignore_when_path:
+                        if keyword in basename:
+                            basename = basename.split(keyword)[0]
                 file_list[filename] = file_data
                 images_by_path[dirname].setdefault("images", set())
                 images_by_path[dirname]["images"].add(basename)
