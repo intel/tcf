@@ -664,13 +664,29 @@ def _get_images_paths(target: ttbl.test_target, inventory: dict, kws: dict):
 
         images[image_type]['file_list'] = file_list
 
+    # we need a list of the paths that can flash all target's images.
+    # we identify which paths contain all the images types and append it to the
+    # list.
+    # you now could render a dropdown menu with the paths that could flash
+    # all fw in a target
     paths_for_all_images_types = []
     for path, info in images_by_path.items():
-        if len(info['images']) == len(images.keys()):
-            tmp = {}
-            tmp['paths'] = path + '/'
-            tmp['short_name'] = path[len(info['prefix']) + 1:]
-            paths_for_all_images_types.append(tmp)
+        count = 0
+        for image_type in images.keys():
+            # let's append the image suffix (if any) to match the file name
+            image_type = image_type + images[image_type].get('suffix', '')
+            if image_type in info['images']:
+                count += 1
+
+        # not found all fw in the path, let's continue and try with the next
+        # one
+        if count != len(images.keys()): continue
+
+        # found all fw in the path
+        list_item = {}
+        list_item['paths'] = path + '/'
+        list_item['short_name'] = path[len(info['prefix']) + 1:]
+        paths_for_all_images_types.append(list_item)
 
     return images, paths_for_all_images_types
 
