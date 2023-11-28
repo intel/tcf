@@ -392,7 +392,7 @@ def _cmdline_setup_advanced(arg_subparsers):
         "property-set",
         help = "Set a target's property")
     tcfl.ui_cli.args_verbosity_add(ap)
-    tcfl.ui_cli.args_targetspec_add(ap)
+    tcfl.ui_cli.args_targetspec_add(ap, nargs = 1)
     ap.add_argument(
         "property", metavar = "PROPERTY", action = "store",
         default = None, help = "Name of property to set")
