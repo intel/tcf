@@ -238,10 +238,10 @@ class vlan_pci(ttbl.power.impl_c):
             # We do have a physical device, so we are going to first,
             # rename it to match the IC's name (so it allows targets
             # to find it to run IP commands to attach to it)
-            ifname = commonl.if_find_by_mac(target.tags['mac_addr'])
+            ifname = commonl.if_find_by_mac(target.property_get('mac_addr'))
             if ifname == None:
                 raise ValueError("Cannot find network interface with MAC '%s'"
-                                 % target.tags['mac_addr'])
+                                 % target.property_get('mac_addr'))
             if ifname != bridge_ifname:
                 subprocess.check_call("ip link set %s down" % ifname,
                                       shell = True)
@@ -282,7 +282,7 @@ class vlan_pci(ttbl.power.impl_c):
 
             # our lower is a physical device, our upper is a device
             # which till tag for eth vlan %(vlan)
-            ifname = commonl.if_find_by_mac(target.tags['mac_addr'],
+            ifname = commonl.if_find_by_mac(target.property_get('mac_addr'),
                                             physical = True)
             if not commonl.if_present(bridge_ifname):
                 # Do create the new interface only if not already
@@ -302,7 +302,7 @@ class vlan_pci(ttbl.power.impl_c):
                     f"/usr/sbin/ip link set dev {ifname} up promisc on",
                     shell = True)
         elif mode == 'physical':
-            ifname = commonl.if_find_by_mac(target.tags['mac_addr'])
+            ifname = commonl.if_find_by_mac(target.property_get('mac_addr'))
             subprocess.check_call(	# bring lower up
                 f"/usr/sbin/ip link set dev {ifname} up promisc on",
                 shell = True)
@@ -356,7 +356,7 @@ class vlan_pci(ttbl.power.impl_c):
         mode = self._get_mode(target)
         if mode == 'physical':
             # bring down the lower device
-            ifname = commonl.if_find_by_mac(target.tags['mac_addr'])
+            ifname = commonl.if_find_by_mac(target.property_get('mac_addr'))
             subprocess.check_call(
                 # flush the IP addresses, bring it down
                 f"/usr/sbin/ip add flush dev {ifname}; "
