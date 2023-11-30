@@ -1644,6 +1644,11 @@ if __name__ == "__main__":
         help = "Path from where to load conf_*.py "
         "configuration files (in alphabetic order)")
     arg_parser.add_argument(
+        "--server",
+        action = "store", choices = [ "gunicorn", "tornado", "flask" ],
+        default = "tornado",
+        help = "Server implementation to use [%(default)s]")
+    arg_parser.add_argument(
         "--config-file", "-c",
         action = "append", dest = "config_files", metavar = "CONFIG-FILE.py",
         # FIXME: s|/etc|system prefix from installation
@@ -1688,6 +1693,9 @@ if __name__ == "__main__":
         " FILE:<ABSOLUTEFILENAME> to read the password form a file")
     arg_parser.add_argument(
         "--no-ssl", dest = "ssl", action = "store_false", default = True,
+        help = "Disable SSL support")
+    arg_parser.add_argument(
+        "--ssl", dest = "ssl", action = "store_true",
         help = "Disable SSL support")
     arg_parser.add_argument(
         "--ssl-enabled-check-disregard", action = "store_true",
@@ -1738,7 +1746,6 @@ if __name__ == "__main__":
     logging.getLogger("flask").setLevel(logging.WARNING)
     logging.getLogger("werkzeug").setLevel(logging.WARNING)
     logging.getLogger("urllib3").setLevel(logging.ERROR)
-    logging.getLogger("tornado.access").setLevel(logging.ERROR)
 
     ttbl.config.target_max_idle = args.target_max_idle
 
@@ -2013,7 +2020,52 @@ if __name__ == "__main__":
     # Have flask send HTTP keep alives by implementing 1.1
     werkzeug.serving.WSGIRequestHandler.protocol_version = "HTTP/1.1"
 
-    if True:
+    server = args.server
+    if ttbl.config.server != None:
+        server = tcfl.config.server
+    if server == "gunicorn":
+        # https://docs.gunicorn.org/en/stable/custom.html
+        logging.error("serving with gunicorn")
+
+        import gunicorn.app.base
+        class gunicorn_app_c(gunicorn.app.base.BaseApplication):
+
+            def __init__(self, app):
+                self.application = app
+                gunicorn.app.base.BaseApplication.__init__(self)
+
+            def load_config(self):
+                self.cfg.set('bind', f'{host}:{port}')
+                self.cfg.set('workers', ttbl.config.processes)
+                self.cfg.set('threads', 1)
+                self.cfg.set('timeout', 120)
+                # restart process after handling 10 requests, to avoid
+                # leaks
+                self.cfg.set('max_requests', 10)
+                self.cfg.set('max_requests_jitter', 5)
+                # gunicorn >= 20.2 accepts just using the ssl_context
+                # variable we created above, but it's quite new, so
+                # default for now to just do this...
+                if args.ssl_crt and args.ssl_key:
+                    self.cfg.set('certfile', args.ssl_crt)
+                    self.cfg.set('keyfile', args.ssl_key)
+                elif args.ssl == True:
+                    self.cfg.set('certfile', cert_fn)
+                    self.cfg.set('keyfile', pkey_fn)
+                elif args.ssl == False:
+                    self.cfg.set('certfile', cert_fn)
+                    self.cfg.set('keyfile', pkey_fn)
+
+            def load(self):
+                return self.application
+
+        sd_notify.notify("READY=1")
+        gunicorn_app_c(app).run()
+
+    elif server == "tornado":
+
+        logging.error("serving with tornado")
+        logging.getLogger("tornado.access").setLevel(logging.ERROR)
         # Tornado is single threaded, so not good for what we need
         from tornado.wsgi import WSGIContainer
         from tornado.httpserver import HTTPServer
@@ -2029,6 +2081,9 @@ if __name__ == "__main__":
         http_server.start(ttbl.config.processes)
         sd_notify.notify("READY=1")
         IOLoop.instance().start()
+
     else:
+        logging.error("serving with flask (DEBUG!)")
+
         app.run(host = host, port = port, debug = True, use_reloader = False,
-                processes = 10, ssl_context = ssl_context)
+                processes = ttbl.config.processes, ssl_context = ssl_context)

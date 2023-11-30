@@ -92,6 +92,13 @@ instance_suffix = ""
 #: Maximum length of the reason given to an allocation
 reason_len_max = 128
 
+#: Server implementation to use: gunicorn, tornado, flask
+#:
+#: (defaults to Tornado) Set in any serverconfiguration file:
+#:
+#: >>> ttbl.config.server = "gunicorn"
+server = None
+
 def _nested_list_flatten(l):
     for e in l:
         if isinstance(e, collections.abc.Iterable):
