@@ -25,6 +25,7 @@ blinker         # package: python3-blinker
 flask           # package: python3-flask
 flask-login     # package: python3-flask-login
 flask-principal # package: fedora,ubuntu=python3-flask-principal
+gunicorn        # package: python3-gunicorn
 keyring         # package: fedora,ubuntu=python3-keyring
 netifaces       # package: python3-netifaces
 pexpect         # package: python3-pexpect
