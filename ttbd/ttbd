@@ -2022,7 +2022,7 @@ if __name__ == "__main__":
 
     server = args.server
     if ttbl.config.server != None:
-        server = tcfl.config.server
+        server = ttbl.config.server
     if server == "gunicorn":
         # https://docs.gunicorn.org/en/stable/custom.html
         logging.error("serving with gunicorn")
