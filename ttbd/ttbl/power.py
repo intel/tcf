@@ -205,8 +205,10 @@ not published and must be assumed as *off* or *fully off*.
 
 """
 import collections
+import concurrent.futures
 import errno
 import json
+import multiprocessing.process
 import numbers
 import os
 import re
@@ -356,10 +358,36 @@ class impl_c(ttbl.tt_interface_impl_c):
                                   % (target.id, component))
 
     def get(self, target, component):
-        """
-        Return the component's power state
+        """Return the component's power state
 
         Same parameters as :meth:`on`
+
+        WARNING! This function can be called fro multiple *processes*
+        (not threads, we never do threads) at the same time, so if
+        there is common resource access, you might have to protect it,
+        eg: to access a serial port
+
+        >>> tty_dev_base = os.path.basename(tty_dev)
+        >>> try:
+        >>>     with ttbl.process_posix_file_lock_c(
+        >>>              f"/var/lock/LCK..{tty_dev_base}", timeout = 2), \
+        >>>          serial.Serial(tty_dev, baudrate = 9600,
+        >>>                        bytesize = serial.EIGHTBITS,
+        >>>                        parity = serial.PARITY_NONE,
+        >>>                        stopbits = serial.STOPBITS_ONE,
+        >>>                        # .5s for timeout to avoid getting stuck,
+        >>>                        # which will trigger the watchdog
+        >>>                        timeout = 0.5) as s:
+        >>>         # do something with s
+        >>>         ...
+        >>>         return response
+        >>>
+        >>> except ttbl.process_posix_file_lock_c.timeout_e:
+        >>>     target.log.error(
+        >>>         f"{tty_dev_base}: timed out acquiring lock for blahbla")
+        >>>     return no state or re-raise, etc
+
+        Retrying is ok, but don't take more than two seconds.
 
         :returns: power state:
 
@@ -369,6 +397,7 @@ class impl_c(ttbl.tt_interface_impl_c):
 
           - *None*: this is a *fake* power unit, so it has no actual
             power state
+
         """
         raise NotImplementedError("%s/%s: getting power state not implemented"
                                   % (target.id, component))
@@ -535,43 +564,83 @@ class interface(ttbl.tt_interface):
         explicit = {}
         explicit_on = {}
         explicit_off = {}
+
+        impls_non_aliased = {}
         for component, impl in impls:
-            # need to get state for the real one!
             if component in self.aliases:
-                component_real = self.aliases[component]
-            else:
-                component_real = component
-            try:
-                state = self._impl_get(impl, target, component_real)
-            except impl.error_e as e:
-                if not impl.ignore_get_errors:
-                    raise
-                # if this is an explicit component, ignore any errors
-                # and just assume we are not using this for real power
-                # control
-                target.log.error(
-                    "%s: ignoring power state error from explicit power component: %s"
-                    % (component, e))
-                state = None
-            self.assert_return_type(state, bool, target,
-                                    component, "power.get", none_ok = True)
-            data[component] = {
-                "state": state
+                component = self.aliases[component]
+            impls_non_aliased[component] = impl
+
+        # ugly trick: remove current processes's daemon setting to
+        # fake the concurrent futures processpoolexecutor, which
+        # as of Pyhton 3.11 doesn't allow them for unknown reaosns
+        # and in Stackoverflow everyone and their mum just fakes
+        # it. Note we'll reset it later  in the finally block
+        current_process = multiprocessing.process.current_process()
+        _config = getattr(current_process, "_config", None)
+        daemon_orig = _config.get('daemon', None)
+        _config['daemon'] = False
+
+        # Run in parallel all the get operations: this way very large
+        # power rails (which can happen once you add different
+        # components and detectors and retries) are not that painful
+        # to run frequently.
+        #
+        # Note the get() operations are mostly I/O bound, but still we
+        # use processes rather than threads, so we are not contenting
+        # for the Python GIL and they are truly running in parallel
+        executor = concurrent.futures.ProcessPoolExecutor(len(impls_non_aliased))
+        try:
+
+            futures = {
+                # for each target id, queue a thread that will call
+                # _run_on_by_targetid(), who will call fn taking care
+                # of exceptions
+
+                # self.aliases.get(component, component): gets the real
+                # component name if there is an alias; if there is no alias, we just use
+                # the component name we got
+                component: executor.submit(self._impl_get,
+                                           impl, target, component)
+                for component, impl in impls_non_aliased.items()
             }
-            if impl.explicit:
-                data[component]['explicit'] = impl.explicit
-            if impl.explicit == None:
-                normal[component] = state
-            elif impl.explicit == 'both':
-                explicit[component] = state
-            elif impl.explicit == 'on':
-                explicit_on[component] = state
-            elif impl.explicit == 'off':
-                explicit_off[component] = state
-            else:
-                raise AssertionError(
-                    "BUG! component %s: unknown explicit tag '%s'" %
-                    (component, impl.explicit))
+
+            for component in futures:
+                impl = self.impls[component]
+                try:
+                    state = futures[component].result()
+                except impl.error_e as e:
+                    if not impl.ignore_get_errors:
+                        raise
+                    # if this is an explicit component, ignore any errors
+                    # and just assume we are not using this for real power
+                    # control
+                    target.log.error(
+                        "%s: ignoring power state error from explicit power component: %s"
+                        % (component, e))
+                    state = None
+                self.assert_return_type(state, bool, target,
+                                        component, "power.get", none_ok = True)
+                data[component] = {
+                    "state": state
+                }
+                if impl.explicit:
+                    data[component]['explicit'] = impl.explicit
+                if impl.explicit == None:
+                    normal[component] = state
+                elif impl.explicit == 'both':
+                    explicit[component] = state
+                elif impl.explicit == 'on':
+                    explicit_on[component] = state
+                elif impl.explicit == 'off':
+                    explicit_off[component] = state
+                else:
+                    raise AssertionError(
+                        "BUG! component %s: unknown explicit tag '%s'" %
+                        (component, impl.explicit))
+            executor.shutdown(wait = True)
+        finally:
+            _config['daemon'] = daemon_orig
 
         # What state are we in?
         #
