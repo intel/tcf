@@ -1059,15 +1059,20 @@ class fake_c(impl_c):
       location), so if used in other interface than *power* (default),
       use paramer *iface_name*.
 
+    :param float delay: (optional, default 0) time in seconds to delay
+      all operations
+
     Parameters are the same as for :class:impl_c.
 
     """
-    def __init__(self, name = None, iface_name = "power", **kwargs):
+    def __init__(self, name = None, iface_name = "power",
+                 delay: float = 0, **kwargs):
         impl_c.__init__(self, **kwargs)
         if name == None:
             name = "%x" % id(self)
         self.name = name
         self.iface_name = iface_name
+        self.delay = delay
         self.upid_set("Fake power controller #%s" % name,
                       name = name, iface_name = iface_name)
 
@@ -1075,16 +1080,31 @@ class fake_c(impl_c):
     # right inventory in the namespace and it doesn't collide with
     # *state*, which is set by the upper layers.
     def on(self, target, component):
+        delay = float(target.fsdb.get(
+            f"interfaces.{self.iface_name}.{component}.delay", self.delay))
+        target.log.warning(f"fake_c powering {component} ON after {delay}s")
+        time.sleep(delay)
         target.fsdb.set(
             'interfaces.%s.%s.fake-state' % (self.iface_name, component), True)
+        target.log.warning(f"fake_c powered {component} ON after {delay}s")
 
     def off(self, target, component):
+        delay = float(target.fsdb.get(
+            f"interfaces.{self.iface_name}.{component}.delay", self.delay))
+        target.log.warning(f"fake_c power {component} OFF after {delay}s")
+        time.sleep(delay)
         target.fsdb.set(
             'interfaces.%s.%s.fake-state' % (self.iface_name, component), None)
+        target.log.warning(f"fake_c powered {component} OFF after {delay}s")
 
     def get(self, target, component):
+        delay = float(target.fsdb.get(
+            f"interfaces.{self.iface_name}.{component}.delay", self.delay))
+        target.log.warning(f"fake_c power {component} getting after {delay}s")
+        time.sleep(delay)
         state = target.fsdb.get(
             'interfaces.%s.%s.fake-state' % (self.iface_name, component))
+        target.log.warning(f"fake_c power {component} get after {delay}s")
         return state == True
 
 
