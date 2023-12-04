@@ -8,6 +8,8 @@ packager = Inaky Perez-Gonzalez <inaky.perez-gonzalez@intel.com>
 # The grub thing? So it works in fedora27 or fedora 25
 requires = {{requirements}}
     tcf-client == %%{version}-%%{release}
+    python3-tornado
+    python3-gunicorn
 
 build_requires =
     gcc
