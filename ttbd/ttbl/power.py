@@ -426,7 +426,7 @@ class interface(ttbl.tt_interface):
     sequence.
     """
 
-    def __init__(self, *impls, **kwimpls):
+    def __init__(self, *impls, get_parallel: bool = False, **kwimpls):
         # in Python 3.6, kwargs are sorted; but for now, they are not.
         ttbl.tt_interface.__init__(self)
         # we need an ordered dictionary because we need to iterate in
@@ -434,6 +434,9 @@ class interface(ttbl.tt_interface):
         # what the user dictates. Because the power on/off order of
         # each rail component matters.
         self.impls_set(impls, kwimpls, impl_c)
+        self.get_parallel = get_parallel
+
+
 
     def _target_setup(self, target, iface_name):
         # Called when the interface is added to a target to initialize
@@ -595,50 +598,30 @@ class interface(ttbl.tt_interface):
         daemon_orig = _config.get('daemon', None)
         _config['daemon'] = False
 
-        # Run in parallel all the get operations: this way very large
-        # power rails (which can happen once you add different
-        # components and detectors and retries) are not that painful
-        # to run frequently.
-        #
-        # Note the get() operations are mostly I/O bound, but still we
-        # use processes rather than threads, so we are not contenting
-        # for the Python GIL and they are truly running in parallel
-        executor = concurrent.futures.ProcessPoolExecutor(len(impls_non_aliased))
-        try:
 
-            futures = {
-                # for each target id, queue a thread that will call
-                # _run_on_by_targetid(), who will call fn taking care
-                # of exceptions
-
-                # self.aliases.get(component, component): gets the real
-                # component name if there is an alias; if there is no alias, we just use
-                # the component name we got
-                component: executor.submit(_impl_get_trampoline, self._impl_get,
-                                           impl, target, component)
-                for component, impl in impls_non_aliased.items()
-            }
-
-            for component in futures:
-                impl = self.impls[component]
+        if not self.get_parallel:
+            # Run serially all the get operations
+            #
+            # We still default to this since we are having issues in
+            # parallelizing / pickling, it trips in SSLcontexts which
+            # we are not sure where it comes from.
+            for component, impl in impls_non_aliased.items():
+                # need to get state for the real one!
+                if component in self.aliases:
+                    component_real = self.aliases[component]
+                else:
+                    component_real = component
                 try:
-                    state, e, tb = futures[component].result()
-                except Exception as e:
-                    target.log.error(
-                        "BUG!? %s: exception getting _get() result: %s",
-                        component, e, exc_info = True)
-                    continue
-                if e:
-                    # if the call to _get() for the driver got an issue
+                    state = self._impl_get(impl, target, component_real)
+                except impl.error_e as e:
                     if not impl.ignore_get_errors:
                         raise
                     # if this is an explicit component, ignore any errors
                     # and just assume we are not using this for real power
                     # control
                     target.log.error(
-                        "%s: ignoring power state error from explicit"
-                        " power component: %s: %s",
-                        component, e, tb)
+                        "%s: ignoring power state error from explicit power component: %s"
+                        % (component, e))
                     state = None
                 self.assert_return_type(state, bool, target,
                                         component, "power.get", none_ok = True)
@@ -659,9 +642,75 @@ class interface(ttbl.tt_interface):
                     raise AssertionError(
                         "BUG! component %s: unknown explicit tag '%s'" %
                         (component, impl.explicit))
-            executor.shutdown(wait = True)
-        finally:
-            _config['daemon'] = daemon_orig
+
+        else:
+            # Run in parallel all the get operations: this way very large
+            # power rails (which can happen once you add different
+            # components and detectors and retries) are not that painful
+            # to run frequently.
+            #
+            # Note the get() operations are mostly I/O bound, but still we
+            # use processes rather than threads, so we are not contenting
+            # for the Python GIL and they are truly running in parallel
+            executor = concurrent.futures.ProcessPoolExecutor(len(impls_non_aliased))
+            try:
+
+                futures = {
+                    # for each target id, queue a thread that will call
+                    # _run_on_by_targetid(), who will call fn taking care
+                    # of exceptions
+
+                    # self.aliases.get(component, component): gets the real
+                    # component name if there is an alias; if there is no alias, we just use
+                    # the component name we got
+                    component: executor.submit(_impl_get_trampoline, self._impl_get,
+                                               impl, target, component)
+                    for component, impl in impls_non_aliased.items()
+                }
+
+                for component in futures:
+                    impl = self.impls[component]
+                    try:
+                        state, e, tb = futures[component].result()
+                    except Exception as e:
+                        target.log.error(
+                            "BUG!? %s: exception getting _get() result: %s",
+                            component, e, exc_info = True)
+                        continue
+                    if e:
+                        # if the call to _get() for the driver got an issue
+                        if not impl.ignore_get_errors:
+                            raise
+                        # if this is an explicit component, ignore any errors
+                        # and just assume we are not using this for real power
+                        # control
+                        target.log.error(
+                            "%s: ignoring power state error from explicit"
+                            " power component: %s: %s",
+                            component, e, tb)
+                        state = None
+                    self.assert_return_type(state, bool, target,
+                                            component, "power.get", none_ok = True)
+                    data[component] = {
+                        "state": state
+                    }
+                    if impl.explicit:
+                        data[component]['explicit'] = impl.explicit
+                    if impl.explicit == None:
+                        normal[component] = state
+                    elif impl.explicit == 'both':
+                        explicit[component] = state
+                    elif impl.explicit == 'on':
+                        explicit_on[component] = state
+                    elif impl.explicit == 'off':
+                        explicit_off[component] = state
+                    else:
+                        raise AssertionError(
+                            "BUG! component %s: unknown explicit tag '%s'" %
+                            (component, impl.explicit))
+                executor.shutdown(wait = True)
+            finally:
+                _config['daemon'] = daemon_orig
 
         # What state are we in?
         #
@@ -697,6 +746,7 @@ class interface(ttbl.tt_interface):
 
         if whole_rail:
             # update full power state in inventory
+            # FIXME: only do this if we are working as power interface, not as buttons
             target.fsdb.set('interfaces.power.state', state)
             target.fsdb.set('interfaces.power.substate', substate)
         return state, data, substate
