@@ -155,7 +155,7 @@ class rly08b(ttbl.tt_interface_impl_c):
 
         try:
             with ttbl.process_posix_file_lock_c(
-                    f"/var/lock/LCK..{tty_dev_base}", timeout = 2), \
+                    f"/var/lock/lockdev/LCK..{tty_dev_base}", timeout = 2), \
                  serial.Serial(tty_dev, baudrate = 9600,
                                bytesize = serial.EIGHTBITS,
                                parity = serial.PARITY_NONE,
