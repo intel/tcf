@@ -149,41 +149,51 @@ class rly08b(ttbl.tt_interface_impl_c):
             target, self.device_spec,
             f"instrumentation.{self.upid_index}.device_spec")
         tty_dev = device_resolver.tty_find_by_spec()
-            
+        tty_dev_base = os.path.basename(tty_dev)
+
         response = []
 
-        with serial.Serial(tty_dev, baudrate = 9600,
-                           bytesize = serial.EIGHTBITS,
-                           parity = serial.PARITY_NONE,
-                           stopbits = serial.STOPBITS_ONE,
-                           # .5s for timeout to avoid getting stuck,
-                           # which will trigger the watchdog
-                           timeout = 0.5) as s:
-            for cmd in cmds:
-                assert cmd >= 0 and cmd <= 255
-                s.write(bytearray([cmd]))
-                if cmd == 0x38:		# get serial #
-                    response.append(s.read(8))
-                elif cmd == 0x5a:		# get SW version
-                    response.append(s.read(2))
-                elif cmd == 0x5b:		# get relay states
+        try:
+            with ttbl.process_posix_file_lock_c(
+                    f"/var/lock/LCK..{tty_dev_base}", timeout = 2), \
+                 serial.Serial(tty_dev, baudrate = 9600,
+                               bytesize = serial.EIGHTBITS,
+                               parity = serial.PARITY_NONE,
+                               stopbits = serial.STOPBITS_ONE,
+                               # .5s for timeout to avoid getting stuck,
+                               # which will trigger the watchdog
+                               timeout = 0.5) as s:
+                for cmd in cmds:
+                    assert cmd >= 0 and cmd <= 255
+                    s.write(bytearray([cmd]))
+                    if cmd == 0x38:		# get serial #
+                        response.append(s.read(8))
+                    elif cmd == 0x5a:		# get SW version
+                        response.append(s.read(2))
+                    elif cmd == 0x5b:		# get relay states
+                        r = s.read(1)
+                        response.append(r)
+                    elif cmd == 0x5c:   	# set relay states
+                        assert states >= 0 and states <= 255
+                        s.write(bytearray([states]))
+                        response.append(None)
+                    elif cmd >= 0x64 or cmd <= 76:
+                        # No response
+                        response.append(None)
+                    else:
+                        raise ValueError("Unknown command 0x%02x" % cmd)
+
+                if get_state:
+                    s.write(bytearray([0x5b]))
                     r = s.read(1)
                     response.append(r)
-                elif cmd == 0x5c:   	# set relay states
-                    assert states >= 0 and states <= 255
-                    s.write(bytearray([states]))
-                    response.append(None)
-                elif cmd >= 0x64 or cmd <= 76:
-                    # No response
-                    response.append(None)
-                else:
-                    raise ValueError("Unknown command 0x%02x" % cmd)
+                return response
 
-            if get_state:
-                s.write(bytearray([0x5b]))
-                r = s.read(1)
-                response.append(r)
-            return response
+        except ttbl.process_posix_file_lock_c.timeout_e:
+            target.log.error(
+                f"{tty_dev_base}: timed out acquiring lock for USBRLY08B")
+            return []
+
 
 
 class pc(rly08b, ttbl.power.impl_c):
