@@ -403,6 +403,19 @@ class impl_c(ttbl.tt_interface_impl_c):
                                   % (target.id, component))
 
 
+
+def _impl_get_trampoline(fn_impl_get: callable, impl: impl_c,
+                         target: ttbl.test_target, component: str) -> tuple:
+    try:
+        return fn_impl_get(impl, target, component), None, None
+    except Exception as e:
+        # we can't pickle tracebacks, so we send them as a
+        # formated traceback so we can at least do some debugging
+        tb = traceback.format_exception(type(e), e, e.__traceback__)
+        return None, e, tb
+
+
+
 class interface(ttbl.tt_interface):
     """
     Power control interface
@@ -601,7 +614,7 @@ class interface(ttbl.tt_interface):
                 # self.aliases.get(component, component): gets the real
                 # component name if there is an alias; if there is no alias, we just use
                 # the component name we got
-                component: executor.submit(self._impl_get,
+                component: executor.submit(_impl_get_trampoline, self._impl_get,
                                            impl, target, component)
                 for component, impl in impls_non_aliased.items()
             }
@@ -609,16 +622,23 @@ class interface(ttbl.tt_interface):
             for component in futures:
                 impl = self.impls[component]
                 try:
-                    state = futures[component].result()
-                except impl.error_e as e:
+                    state, e, tb = futures[component].result()
+                except Exception as e:
+                    target.log.error(
+                        "BUG!? %s: exception getting _get() result: %s",
+                        component, e, exc_info = True)
+                    continue
+                if e:
+                    # if the call to _get() for the driver got an issue
                     if not impl.ignore_get_errors:
                         raise
                     # if this is an explicit component, ignore any errors
                     # and just assume we are not using this for real power
                     # control
                     target.log.error(
-                        "%s: ignoring power state error from explicit power component: %s"
-                        % (component, e))
+                        "%s: ignoring power state error from explicit"
+                        " power component: %s: %s",
+                        component, e, tb)
                     state = None
                 self.assert_return_type(state, bool, target,
                                         component, "power.get", none_ok = True)
