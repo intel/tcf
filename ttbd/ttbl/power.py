@@ -554,12 +554,13 @@ class interface(ttbl.tt_interface):
             % (component, ts - ts0, " ".join(str(r) for r in results)))
 
 
-    def _get(self, target, impls = None):
+    def _get(self, target, impls = None, whole_rail: bool = True):
         # get the power state for the target's given power components,
         # keep data ordered, makes more sense
         data = collections.OrderedDict()
         if impls == None:	# none give, do the whole power rail
             impls = iter(self.impls.items())
+            whole_rail = True
         normal = {}
         explicit = {}
         explicit_on = {}
@@ -674,8 +675,10 @@ class interface(ttbl.tt_interface):
             state = False
             substate = 'partial'
 
-        target.fsdb.set('interfaces.power.state', state)
-        target.fsdb.set('interfaces.power.substate', substate)
+        if whole_rail:
+            # update full power state in inventory
+            target.fsdb.set('interfaces.power.state', state)
+            target.fsdb.set('interfaces.power.substate', substate)
         return state, data, substate
 
 
@@ -688,7 +691,7 @@ class interface(ttbl.tt_interface):
         #
         # If the user asked for the whole rail, then we'll also run
         # the pre/post hooks.
-        _state, data, _substate = self._get(target, impls)
+        _state, data, _substate = self._get(target, impls, whole_rail)
 
         target.log.info("powering off%s" % why)
         if whole_rail:
@@ -761,7 +764,7 @@ class interface(ttbl.tt_interface):
         #
         # Recovery can be quite painful, since we might have to retry
         # (a single component) or the whole rail. Code gets ugly.
-        _state, data, _substate = self._get(target, impls)
+        _state, data, _substate = self._get(target, impls, whole_rail)
 
         target.log.info("powering on%s" % why)
         if whole_rail:
