@@ -1980,9 +1980,12 @@ if __name__ == "__main__":
     # really solved what happens if we reap a daemon from a Python web
     # framework process that exited.
     def sigchld_handler(signum, frame):
-        si = os.waitid(os.P_ALL, 0, os.WNOHANG | os.WEXITED | os.WNOWAIT)
-        if si == None:
-            return
+        try:
+            si = os.waitid(os.P_ALL, 0, os.WNOHANG | os.WEXITED | os.WNOWAIT)
+            if si == None:
+                return
+        except ChildProcessError:
+            return	# there is none to wait for, so whatever
         pid = si.si_pid
         if pid == -1 or pid == 0:
             return
