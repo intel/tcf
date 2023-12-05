@@ -744,9 +744,10 @@ class interface(ttbl.tt_interface):
             state = False
             substate = 'partial'
 
-        if whole_rail:
-            # update full power state in inventory
-            # FIXME: only do this if we are working as power interface, not as buttons
+        if whole_rail and getattr(ttbl.tls, 'interface', None) == "power":
+            # update full power state in inventory ONLY if we are
+            # using this call in the *power* interface (eg not as part
+            # of the *buttons* interface)
             target.fsdb.set('interfaces.power.state', state)
             target.fsdb.set('interfaces.power.substate', substate)
         return state, data, substate
@@ -816,7 +817,14 @@ class interface(ttbl.tt_interface):
             for f in target.power_off_post_fns:
                 f(target)
             target.log.debug("power post-off%s done" % why)
-        target.fsdb.set('powered', None)
+        if whole_rail and getattr(ttbl.tls, 'interface', None) == "power":
+            # update full power state in inventory ONLY if we are
+            # using this call in the *power* interface (eg not as part
+            # of the *buttons* interface)
+            target.fsdb.set('interfaces.power.state', False)
+            target.fsdb.set('interfaces.power.substate',
+                            "full" if explicit else "normal")
+            target.fsdb.set('powered', None)
         target.log.info("powered off%s" % why)
 
 
@@ -965,7 +973,14 @@ class interface(ttbl.tt_interface):
         if not isinstance(why, str):
             raise TypeError(type(why))
         target.log.info("powered on%s" % why)
-        target.fsdb.set('powered', 'On')
+        if whole_rail and getattr(ttbl.tls, 'interface', None) == "power":
+            # update full power state in inventory ONLY if we are
+            # using this call in the *power* interface (eg not as part
+            # of the *buttons* interface)
+            target.fsdb.set('interfaces.power.state', True)
+            target.fsdb.set('interfaces.power.substate',
+                            "full" if explicit else "normal")
+            target.fsdb.set('powered', "On")
 
 
     # called by the daemon when a METHOD request comes to the HTTP path
