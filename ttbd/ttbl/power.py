@@ -3090,3 +3090,129 @@ def create_pc_from_spec(power_spec, **kwargs):
     if isinstance(power_spec, ttbl.power.impl_c):
         return power_spec
     raise RuntimeError(f"power_spec: unknown type {type(power_spec)}")
+
+
+
+def _execute_action(target: ttbl.test_target, state: bool, soft_failure: bool):
+    # executes a power action based on the state variable
+    if state == None:
+        return
+    try:
+        target.log.warning(
+            "ttbl.power._execute_action(): powering %s",
+            "on" if state == True else "off")
+        if state == True:
+            target.power.put_on(target, ttbl.who_daemon(), {}, {}, None)
+        elif state == False:
+            target.power.put_off(target, ttbl.who_daemon(), {}, {}, None)
+    except Exception as e:
+        if soft_failure == False:
+            raise
+        target.log.warning(
+            "ttbl.power._execute_action(): ignoring power %s failure: %s",
+            "on" if state == True else "off", e)
+
+
+_startup_defer_list = []
+
+def defer(target: ttbl.test_target, state: bool,
+          defer_list: list = None, soft_failure: bool = True):
+    """
+    Defer a power action
+
+    This is mostly used during configuration:
+
+    - Execute inmediately as configured (can slow down startup):
+
+      >>> ttbl.power.defer(target, True)
+
+    - Execute later in a batch during configuration:
+
+      >>> somename_list = []
+      >>> target = ...createtarget...
+      >>> ttbl.power.defer(target, True, somename_list)
+      >>> ...
+      >>> ttbl.power.execute_defer_list(somename_list)
+
+    - Execute once daemon is complete and serving:
+
+      >>> target = ...createtarget...
+      >>> ttbl.power.defer(target, True, "startup")
+
+    :param ttbl.test_target target: target where to act
+
+    :param list defer_list: append to the given defer list; if
+      "startup", will be run right after the server starts and starts
+      serving. Use :func:`ttbl.execute_defer_list` later to sequence
+      the power actions.
+
+    :param bool state: state the target shall be in; *True* for
+      powered on, *False* for powered off, *None* for don't do anything.
+
+    """
+    assert state == None or isinstance(state, bool), \
+        "state: expected bool or None; got {type(state)}"
+
+    if defer_list == None:
+        _execute_action(target, state, soft_failure)
+        return
+
+    if defer_list == "startup":
+        # use tags, since we want them to survive restarts and then
+        # we'll just ignore'em
+        target.tags["interfaces.power.__on_startup"] = state
+        _startup_defer_list.append(( target, state, soft_failure ))
+        return
+
+    assert isinstance(defer_list, list), \
+        "defer_list: expected list; got {type(defer_list)}"
+    defer_list.append(( target, state, soft_failure ))
+
+
+
+def execute_defer_list(defer_list: list, name: str, serialize: bool = False):
+    """
+    Execute the deferred power actions in @defer_list
+
+    :param list defer_list: list of deferred power actions filled by
+      :func:`ttbl.power.defer`
+
+    :param str name: name of the deferred list
+
+    :param bool serialize: (optional; defaults to *False*) execute the
+      actions in a serial manner.
+    """
+    logging.info("power defer list '%s': executing", name)
+    if serialize:
+        for ( target, state, soft_failure ) in defer_list:
+            _execute_action(target, state, soft_failure)
+    else:
+        processes = max(20, len(defer_list))
+        current_process = multiprocessing.process.current_process()
+        _config = getattr(current_process, "_config", None)
+        daemon_orig = _config.get('daemon', None)
+        _config['daemon'] = False
+        executor = concurrent.futures.ProcessPoolExecutor(processes)
+        try:
+            futures = {
+                executor.submit(_execute_action,
+                                target, state, soft_failure): (
+                                    target, state, soft_failure
+                                )
+                for ( target, state, soft_failure ) in defer_list
+            }
+            for future in concurrent.futures.as_completed(futures):
+                target, state, soft_failure = futures[future]
+                try:
+                    _ = future.result()
+                except Exception as e:
+                    logging.error(
+                        "%s: exception running deferred power-%s operation: %s",
+                        target.id, "on" if state else "off", e)
+                    if not soft_failure:
+                        raise
+            executor.shutdown(wait = True)
+        finally:
+            _config['daemon'] = daemon_orig
+
+    logging.warning("power defer list '%s': executed", name)
