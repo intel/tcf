@@ -2072,11 +2072,11 @@ if __name__ == "__main__":
                     self.cfg.set('certfile', args.ssl_crt)
                     self.cfg.set('keyfile', args.ssl_key)
                 elif args.ssl == True:
+                    # take from generated above
                     self.cfg.set('certfile', cert_fn)
                     self.cfg.set('keyfile', pkey_fn)
                 elif args.ssl == False:
-                    self.cfg.set('certfile', cert_fn)
-                    self.cfg.set('keyfile', pkey_fn)
+                    pass
 
             def load(self):
                 return self.application
