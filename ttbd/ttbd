@@ -1464,6 +1464,8 @@ daemon_user = None
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
 requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 
+
+
 # This is one of the dirtiest kludges ever done
 def cleanup_process_fn():
     global _systemd_watchdog_period
@@ -1480,6 +1482,11 @@ def cleanup_process_fn():
     else:
         _systemd_watchdog_period =  None
         sleep_period = ttbl.config.target_max_idle / 2
+
+    # execute tasks that have to be done only once when starting the
+    # daemon; for now this is only for things we want to power on/off
+    ttbl.power.execute_defer_list(ttbl.power._startup_defer_list, "startup")
+
     logi("Clean up process [period %.2fs]" % sleep_period)
     ts_now = datetime.datetime.now()
     cleanup_files_last = ts_now
