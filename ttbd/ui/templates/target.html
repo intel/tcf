@@ -420,12 +420,13 @@ $ tcf ls -vv {{ targetid}}</code> </pre></p>
         <table class='display'>
           <tr>
             <td>power state:</td>
-            <td>
-              {% if state.power == 'True' %}
-              <label style='color: green;'>on</label>
-              {% else %}
-              <label style='color: red;'>off</label>
-              {% endif %}
+            <td id='table_datacell_overall_power_state' style='color: gray;'>
+              <div class = "tooltip">
+                    n/a
+                <span class = "tooltiptext">
+                    You need to acquire the target to get its power state
+                </span>
+              </div>
             </td>
           </tr>
 

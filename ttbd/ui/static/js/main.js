@@ -657,7 +657,20 @@ async function power_state_update_for_all_components(targetid) {
         alert('there was an error reading the state of the power rail\n' + body);
         return
     }
+
     let power_list = JSON.parse(body);
+    let table_datacell = document.getElementById('table_datacell_overall_power_state');
+    if (power_list['state'] === false) {
+        table_datacell.textContent = 'off';
+        table_datacell.style.color = 'red';
+    } else if (power_list['state'] === true) {
+        table_datacell.textContent = 'on';
+        table_datacell.style.color = 'green';
+    } else {
+        table_datacell.textContent = 'malfunction?';
+        table_datacell.style.color = 'yellow';
+    }
+
     let power_rail = power_list['components'];
     for (const [component, information] of Object.entries(power_rail)) {
         let table_datacell = document.getElementById('table-datacell-' + component + '-state');
