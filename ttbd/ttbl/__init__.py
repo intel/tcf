@@ -54,6 +54,8 @@ import ttbl.user_control
 
 logger = logging.root.getChild("ttb")
 
+tls = threading.local()
+
 class test_target_e(Exception):
     """
     A base for all operations regarding test targets.
