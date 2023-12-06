@@ -1485,6 +1485,8 @@ def cleanup_process_fn():
 
     # execute tasks that have to be done only once when starting the
     # daemon; for now this is only for things we want to power on/off
+    # FIXME: if there is an exeception here, what do we do? do we
+    # ignore it? if so we need to force soft_failure
     ttbl.power.execute_defer_list(ttbl.power._startup_defer_list, "startup")
 
     logi("Clean up process [period %.2fs]" % sleep_period)
@@ -2030,11 +2032,23 @@ if __name__ == "__main__":
             raise
         # It is already a session leader...can ignore
 
+    server = args.server
+    if ttbl.config.server != None:
+        server = ttbl.config.server
+
     daemon_user = ttbl.user_control.User('local', roles = [ "admin" ])
-    # Cleanup process...now this is quite very ugly...see _cleanup()
-    cleanup_process = multiprocessing.Process(target = cleanup_process_fn)
-    cleanup_process.daemon = True
-    cleanup_process.start()
+    if server == "gunicorn":
+        # gunicorn conflicts with MP and kills cleanup, so just fork
+        # the cleanup thread
+        pid = os.fork()
+        if pid == 0:	# I'm the child
+            cleanup_process_fn()
+            sys.exit()
+    else:	# just invoke using multiprocessing
+        # Cleanup process...now this is quite very ugly...see _cleanup()
+        cleanup_process = multiprocessing.Process(target = cleanup_process_fn)
+        cleanup_process.daemon = True
+        cleanup_process.start()
 
     # See authentication in the file's doc header
     auth_init(app)
@@ -2042,9 +2056,6 @@ if __name__ == "__main__":
     # Have flask send HTTP keep alives by implementing 1.1
     werkzeug.serving.WSGIRequestHandler.protocol_version = "HTTP/1.1"
 
-    server = args.server
-    if ttbl.config.server != None:
-        server = ttbl.config.server
     if server == "gunicorn":
         # https://docs.gunicorn.org/en/stable/custom.html
         logging.error("serving with gunicorn")
