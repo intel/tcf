@@ -121,12 +121,6 @@ $ tcf ls -vv {{ targetid}}</code> </pre></p>
     </div>
     <hr>
     {% if state.acquired %}
-        <script>
-            /* let us update the power state of the power rail when we load
-            the page for the first time */
-            power_state_update_for_all_components("{{targetid}}");
-            buttons_state_update_for_all_components("{{targetid}}");
-        </script>
 
        <div class='subsection'>
 
@@ -194,6 +188,11 @@ $ tcf ls -vv {{ targetid}}</code> </pre></p>
                 </span>
               </div>
           {% else %}
+            <script>
+                /* let us update the power state of the buttons when we load
+                the page for the first time */
+                buttons_state_update_for_all_components("{{targetid}}");
+            </script>
               <button class='minor' onclick="toggle('buttons-ls')">
                 buttons, jumpers and relays <i class="arrow down"></i>
               </button>
@@ -215,6 +214,13 @@ $ tcf ls -vv {{ targetid}}</code> </pre></p>
               </tr>
             </thead>
             <tbody>
+            {% if powerls|length != 0 %}
+              <script>
+                /* let us update the power state of the power rail when we load
+                the page for the first time */
+                power_state_update_for_all_components("{{targetid}}");
+              </script>
+            {% endif %}
               {% for component, description in powerls.items() %}
               <tr>
 
