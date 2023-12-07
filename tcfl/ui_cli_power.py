@@ -142,48 +142,48 @@ def _cmdline_power_get(cli_args: argparse.Namespace):
     return retval
 
 
-def _cmdline_power_list(cli_args: argparse.Namespace):
+def _power_list_by_target(target, cli_args):
+    state, substate, components = target.power.list()
 
-    def _power_list_by_target(target, cli_args):
-        state, substate, components = target.power.list()
+    def _state_to_str(state):
+        if state == True:
+            return 'on'
+        if state == False:
+            return 'off'
+        if state == None:
+            return "n/a"
+        return "BUG:unknown-state"
 
-        def _state_to_str(state):
-            if state == True:
-                return 'on'
-            if state == False:
-                return 'off'
-            if state == None:
-                return "n/a"
-            return "BUG:unknown-state"
-
-        verbosity = cli_args.verbosity - cli_args.quietosity
-        if verbosity < 2:
+    verbosity = cli_args.verbosity - cli_args.quietosity
+    if verbosity < 2:
+        _state = _state_to_str(state)
+        print(f"{target.id}: overall: {_state} ({substate})")
+        for component, data in components.items():
+            state = data['state']
+            explicit = data.get('explicit', None)
             _state = _state_to_str(state)
-            print(f"{target.id}: overall: {_state} ({substate})")
-            for component, data in components.items():
-                state = data['state']
-                explicit = data.get('explicit', None)
-                _state = _state_to_str(state)
-                if explicit and verbosity == 0:
-                    continue
-                if not explicit:
-                    explicit = ""
-                else:
-                    explicit = " (explicit/" + explicit + ")"
-                print(f"  {component}: {_state}{explicit}")
+            if explicit and verbosity == 0:
+                continue
+            if not explicit:
+                explicit = ""
+            else:
+                explicit = " (explicit/" + explicit + ")"
+            print(f"  {component}: {_state}{explicit}")
 
-        elif verbosity == 2:
-            r = dict(state = state, substate = substate,
-                     components = components)
-            commonl.data_dump_recursive(r, prefix = target.id)
+    elif verbosity == 2:
+        r = dict(state = state, substate = substate,
+                 components = components)
+        commonl.data_dump_recursive(r, prefix = target.id)
 
-        else:  # verbosity >= 2:
-            r = { target.id: dict(state = state, substate = substate,
-                                  components = components) }
-            json.dump(r, sys.stdout, skipkeys = True, indent = 4)
-            print(",")
-        sys.stdout.flush()
+    else:  # verbosity >= 2:
+        r = { target.id: dict(state = state, substate = substate,
+                              components = components) }
+        json.dump(r, sys.stdout, skipkeys = True, indent = 4)
+        print(",")
+    sys.stdout.flush()
 
+
+def _cmdline_power_list(cli_args: argparse.Namespace):
 
     return tcfl.ui_cli.run_fn_on_each_targetspec(
         _power_list_by_target, cli_args, cli_args,
