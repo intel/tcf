@@ -453,12 +453,11 @@ function terminal_create(div_id, targetid, terminal) {
         let read_information_d = await terminal_get_content(
             term, targetid, terminal, bytes_read_so_far);
 
+        let tmp_terminal_generation = 0;
+        let max_bytes_read = 0;
         if ( 'stream-gen-offset' in read_information_d ) {
-            let tmp_terminal_generation = read_information_d['stream-gen-offset'].split(' ')[0];
-            let max_bytes_read = read_information_d['stream-gen-offset'].split(' ')[1];
-        } else {
-            let tmp_terminal_generation = 0;
-            let max_bytes_read = 0;
+            tmp_terminal_generation = read_information_d['stream-gen-offset'].split(' ')[0];
+            max_bytes_read = read_information_d['stream-gen-offset'].split(' ')[1];
         }
 
         let bytes_label = document.getElementById('console-read-bytes-' + terminal);
