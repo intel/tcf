@@ -324,8 +324,8 @@ if __name__ == "__main__":
 
     # extra stuff that is not adding to the API, just to the command
     # line interface
-    import tcfl.target_ext_alloc_ui
-    tcfl.target_ext_alloc_ui._cmdline_setup(arg_subparsers)
+    import tcfl.ui_cli_alloc_monitor
+    tcfl.ui_cli_alloc_monitor._cmdline_setup(arg_subparsers)
 
     import tcfl.ui_cli_testcases
     tcfl.ui_cli_testcases._cmdline_setup(arg_subparsers)
