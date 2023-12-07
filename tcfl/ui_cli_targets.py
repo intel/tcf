@@ -293,8 +293,13 @@ def _cmdline_target_disable(cli_args: argparse.Namespace):
 
 
 def _target_property_set(target, cli_args):
+    log = logger.getChild(target.id)
+    tcfl.ui_cli.logger_verbosity_from_cli(log, cli_args)
     value = commonl.cmdline_str_to_value(cli_args.value)
-    target.property_set(cli_args.property, value)
+    r = target.property_set(cli_args.property, value)
+    log.warning(f"set property '{cli_args.property}' to"
+                f" {type(value).__name__}:{value}: {r=}")
+    return r
 
 def _cmdline_target_property_set(cli_args: argparse.Namespace):
 
