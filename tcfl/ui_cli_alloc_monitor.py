@@ -8,8 +8,10 @@
 Alloc utilities that are UI specific and need extra dependencies, we
 only import if we use
 """
+import argparse
 import bisect
 import collections
+import logging
 import json
 import sys
 
@@ -18,9 +20,12 @@ import requests.exceptions
 
 import tcfl.tc
 import tcfl.ttb_client
+import tcfl.ui_cli
 from . import msgid_c
 
-def _cmdline_alloc_monitor(args):
+logger = logging.getLogger("alloc-monitor")
+
+def _cmdline_alloc_monitor(cli_args: argparse.Namespace):
 
     try:
         # yup, import here so we only do it if we need it. Lots of
@@ -88,17 +93,16 @@ def _cmdline_alloc_monitor(args):
 
     class _model_c:
 
-        def __init__(self, servers, targets):
+        def __init__(self, targets):
             self.targets = targets
-            self.servers = servers
             self.max_waiters = 30
 
         def get_content(self):
 
-            for rtb in self.servers:
+            for server_url, server in tcfl.server_c.servers.items():
                 try:
                     # FIXME: list only for a given set of targets
-                    r = rtb.send_request(
+                    r = server.send_request(
                         "GET", "targets/",
                         data = {
                             'projection': json.dumps([ "_alloc*" ])
@@ -167,19 +171,21 @@ def _cmdline_alloc_monitor(args):
 
 
     with msgid_c("cmdline"):
-        servers = set()
-        targetl = tcfl.ttb_client.cmdline_list(args.target, args.all)
-        targets = collections.OrderedDict()
+        import tcfl.targets
+        tcfl.targets.setup_by_spec(
+            cli_args.target,
+            verbosity = tcfl.ui_cli.logger_verbosity_from_cli(logger, cli_args),
+            targets_all = cli_args.all)
 
         # to use fullid, need to tweak the refresh code to add the aka part
-        for rt in sorted(targetl, key = lambda x: x['id']):
-            target_name = rt['id']
-            targets[target_name] = \
-                tcfl.tc.target_c.create_from_cmdline_args(
-                    # load no extensions, not needed, plus faster
-                    args, target_name, extensions_only = [])
-            servers.add(targets[target_name].rtb)
-        model = _model_c(servers, targets)
+        targets = collections.OrderedDict()
+        for targetid in tcfl.targets.discovery_agent.rts:
+            targets[targetid] = tcfl.tc.target_c.create(
+                targetid,
+                target_discovery_agent = tcfl.targets.discovery_agent)
+
+        # tcfl.server_c.servers is a dict keyed by URL
+        model = _model_c(targets)
 
         def _run_alloc_monitor(screen, scene):
             scenes = [
@@ -207,13 +213,6 @@ def _cmdline_setup(arg_subparsers):
     ap = arg_subparsers.add_parser(
         "alloc-monitor",
         help = "Monitor the allocations current in the system")
-    ap.add_argument(
-        "-a", "--all", action = "store_true", default = False,
-        help = "Consider also disabled targets")
-    ap.add_argument(
-        "target", metavar = "TARGETSPEC", nargs = "*",
-        action = "store", default = None,
-        help = "Target's names or a general target specification "
-        "which might include values of tags, etc, in single quotes (eg: "
-        "'zephyr_board and not type:\"^qemu.*\"'")
+    tcfl.ui_cli.args_verbosity_add(ap)
+    tcfl.ui_cli.args_targetspec_add(ap)
     ap.set_defaults(func = _cmdline_alloc_monitor)
