@@ -396,11 +396,21 @@ class pgm_c(ttbl.images.flash_shell_cmd_c):
         # now set it for flash_shell_cmd_c.flash_start()
         self.cmdline = cmdline
 
+        if self.tcp_port:	            # Connect to the right instance
+            cmdline = [
+                self.path_jtagconfig,
+                "--addserver", f"localhost:{self.tcp_port}", "",  # empty password
+            ]
+            target.log.info("running per-config server: %s", " ".join(cmdline))
+            subprocess.check_output(
+                cmdline, shell = False, stderr = subprocess.STDOUT)
         if self.jtagconfig:
+            # once the --addserver has been run, device_path addresses
+            # by server and cable numbers, so there are no
+            # identification issues
             for option, value in self.jtagconfig.items():
                 cmdline = [
                     self.path_jtagconfig,
-                    "--addserver", f"localhost:{self.tcp_port}", "",  # empty password
                     "--setparam",
                     device_path,
                     option, value
