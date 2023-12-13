@@ -80,14 +80,12 @@ class extension(tc.target_extension_c):
         target.report_info(f"{image}: reading image", dlevel = 1)
 
         with io.open(file_name, "wb+") as of, \
-             contextlib.closing(self.target.ttbd_iface_call("images",
-                                                            "flash",
-                                                            method = "GET",
-                                                            stream = True,
-                                                            raw = True,
-                                                            image=image,
-                                                            image_offset=image_offset,
-                                                            read_bytes=read_bytes)) as r:
+             contextlib.closing(
+                self.target.ttbd_iface_call(
+                    "images", "flash", method = "GET", stream = True,
+                    raw = True, image = image, image_offset = image_offset,
+                    timeout = 480, read_bytes = read_bytes)
+             ) as r:
             # http://docs.python-requests.org/en/master/user/quickstart/#response-content
             chunk_size = 4096
             total = 0
