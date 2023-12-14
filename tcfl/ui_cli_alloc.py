@@ -287,6 +287,73 @@ def _aka_allocid_extract(allocid: str):
 
 
 
+def _guest_add(_server_name: str, server: tcfl.server_c,
+               _cli_args: argparse.Namespace, allocid: str,
+               guests: list):
+
+    for guest in guests:
+        try:
+            r = server.send_request("PATCH", "allocation/%s/%s"
+                                    % (allocid, guest))
+            logger.info("%s: added guest %s to allocation %s",
+                        server.url, guest, allocid)
+            return r
+        except Exception as e:
+            if "invalid allocation" not in str(e):
+                raise
+            # convert this condition so we don't trigger error
+            # handling in run_fn_on_each_server--we have basically
+            # tried every server for the allocid and if it says I
+            # can't find it, it's fine
+            return None
+
+
+def _cmdline_guest_add(cli_args: argparse.Namespace):
+    import tcfl.servers
+
+    verbosity = tcfl.ui_cli.logger_verbosity_from_cli(logger, cli_args)
+    tcfl.servers.subsystem_setup()
+
+    if not tcfl.server_c.servers:
+        logger.error("E: no servers available? did you discover?")
+        return 1
+
+    server, allocid = _aka_allocid_extract(cli_args.allocid)
+    if server:
+        servers = { server.url: server }
+    else:
+        servers = tcfl.server_c.servers
+
+    retval, r = tcfl.ui_cli.run_fn_on_each_server(
+        servers,
+        _guest_add, cli_args, allocid, cli_args.guests)
+
+    # r is not a dict { SERVERURL : ( GUESTLIST, EXCEPTION, TRACEBACK
+    # ) } however, the allocation IDs are unique to a server, so in
+    # theory we should get an entry for only one server--in case we
+    # expand this in the future to dif server, same allocid, we scan
+    # them all
+    guests = []
+    invalid_allocations = 0
+    for serverurl, ( data, ex, _ex_traceback ) in list(r.items()):
+        if ex:			# reported by tcfl.ui_cli.run_fn_on_each_server
+            del r[serverurl]
+        if data == None:	# from _guest_add()
+            invalid_allocations += 1
+        elif isinstance(data, dict):
+            pass		# we are good
+        else:
+            logger.error(f"%s: unknown response type: %s, expected list[str]",
+                           serverurl, type(guestlist))
+
+    if invalid_allocations == len(r):
+        # all failed with invalid allocation, so it's an invalid alloc
+        logger.error(f"{cli_args.allocid}: invalid allocation")
+        return 1
+    return retval
+
+
+
 def _guests_list(_server_name: str, server: tcfl.server_c,
                  _cli_args: argparse.Namespace, allocid: str):
     try:
@@ -418,6 +485,27 @@ def cmdline_setup_intermediate(arg_subparser):
         "-f", "--force", action = "store_true", default = False,
         help = "Force release of a target you don't own (only admins)")
     ap.set_defaults(func = _cmdline_release)
+
+
+    ap = arg_subparser.add_parser(
+        "guest-add",
+        help = "Add a guest to an allocation so they can use the"
+        " targets the same way as the owner")
+    tcfl.ui_cli.args_verbosity_add(ap)
+    ap.add_argument(
+        "--parallelization-factor",
+        action = "store", type = int, default = -4,
+        help = "(advanced) parallelization factor")
+    ap.add_argument(
+        "allocid", metavar = "[SERVERAKA/]ALLOCATIONID",
+        action = "store", default = None,
+        help = "Allocation IDs to which to add guest to")
+    ap.add_argument(
+        "guests", metavar = "USERNAME", nargs = "+",
+        action = "store", default = None,
+        help = "Name of guest to add; note this is the names"
+        " the users logged in with")
+    ap.set_defaults(func = _cmdline_guest_add)
 
 
     ap = arg_subparser.add_parser(
