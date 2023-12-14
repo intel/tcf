@@ -597,6 +597,12 @@ async function terminal_send_keystroke(targetid, terminal, keystroke) {
 /**
  * Enable or disable a console given its name and targetid
  *
+ * If possible it will also change the state label of the console, this label
+ * should have the id `console-state-label-{{terminal}}`. And it will
+ * disabled/enable the corect button to either enable or disable the console.
+ * (id: `console-enable-button-{{terminal}}` and
+ * `console-disable-button-{{terminal}}`)
+ *
  * @param {targetid} str -> target id from where you want enable/disable the
  *      consoles
  * @param {terminal} str -> name console you want to enable
@@ -606,6 +612,10 @@ async function terminal_send_keystroke(targetid, terminal, keystroke) {
  * @return {void}
  */
 async function js_console_enable(targetid, terminal, enable) {
+    $('#loading').append(
+        '<label>' + enable + ' console ' + terminal + ':<br></label><progress id="progress-bar" aria-label="Content loading…"></progress></div>' +
+        '<br>'
+    );
     let data = new URLSearchParams();
     data.append('component', terminal);
 
@@ -620,12 +630,29 @@ async function js_console_enable(targetid, terminal, enable) {
             'there was an issue enabling or disabling the console:' +
             terminal + '\n' + b
         );
+        $('#loading').empty();
+        $('#loading').append(
+            '<b><label style="color: red;">FAIL</label></b>'
+        );
         return
     }
 
-    /* FIXME we need to add a better way to display this type of messages to
-     * the user, so we do not rely on alerts */
-    alert('SUCCESS; ' + terminal + ' ' + enable + 'd');
+    let label_console_state = document.getElementById('console-state-label-' + terminal);
+    let button_console_enable = document.getElementById('console-enable-button-' + terminal);
+    let button_console_disable = document.getElementById('console-disable-button-' + terminal);
+    if (enable == 'enable'){
+        label_console_state.textContent = 'enable';
+        label_console_state.style.color = 'green';
+        button_console_enable.disabled = true;
+        button_console_disable.disabled = false;
+    } else {
+        label_console_state.textContent = 'disable';
+        label_console_state.style.color = 'red';
+        button_console_enable.disabled = false;
+        button_console_disable.disabled = true;
+    }
+    $('#loading').empty();
+
 }
 
 
