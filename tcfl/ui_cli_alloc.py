@@ -106,6 +106,9 @@ def _cmdline_alloc_ls(cli_args: argparse.Namespace):
                 ])
             elif verbosity == 2:
                 commonl.data_dump_recursive(data, allocid,)
+    if not table:
+        logging.error("No allocations found")
+        return 1
 
     if verbosity == 0:
         # To try to be more or less responsive to the terminal size,
