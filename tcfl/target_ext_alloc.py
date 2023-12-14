@@ -334,14 +334,6 @@ def _rtb_allocid_extract(allocid):
         return None, allocid
     return None, allocid
 
-def _guests_add(rtb, allocid, guests):
-    for guest in guests:
-        try:
-            rtb.send_request("PATCH", "allocation/%s/%s"
-                             % (allocid, guest))
-        except requests.HTTPError as e:
-            logging.warning("%s: can't add guest %s: %s",
-                            allocid, guest, e)
 
 
 def _guests_remove(rtb, allocid, guests):
@@ -356,21 +348,6 @@ def _guests_remove(rtb, allocid, guests):
         except requests.HTTPError as e:
             logging.error("%s: can't remove guest %s: %s",
                           allocid, guest, e)
-
-
-def _cmdline_guest_add(args):
-    with msgid_c("cmdline"):
-        rtb, allocid = _rtb_allocid_extract(args.allocid)
-        if rtb == None:
-            # Unknown server, so let's try them all ... yeah,
-            # collateral damage might happen--but then, you can
-            # only delete yours
-            for rtb in tcfl.ttb_client.rest_target_brokers.values():
-                _guests_add(rtb, allocid, args.guests)
-        else:
-            _guests_add(rtb, allocid, args.guests)
-
-
 
 
 def _cmdline_guest_remove(args):
@@ -468,18 +445,6 @@ def _cmdline_setup(arg_subparsers):
 
 def _cmdline_setup_intermediate(arg_subparsers):
 
-    ap = arg_subparsers.add_parser(
-        "guest-add",
-        help = "Add a guest to an allocation")
-    ap.add_argument(
-        "allocid", metavar = "[SERVER/]ALLOCATIONID",
-        action = "store", default = None,
-        help = "Allocation IDs to which to add guest to")
-    ap.add_argument(
-        "guests", metavar = "USERNAME", nargs = "+",
-        action = "store", default = None,
-        help = "Name of guest to add")
-    ap.set_defaults(func = _cmdline_guest_add)
 
     ap = arg_subparsers.add_parser(
         "guest-rm",
