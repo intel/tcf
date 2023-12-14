@@ -384,6 +384,58 @@ async function js_images_flash(targetid, select_id, image_type, suffix) {
     window.location.reload()
 }
 
+
+/*
+* upload file for flashing `image_type` from input with id:
+* flash_file_input_<image_type>
+*
+* note: this is mostly a helping function for func:js_images_flash. The
+* workflow is calling this function to upload the image, and then continue in
+* that function to send the flashing request
+*
+* @param {targetid} str -> target id to which you want to flash
+* @param {image_type} str ->  the type of firmware you want to flash
+*
+*/
+async function js_images_upload_from_file(targetid, image_type) {
+    let fileInput = document.getElementById('flash_file_input_' + image_type);
+    let file = fileInput.files[0];
+
+    if (!file) {
+        alert('no file!')
+        return;
+    }
+
+    let form_data = new FormData();
+    let filename = targetid + "." + image_type +  Date.now();
+    form_data.append('file_path', filename);
+    form_data.append('file', file);
+
+    let r = await fetch('/ttb-v2/targets/' + targetid + '/store/file', {
+        method: 'POST',
+        body: form_data,
+    })
+
+    let b = await r.text();
+
+    if (r.status == 401) {
+        alert(
+            'oops, seems that you are not logged in. Please log in to' +
+            ' acquire machines (top right corner)'
+        );
+        return
+    }
+
+    if (!r.ok) {
+        alert(
+            'something went wrong: ' + b
+        );
+        return
+    }
+
+    return filename
+}
+
 /**
  * toggle visibilty of div
  *
@@ -796,5 +848,28 @@ function create_or_destroy_terminal_div(wrapper_id, div_id) {
     if (wrapper.style.display === "none") {
         $('#' + div_id).empty();
         return;
+    }
+}
+
+
+/**
+ * make visible the "upload a file" div per image_type when selecting the option
+ * `upload` from the dropdown menu.
+ *
+ * The way you use this is basically by adding it as an onchange func in the
+ * select:
+ * <select  onchange='flash_images_onchange_select("{{image_type}}")'>
+ *
+ * Like the toggle func, this will change the visibility of the div
+ *
+ */
+function flash_images_onchange_select(image_type) {
+    let file_input_contiainer = document.getElementById('flash_file_input_div_' + image_type);
+    let flash_images_select = document.getElementById('flash_images_version_for_component_' + image_type);
+
+    if (flash_images_select.value === 'upload') {
+        file_input_contiainer.style.display = 'block';
+    } else {
+        file_input_contiainer.style.display = 'none';
     }
 }
