@@ -293,7 +293,11 @@ def run_fn_on_each_server(
         if exception != None:
             msg = str(exception.args[0])
             if cli_args.traces:
-                logger.error("%s: %s:\n" + "".join(ex_tb), server_name, msg)
+                # need to do like this otherwise if ex_tb has %s, it
+                # gets confused; so yeah we just escape it %. Better way?
+                logger.error("%s: %s:\n   "
+                             + "   ".join(ex_tb).replace("%", "%%"),
+                             server_name, msg)
             else:
                 logger.error("%s: %s", server_name, msg)
 
