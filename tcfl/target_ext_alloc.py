@@ -344,10 +344,6 @@ def _guests_add(rtb, allocid, guests):
                             allocid, guest, e)
 
 
-def _guests_list(rtb, allocid):
-    r = rtb.send_request("GET", "allocation/%s" % allocid)
-    print("\n".join(r.get('guests', [])))
-
 def _guests_remove(rtb, allocid, guests):
     if not guests:
         # no guests given, remove'em all -- so list them first
@@ -374,19 +370,6 @@ def _cmdline_guest_add(args):
         else:
             _guests_add(rtb, allocid, args.guests)
 
-
-
-def _cmdline_guest_list(args):
-    with msgid_c("cmdline"):
-        rtb, allocid = _rtb_allocid_extract(args.allocid)
-        if rtb == None:
-            # Unknown server, so let's try them all ... yeah,
-            # collateral damage might happen--but then, you can
-            # only delete yours
-            for rtb in tcfl.ttb_client.rest_target_brokers.values():
-                _guests_list(rtb, allocid)
-        else:
-            _guests_list(rtb, allocid)
 
 
 
@@ -497,15 +480,6 @@ def _cmdline_setup_intermediate(arg_subparsers):
         action = "store", default = None,
         help = "Name of guest to add")
     ap.set_defaults(func = _cmdline_guest_add)
-
-    ap = arg_subparsers.add_parser(
-        "guest-ls",
-        help = "list guests in an allocation")
-    ap.add_argument(
-        "allocid", metavar = "[SERVER/]ALLOCATIONID",
-        action = "store", default = None,
-        help = "Allocation IDs to which to add guest to")
-    ap.set_defaults(func = _cmdline_guest_list)
 
     ap = arg_subparsers.add_parser(
         "guest-rm",
