@@ -794,7 +794,6 @@ async function buttons_state_update_for_all_components(targetid) {
 function create_or_destroy_terminal_div(wrapper_id, div_id) {
     let wrapper = document.getElementById(wrapper_id);
     if (wrapper.style.display === "none") {
-        console.log('im here')
         $('#' + div_id).empty();
         return;
     }
