@@ -301,6 +301,10 @@ async function js_alloc_guest_remove(allocid, selector_id) {
 /*
 * make a flashing call given a version and an image type
 *
+* note: if the `version` gotten from the select is `upload` we will call the
+* upload js_images_upload_from_file function to upload the file  and then do
+* the request with that filename
+*
 * @param {targetid} str -> target id to which you want to flash
 * @param {select_id} str -> select tag html id where the paths for flashing are
 * @param {image_type} str ->  the type of firmware you want to flash, if you
@@ -324,7 +328,7 @@ async function js_images_flash(targetid, select_id, image_type, suffix) {
         '<br>'
     );
 
-    let images = new Object();
+    var images = new Object();
     if (select_id != 'flash_images_version_for_all') {
         images[image_type] = fullpath;
     } else {
@@ -341,8 +345,26 @@ async function js_images_flash(targetid, select_id, image_type, suffix) {
         });
     }
 
-    images = JSON.stringify(images);
 
+    // if the option in the select version dropdown was upload, then let us
+    // upload the file.  This will be the new value of the images dict meaning
+    // the images dict would look something like
+    // images = {
+    //     'fw': 'file.just.uploaded'
+    // }
+    //
+    // luckily for us, the flashing request is the same, but just with this
+    // new filename.
+    if (fullpath === 'upload') {
+        images = new Object();
+        let filename = await js_images_upload_from_file(targetid, image_type)
+        images[image_type] = filename;
+        $('#loading').append(
+            '<p style="color: green;">file uploaded successfully<p>'
+        );
+    }
+
+    images = JSON.stringify(images);
     let data = new URLSearchParams();
     data.append('images', images);
 
