@@ -487,6 +487,17 @@ def _target(targetid):
         _get_images_paths(target, inventory, kws)
 
     # get console information for target.html to render
+    # example:
+    # consoles = {
+    #   'ttyS0': {
+    #       'instrument': 'hbq4',
+    #       'check_ts': '1702313360.2028477',
+    #       'crlf':  '\r ',
+    #       'generation': '1702312127 ',
+    #       'state':  True,
+    #   },
+    #   'other_console': {
+    #   ...more
     consoles = dict(inventory.get('interfaces', {}).get('console', {}))
 
     return flask.render_template(
