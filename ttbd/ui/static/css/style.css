@@ -298,6 +298,12 @@ form {
     border-color: #8c8c8c;
 }
 
+button:disabled {
+	cursor: not-allowed;
+    opacity: 0.65
+}
+
+
 .toolbox > .subsection > button:disabled {
 	cursor: not-allowed;
     opacity: 0.65
