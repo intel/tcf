@@ -17,7 +17,6 @@ learn more about them):
 """
 
 import argparse
-import json
 import logging
 import os
 import sys
@@ -60,6 +59,7 @@ def _cmdline_alloc_ls(cli_args: argparse.Namespace):
         pprint.pprint(allocations)
         return
     elif verbosity == 4:
+        import json
         print(json.dumps(allocations, skipkeys = True, indent = 4))
         return
 
