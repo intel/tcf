@@ -431,6 +431,7 @@ class cisco_c(router_c):
             # set the port to mode trunk, so multiple VLANs can be
             # routed over it.
             "switchport mode trunk",
+            "no shut",	# actully enable it
             # done!
             "exit",
         )
