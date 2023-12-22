@@ -323,46 +323,6 @@ def _cmdline_alloc_targets(args):
 
 
 
-def _rtb_allocid_extract(allocid):
-    rtb = None
-    if '/' in allocid:
-        server_aka, allocid = allocid.split('/', 1)
-        for rtb in tcfl.ttb_client.rest_target_brokers.values():
-            if rtb.aka == server_aka:
-                return rtb, allocid
-        logging.error("%s: unknown server name", server_aka)
-        return None, allocid
-    return None, allocid
-
-
-
-def _guests_remove(rtb, allocid, guests):
-    if not guests:
-        # no guests given, remove'em all -- so list them first
-        r = rtb.send_request("GET", "allocation/%s" % allocid)
-        guests = r.get('guests', [])
-    for guest in guests:
-        try:
-            r = rtb.send_request("DELETE", "allocation/%s/%s"
-                                 % (allocid, guest))
-        except requests.HTTPError as e:
-            logging.error("%s: can't remove guest %s: %s",
-                          allocid, guest, e)
-
-
-def _cmdline_guest_remove(args):
-    with msgid_c("cmdline"):
-        rtb, allocid = _rtb_allocid_extract(args.allocid)
-        if rtb == None:
-            # Unknown server, so let's try them all ... yeah,
-            # collateral damage might happen--but then, you can
-            # only delete yours
-            for rtb in tcfl.ttb_client.rest_target_brokers.values():
-                _guests_remove(rtb, allocid, args.guests)
-        else:
-            _guests_remove(rtb, allocid, args.guests)
-
-
 try:
     username = getpass.getuser() + "@"
 except KeyError:
@@ -444,18 +404,4 @@ def _cmdline_setup(arg_subparsers):
 
 
 def _cmdline_setup_intermediate(arg_subparsers):
-
-
-    ap = arg_subparsers.add_parser(
-        "guest-rm",
-        help = "Remove a guest from an allocation")
-    commonl.argparser_add_aka(arg_subparsers, "guest-rm", "guest-remove")
-    ap.add_argument(
-        "allocid", metavar = "[SERVER/]ALLOCATIONID",
-        action = "store", default = None,
-        help = "Allocation IDs to which to add guest to")
-    ap.add_argument(
-        "guests", metavar = "USERNAME", nargs = "*",
-        action = "store", default = None,
-        help = "Name of guest to remove (all if none given)")
-    ap.set_defaults(func = _cmdline_guest_remove)
+    pass
