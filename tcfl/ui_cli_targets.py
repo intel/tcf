@@ -332,7 +332,7 @@ def _cmdline_setup(arg_subparsers):
     import tcfl.ui_cli
 
     ap = arg_subparsers.add_parser(
-        f"ls{tcfl.ui_cli.commands_new_suffix}",
+        "ls",
         help = "List targets by name or search pattern")
     tcfl.ui_cli.args_verbosity_add(ap)
     tcfl.ui_cli.args_targetspec_add(ap)
