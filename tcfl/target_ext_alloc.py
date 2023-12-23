@@ -257,25 +257,34 @@ def _alloc_hold(rtb, allocid, state, ts0, max_hold_time, keep_alive_period):
         state = new_state
 
 def _cmdline_alloc_targets(args):
+
+    import tcfl.targets
+
+    verbosity = args.verbosity - args.quietosity
+    tcfl.targets.setup_by_spec(
+        args.target, verbosity = verbosity,
+        targets_all = args.all)
+
     with msgid_c("cmdline"):
-        targetl = tcfl.ttb_client.cmdline_list(args.target, args.all)
+        # FIXME: this is a hack until we cleanup this function
+        targetl = tcfl.rts.values()
         if not targetl:
             logging.error("No targets could be used (missing? disabled?)")
             return
         targets = set()
-        rtbs = set()
+        servers = set()
 
         # to use fullid, need to tweak the refresh code to add the aka part
         tl = []
         for rt in sorted(targetl, key = lambda x: x['fullid']):
             targets.add(rt['id'])
-            rtbs.add(rt['rtb'])
-            tl.append(f"{rt['rtb'].aka}/{rt['id']}")
-        if len(rtbs) > 1:
+            servers.add(rt['server'])
+            tl.append(rt['fullid'])
+        if len(servers) > 1:
             raise tcfl.error_e(
                 f"Targets span more than one server: {' '.join(tl)}",
                 { "targets": tl })
-        rtb = list(rtbs)[0]
+        server = tcfl.server_c.servers[list(servers)[0]]
         allocid = args.allocid
         try:
             groups = { "group": list(targets) }
@@ -292,7 +301,7 @@ def _cmdline_alloc_targets(args):
                 if not extra_data:
                     extra_data = None
                 allocid, state, group_allocated = \
-                    _alloc_targets(rtb, groups, obo = args.obo,
+                    _alloc_targets(server, groups, obo = args.obo,
                                    preempt = args.preempt,
                                    queue = args.queue, priority = args.priority,
                                    reason = args.reason,
@@ -332,6 +341,8 @@ except KeyError:
 
 
 def _cmdline_setup(arg_subparsers):
+    import tcfl.ui_cli
+
     ap = arg_subparsers.add_parser(
         "acquire",
         help = "Allocate targets for exclusive use")
@@ -400,6 +411,7 @@ def _cmdline_setup(arg_subparsers):
         "target", metavar = "TARGETSPEC", nargs = "+",
         action = "store", default = None,
         help = "Target's names, all in the same server")
+    tcfl.ui_cli.args_verbosity_add(ap)
     ap.set_defaults(func = _cmdline_alloc_targets)
 
 
