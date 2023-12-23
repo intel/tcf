@@ -4,7 +4,26 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 #
+"""TCF client library
+==================
 
+Utilities for connecting to ttbd servers and managing the targets exposed by them
+
+
+Debug support
+-------------
+
+- *SSL tracing*: invoke any thing that uses this library with the
+  environment variable *SSLKEYLOGFILE* defined to a file name where to
+  log SSL traffic so it can be analyzed with tools such as wireshark
+
+  - https://www.google.com/url?sa=t&rct=j&q=&esrc=s&source=web&cd=&cad=rja&uact=8&ved=2ahUKEwjeuoy3q6SDAxXwBTQIHY5eDLUQFnoECBAQAQ&url=https%3A%2F%2Fsslkeylog.readthedocs.io%2F&usg=AOvVaw0AlYxgLSaopOJpermTyvNN&opi=89978449
+
+  - https://www.google.com/url?sa=t&rct=j&q=&esrc=s&source=web&cd=&cad=rja&uact=8&ved=2ahUKEwjeuoy3q6SDAxXwBTQIHY5eDLUQFnoECBIQAQ&url=https%3A%2F%2Fmy.f5.com%2Fmanage%2Fs%2Farticle%2FK50557518&usg=AOvVaw3paDq2czEK4CQhE0keC4Nb&opi=89978449
+
+  - https://www.google.com/url?sa=t&rct=j&q=&esrc=s&source=web&cd=&cad=rja&uact=8&ved=2ahUKEwih4bHLq6SDAxVRNzQIHZjdAHwQFnoECBYQAQ&url=https%3A%2F%2Fwww.comparitech.com%2Fnet-admin%2Fdecrypt-ssl-with-wireshark%2F&usg=AOvVaw16YzciaANpU9FnBj8RaZkv&opi=89978449
+
+"""
 import collections
 import concurrent.futures
 import datetime
@@ -832,6 +851,13 @@ def inventory_keys_fix(d):
 
 
 import tcfl.config		# FIXME: this is bad, will be removed
+
+
+# Export all SSL keys to a file, so we can analyze traffic on
+# wireshark & friends
+if 'SSLKEYLOGFILE' in os.environ:
+    import sslkeylog
+    sslkeylog.set_keylog(os.environ['SSLKEYLOGFILE'])
 
 
 @commonl.lru_cache_disk(
