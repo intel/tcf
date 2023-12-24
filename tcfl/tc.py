@@ -1111,7 +1111,8 @@ class target_c(reporter_c):
         # core code so we use it
         self.server = tcfl.server_c.servers[self.server_url]
         # FIXME: this is here until we transition away all of the
-        # ttb_client sublibrary
+        # ttb_client sublibrary -- there are still a lot of users
+        # around the code that need to be translated
         self.rtb = tcfl.ttb_client.rest_target_brokers[self.server_url]
         #: (short) id of this target
         self.id = rt['id']
@@ -2437,7 +2438,7 @@ class target_c(reporter_c):
         while True:
             retry_count += 1
             try:
-                return self.rtb.send_request(
+                return self.server.send_request(
                     method,
                     f"targets/{self.id}/{interface}/{call}",
                     stream = stream, raw = raw, files = files,
@@ -2489,7 +2490,7 @@ class target_c(reporter_c):
                                   # targetid, it's all we usually need
                                   target = self,
                                   targetid = self.fullid,
-                                  server = str(self.rtb),
+                                  server = str(self.server.url_safe),
                                   error = str(e)
                               )) from e
 
