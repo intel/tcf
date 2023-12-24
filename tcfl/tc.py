@@ -1059,7 +1059,7 @@ class target_c(reporter_c):
     """A remote target that can be manipulated
 
     :param dict rt: remote target descriptor (dictionary) as returned
-        by :py:func:`tcfl.ttb_client.rest_target_find_all` and others.
+        by :py:mod:`tcfl.targets`.
     :param tc_c tescase: testcase descriptor to which this target
         instance will be uniquely assigned.
 
@@ -1104,7 +1104,15 @@ class target_c(reporter_c):
         #: Remote tags of this target
         self.rt = rt
         # Mind those static TCs, local target has no rtb
-        self.rtb = rt.get('rtb', None)
+        self.server_url = rt.get('server', None)
+        # transition path to new core client code in tcfl,
+        # tcfl.servers + tcfl.targets; if there is a 'server'
+        # keyword, it means this has been discovered with the new
+        # core code so we use it
+        self.server = tcfl.server_c.servers[self.server_url]
+        # FIXME: this is here until we transition away all of the
+        # ttb_client sublibrary
+        self.rtb = tcfl.ttb_client.rest_target_brokers[self.server_url]
         #: (short) id of this target
         self.id = rt['id']
         #: Full id of this target
@@ -2240,8 +2248,13 @@ class target_c(reporter_c):
                extensions_only = None,
                # FIXME: add tcfl.targets.discovery_agent_c once import hell is fixed
                target_discovery_agent = None):
-        """
-        Create a :class:`tcfl.tc.target_c` object for a direct test
+        """Create a :class:`tcfl.tc.target_c` object for a direct test
+
+        This can be used as:
+
+        >>> import tcfl.targets
+        >>> tcfl.targets.subsystem_setup()
+        >>> tcfl.tc.target_c.create("NAME")
 
         :param str target_name: name of the target; this can be just
           an ID or a fullid (SERVER/ID).
@@ -2258,31 +2271,29 @@ class target_c(reporter_c):
           extensions listed by name.
 
         :param tcfl.targets.discovery_agent_c target_discovery_agent:
-          (optional; default *None*) use new target discovery
-          API. This can be used as:
+          (optional; default *None*, the global discovery agent)
+          use an specifc target discovery agent:
 
-          >>> import tcfl.config
+          >>> import tcfl.servers
           >>> import tcfl.targets
-          >>> tcfl.config.setup()
-          >>> tcfl.targets.subsystem_setup()
-          >>> tcfl.tc.target_c.create("NAME", target_discovery_agent = tcfl.targets.discovery_agent)
-
-          this will evolve in the future to be less cumbersome as we
-          move everything to the new API by default.
+          >>> tcfl.servers.subsystem_setup()
+          >>> discovery_agent = discovery_agent_c(*args, projections = projections, **kwargs)
+          >>> discovery_agent.update_start()
+          >>> discovery_agent.update_complete(update_globals = True)
+          >>> tcfl.tc.target_c.create("NAME", target_discovery_agent = discovery_agent)
 
         :returns: instance of :class:`tcfl.tc.target_c` representing
           said target, if it is available.
+
         """
-        if target_discovery_agent == None:	# COMPAT
-            _rtb, rt = ttb_client._rest_target_find_by_id(target_name)
-            target = target_c(rt, tc_global, None, "target",
-                              extensions_only = extensions_only)
-        else:
-            rt = target_discovery_agent.rts_flat[target_name]
-            rt = dict(rt)	# clone, don't modify original
-            rt['rtb'] = tcfl.ttb_client.rest_target_brokers[rt['rtb']]
-            target = target_c(rt, tc_global, None, "target",
-                              extensions_only = extensions_only)
+        if target_discovery_agent == None:
+            target_discovery_agent = tcfl.targets.discovery_agent
+
+        rt = target_discovery_agent.rts_flat[target_name]
+        rt = dict(rt)	# clone, don't modify original
+        rt['rtb'] = tcfl.ttb_client.rest_target_brokers[rt['rtb']]
+        target = target_c(rt, tc_global, None, "target",
+                          extensions_only = extensions_only)
 
         if iface != None and not iface in target.rt.get('interfaces', []):
             raise RuntimeError("%s: target does not support the %s interface"
@@ -8673,7 +8684,14 @@ def _targets_discover(args, rt_all, rt_selected, ic_selected):
     rt_selected_all = {}
     ic_selected_all = {}
     # List all the targets available
-    rt_all_list = ttb_client.rest_target_find_all(all_targets = args.all)
+    import tcfl.targets
+    tcfl.targets.setup_by_spec(
+        args.target, verbosity = args.verbosity - args.quietosity,
+        targets_all = args.all)
+
+    # HACK to remove old tcfl.ttb_client and plug tcfl.targets; all
+    # this is going to be abandoned with the improved orchestrator
+    rt_all_list = tcfl.targets.discovery_agent.rts.values()
     if not rt_all_list:
         logger.error("WARNING! No targets available")
     for rt in rt_all_list:

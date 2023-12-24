@@ -675,39 +675,3 @@ class rest_target_broker(object, metaclass = _rest_target_broker_mc):
         self.send_request(
             "PUT", "targets/%s/release" % rt['id'],
             data = { 'force': force, 'ticket': ticket })
-
-
-def _rest_target_find_by_id(_target):
-    """
-    Find a target by ID.
-
-    Ignores if the target is disabled or enabled.
-
-    :param str target: Target to locate; it can be a *name* or a full *url*.
-    """
-    # Try to see if it is cached by that ID
-    rt = rest_target_broker.rts_cache.get(_target, None)
-    if rt != None:
-        return rt['rtb'], rt
-    # Dirty messy search
-    for rt in rest_target_broker.rts_cache.values():
-        if rt['id'] == _target:
-            return rt['rtb'], rt
-    raise IndexError("target-id '%s': not found" % _target)
-
-
-def rest_target_find_all(all_targets = False):
-    """
-    Return descriptors for all the known remote targets
-
-    :param bool all_targets: Include or not disabled targets
-    :returns: list of remote target descriptors (each being a dictionary).
-    """
-    if all_targets == True:
-        return list(rest_target_broker.rts_cache.values())
-    targets = []
-    for rt in list(rest_target_broker.rts_cache.values()):
-        if rt.get('disabled', None) != None:
-            continue
-        targets.append(rt)
-    return targets
