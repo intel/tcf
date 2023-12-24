@@ -1742,6 +1742,8 @@ class target_c(reporter_c):
             return default
         return val
 
+
+
     def property_set(self, property_name, value = None):
         """
         Set a property on the target
@@ -1754,8 +1756,8 @@ class target_c(reporter_c):
         self.report_info("setting property '%s' to '%s'"
                          % (property_name, value), dlevel = 4)
         data = { property_name: value }
-        self.rtb.send_request("PATCH", "targets/" + self.id,
-                              json = data, timeout_extra = None)
+        self.server.send_request("PATCH", "targets/" + self.id,
+                                 json = data, timeout_extra = None)
         self.report_info("set property '%s' to '%s'" % (property_name, value),
                          dlevel = 2)
 
