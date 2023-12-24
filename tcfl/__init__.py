@@ -2172,6 +2172,30 @@ class server_c:
 
 
 
+    def release(self, targetid: str, force: bool = False, ticket = ''):
+        """Tell the server to release a target from its allocation
+
+        :param str targetid: name of the target in the server
+
+        :param bool force: (optional; default *False*) force releasing
+          the target even if not the owner
+
+        :param ticket: deprecated and ignored
+
+        Note: this does not remove the allocation the target is in
+        (see allocation removal FIXME:link for that), just removes the
+        target from the allocation.
+        """
+        assert isinstance(targetid, str), \
+            f"targetid: expected str, got {type(targetid)}"
+        assert isinstance(force, bool), \
+            f"force: expected boolstr, got {type(force)}"
+        self.send_request(
+            "PUT", f"targets/{targetid}/release",
+            data = { 'force': force })
+
+
+
 def assert_axes_valid(axes):
     """
     Verify an axes definition as specified in argument *axes* to
