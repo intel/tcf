@@ -2400,30 +2400,17 @@ class target_c(reporter_c):
             assert retry_backoff < retry_timeout, \
                 f"retry_backoff {retry_backoff} has to be" \
                 f" smaller than retry_timeout {retry_timeout}"
-        if self.rtb.server_json_capable:
-            all_json = True
-        else:
-            all_json = False
 
         for k, v in kwargs.items():
-            if all_json:
-                # We need None  passed verbatim so it is not really
-                # passed, so we don't encode it as JSON here--this needs
-                # some cleanup, is quite confusing, to be fair.
-                if v == None: # or isinstance(v, str):
-                    continue
-                kwargs[k] = json.dumps(v)
-            else:
-                if isinstance(v, str):
-                    continue
-                if isinstance(v, (collections.abc.Sequence, collections.abc.Mapping)):
-                    kwargs[k] = json.dumps(v)
+            # We need None  passed verbatim so it is not really
+            # passed, so we don't encode it as JSON here--this needs
+            # some cleanup, is quite confusing, to be fair.
+            if v == None: # or isinstance(v, str):
+                continue
+            kwargs[k] = json.dumps(v)
 
         if component:
-            if all_json == True:
-                kwargs['component'] = json.dumps(component)
-            else:
-                kwargs['component'] = component
+            kwargs['component'] = json.dumps(component)
 
         kwargs['ticket'] = self.mkticket_for_call()
 
