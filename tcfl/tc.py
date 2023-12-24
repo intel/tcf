@@ -1829,42 +1829,6 @@ class target_c(reporter_c):
         """
         self.property_set('disabled', None)
 
-    def thing_plug(self, thing):
-        """
-        Connect a thing described in the target's :attr:`tags`
-        *things* dictionary to the target.
-
-        :param str thing: thing to connect
-        """
-        if isinstance(thing, target_c):
-            thing = thing.id
-        assert isinstance(thing, str)
-        self.report_info("plugging thing '%s'" % thing, dlevel = 3)
-        self.rtb.rest_tb_thing_plug(self.rt, thing)
-        self.report_info("plugged thing '%s'" % thing, dlevel = 2)
-
-    def thing_unplug(self, thing):
-        """
-        Disconnect a thing described in the target's :attr:`tags`
-        *things* dictionary from the target.
-
-        :param str thing: thing to disconnect
-        """
-        if isinstance(thing, target_c):
-            thing = thing.id
-        assert isinstance(thing, str)
-        self.report_info("unplugging thing '%s'" % thing, dlevel = 3)
-        self.rtb.rest_tb_thing_unplug(self.rt, thing)
-        self.report_info("unplugged thing '%s'" % thing, dlevel = 2)
-
-    def thing_list(self):
-        """
-        Return a list of connected things
-        """
-        self.report_info("listing things", dlevel = 3)
-        r = self.rtb.rest_tb_thing_list(self.rt)
-        self.report_info("listed things", dlevel = 2)
-        return r
 
 
     def console_tx(self, data, console = None, detect_context = ""):
