@@ -666,7 +666,3 @@ class rest_target_broker(object, metaclass = _rest_target_broker_mc):
     def rest_tb_target_acquire(self, rt, ticket = '', force = False):
         return self.send_request("PUT", "targets/%s/acquire" % rt['id'],
                                  data = { 'ticket': ticket, 'force': force })
-
-    def rest_tb_target_active(self, rt, ticket = ''):
-        self.send_request("PUT", "targets/%s/active" % rt['id'],
-                          data = { 'ticket': ticket })
