@@ -1696,15 +1696,22 @@ class target_c(reporter_c):
 
     def active(self):
         """
-        Mark an owned target as active
+        Tell the server a target is being used.
 
-        For long running tests, indicate to the server that this
-        target is still active.
+        This way the server doesn't consider it idle and release it.
+
+        You can do this in a more general way sending a keepalive
+        request to the server (FIXME:link).
+
+        :param str targetid: name of the target in the server
         """
         # This one is annoying, so debuglevel it up
         self.report_info("marking as active", dlevel = 3)
-        self.rtb.rest_tb_target_active(self.rt)
+        self.server.send_request(
+            "PUT", f"targets/{self.id}/active")
         self.report_info("marked as active", dlevel = 2)
+
+
 
     def property_get(self, property_name, default = None):
         """
