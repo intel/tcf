@@ -1759,6 +1759,8 @@ class target_c(reporter_c):
         self.report_info("set property '%s' to '%s'" % (property_name, value),
                          dlevel = 2)
 
+
+
     def properties_set(self, d):
         """
         Set a recursive dictionary tree of properties
@@ -1767,9 +1769,11 @@ class target_c(reporter_c):
         """
         assert isinstance(d, dict)
         self.report_info("setting %d properties" % (len(d)), dlevel = 3)
-        self.rtb.send_request("PATCH", "targets/" + self.id,
-                              json = d, timeout_extra = None)
+        self.server.send_request("PATCH", "targets/" + self.id,
+                                 json = d, timeout_extra = None)
         self.report_info("set %d properties" % (len(d)), dlevel = 2)
+
+
 
     def properties_get(self, *projections):
         """
