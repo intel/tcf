@@ -1805,7 +1805,8 @@ class target_c(reporter_c):
             data = { 'projections': json.dumps(projections) }
         else:
             data = None
-        return self.rtb.send_request("GET", "targets/" + self.id, data = data)
+        return self.server.send_request("GET", "targets/" + self.id, data = data)
+
 
 
     def disable(self, reason = 'disabled by the administrator'):
