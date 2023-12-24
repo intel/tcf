@@ -1679,15 +1679,20 @@ class target_c(reporter_c):
     #
     # Actions that operate on the target
     #
-
     def release(self, force: bool = False):
         """
-        Release a target
+        Release a target from its allocation
+
+        :param bool force: (optional; default *False*) force releasing
+          the target even if not the owner
+
+        See :meth:`tcfl.server_c.release`
         """
-        # This one is annoying, so debuglevel it up
         self.report_info("releasing", dlevel = 3)
-        self.rtb.rest_tb_target_release(self.rt, force = force)
+        self.server.release(self.rt['id'], force = force)
         self.report_info("released", dlevel = 2)
+
+
 
     def active(self):
         """
