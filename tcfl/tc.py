@@ -1726,7 +1726,7 @@ class target_c(reporter_c):
         """
         self.report_info("reading property '%s'" % property_name, dlevel = 3)
         data = { "projection": json.dumps([ property_name ]) }
-        r = self.rtb.send_request("GET", "targets/" + self.id, data = data)
+        r = self.server.send_request("GET", "targets/" + self.id, data = data)
         # unfold a.b.c.d which returns { a: { b: { c: { d: value } } } }
         propertyl = property_name.split(".")
         for prop_name in propertyl:
