@@ -2613,6 +2613,7 @@ class target_c(reporter_c):
         for key, val in commonl.dict_to_flat(self.rt,
                                              sort = False, empty_dict = True):
             if key == 'rtb':
+                # DEPRECATED: from old times when rtb was a class object
                 # ok, this is truly a hack -- but we will get ONE value
                 # from target.rt that is the daemon representation, and we
                 # just want its url, which str() does.
@@ -5607,7 +5608,7 @@ class tc_c(reporter_c, metaclass=_tc_mc):
                 target_names = []
                 for tgname in sorted(target_group.targets.keys()):
                     _target = target_group.targets[tgname]
-                    servers.add(_target.rtb.aka)
+                    servers.add(_target.server.aka)
                     if len(_target.rt.get('bsp_models', {})) > 1:
                         target_type = _target.type + ":" + _target.bsp_model
                     else:
@@ -6573,19 +6574,19 @@ class tc_c(reporter_c, metaclass=_tc_mc):
             return
 
         # to use fullid, need to tweak the refresh code to add the aka part
-        rtbs = set()
+        servers = set()
         for target in pending:
-            rtbs.add(target.rtb)
+            servers.add(target.server)
 
         # FIXME: move to a multiple server model
-        if len(rtbs) > 1:
+        if len(servers) > 1:
             raise blocked_e(
                 "Targets span more than one server",
                 dict(
                     targets = [ target.fullid for target in pending ],
-                    servers = [ str(rtb) for rtb in rtbs ],
+                    servers = [ server.url for server in servers ],
                 ))
-        rtb = list(rtbs)[0]
+        server = list(servers)[0]
 
         # If any of the targets declare it takes it a long time to
         # power up, consider that.
@@ -6601,11 +6602,11 @@ class tc_c(reporter_c, metaclass=_tc_mc):
 
         # ensure we have an entry for this server in the list of
         # _allocids we have to remove if we Ctrl-C
-        _allocids.setdefault(rtb, set())
+        _allocids.setdefault(server, set())
         # FIXME: use commonl.progress("")
         register_allocids = set()
         allocid, state, targetids = target_ext_alloc._alloc_targets(
-            rtb,
+            server,
             { "group": [ target.id for target in pending ] },
             obo = self.obo,
             preempt = self.preempt,
@@ -6619,13 +6620,13 @@ class tc_c(reporter_c, metaclass=_tc_mc):
             raise blocked_e("allocation failed, state %s" % state)
         if register_allocids:
             with _allocids_mutex:
-                _allocids[rtb].update(register_allocids)
+                _allocids[server].update(register_allocids)
         self.allocid = allocid
         self.report_info(
             "acquired %s" % allocid,
             dict(
                 targets = targetids,
-                servers = [ str(rtb) for rtb in rtbs ],
+                servers = [ server.url for server in servers ],
             ),
             dlevel = 5)
 
@@ -6642,17 +6643,17 @@ class tc_c(reporter_c, metaclass=_tc_mc):
             self._prefix_update()
             if tc_c.release:
                 with _allocids_mutex:
-                    if allocid in _allocids[rtb]:
+                    if allocid in _allocids[server]:
                         # remove from the Ctrl-C list? it might have been
                         # removed already
-                        _allocids[rtb].remove(allocid)
+                        _allocids[server].remove(allocid)
                 # but just in case do it in the server too
-                target_ext_alloc._delete(rtb, allocid)
+                target_ext_alloc._delete(server, allocid)
                 self.report_info(
                     "released",
                     dict(
                         targets = targetids,
-                        servers = [ str(rtb) for rtb in rtbs ],
+                        servers = [ server.url for server in servers ],
                     ),
                     dlevel = 5)
             else:
@@ -6662,7 +6663,7 @@ class tc_c(reporter_c, metaclass=_tc_mc):
                     "acquired",
                     dict(
                         targets = targetids,
-                        servers = [ str(rtb) for rtb in rtbs ],
+                        servers = [ server.url for server in servers ],
                     ),
                     dlevel = 5)
 
@@ -6701,10 +6702,10 @@ class tc_c(reporter_c, metaclass=_tc_mc):
         servers = collections.defaultdict(dict)
         for target in list(self.targets.values()):
             if not target in skip_targets and target.keep_active:
-                servers[target.rtb][self.allocid] = "active"
+                servers[target.server][self.allocid] = "active"
         # FIXME: paralellize
-        for rtb, allocids in servers.items():
-            rtb.send_request("PUT", "keepalive", json = allocids)
+        for server, allocids in servers.items():
+            server.send_request("PUT", "keepalive", json = allocids)
 
     def _targets_active(self):
         # backwards compat
@@ -8783,16 +8784,16 @@ from . import report_data_json
 _allocids = {}
 _allocids_mutex = threading.Lock()
 
-def _allocid_rtb_keepalive(rtb, allocids):
+def _allocid_rtb_keepalive(server, allocids):
     # send a keepalive to a single server for a list of ALLOCIds
-    logging.info(f"keepalive: {rtb.aka}: allocids {' '.join(allocids)}")
+    logging.info(f"keepalive: {server.aka}: allocids {' '.join(allocids)}")
     data = {}
     for allocid in allocids:
         data[allocid] = "active"
     try:
-        _r = rtb.send_request("PUT", "keepalive", json = data)
+        _r = server.send_request("PUT", "keepalive", json = data)
     except requests.HTTPError as e:
-        logging.error(f"keepalive: {rtb.aka}: error (ignoring): {e}")
+        logging.error(f"keepalive: {server.aka}: error (ignoring): {e}")
 
 
 def _allocids_keepalive_once():
@@ -9073,17 +9074,17 @@ def _run(args):
                 # an user just wanting to cancel to take manual control
                 with _allocids_mutex:
                     allocids_local = dict(_allocids)
-                for rtb in list(allocids_local.keys()):
+                for server in list(allocids_local.keys()):
                     # FIXME: this has to be done so we can submit a list
                     #        of allocids to remove IN parallel
-                    for allocid in allocids_local[rtb]:
+                    for allocid in allocids_local[server]:
                         logging.error("removing allocation %s on %s",
-                                      allocid, rtb)
-                        target_ext_alloc._delete(rtb, allocid)
+                                      allocid, server)
+                        target_ext_alloc._delete(server, allocid)
                     with _allocids_mutex:
                         # another thread might have cleared it, so
-                        if rtb in _allocids:
-                            _allocids[rtb].clear()
+                        if server in _allocids:
+                            _allocids[server].clear()
             if tp:
                 tp.terminate()
             time.sleep(1)

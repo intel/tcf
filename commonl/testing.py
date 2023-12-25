@@ -664,13 +664,6 @@ host = '127.0.0.1'
                     "ttbd:%d not ready after %d seconds: %s\n"
                     % (self.port, timeout, " ".join(self.cmdline)))
             try:
-                # This is where we register this new server with the
-                # client, by putting it in the cache (so no
-                # tcfl.config is touched for it).
-                rtb = tcfl.ttb_client.rest_init(self.state_dir,
-                                                self.url, not self.use_ssl,
-                                                self.aka)
-                # FIXME: these are still being unified
                 self.server = tcfl.server_c(
                     url = self.url, aka = self.aka,
                     ssl_verify = self.use_ssl,
@@ -681,7 +674,7 @@ host = '127.0.0.1'
                 #
                 # meaning the server is up and running
                 try:
-                    r = rtb.send_request("GET", "ttb", skip_prefix = True)
+                    r = self.server.send_request("GET", "ttb", skip_prefix = True)
                     break
                 except requests.HTTPError as e:
                     raise RuntimeError(
