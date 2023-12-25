@@ -1844,6 +1844,9 @@ class server_c:
         :returns requests.Response: response object
 
         """
+        # FIXME: unify this with tcfl.tc.target_c.ttbd_iface_call()'s
+        # repeat and error handling, now they are nested so that ttbd_iface_call()
+        # just calls send_request() without loop
         assert not (data and json), \
             "can't specify data and json at the same time"
         assert isinstance(retry_timeout, (int, float)) and retry_timeout >= 0, \
