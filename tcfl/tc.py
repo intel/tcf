@@ -1113,7 +1113,13 @@ class target_c(reporter_c):
         # FIXME: this is here until we transition away all of the
         # ttb_client sublibrary -- there are still a lot of users
         # around the code that need to be translated
-        self.rtb = tcfl.ttb_client.rest_target_brokers[self.server_url]
+        if self.server_url in tcfl.ttb_client.rest_target_brokers:
+            # note that as we transition out of the old RTB core code,
+            # in some circumstances it might have not initialized a
+            # server, which is fine -- in that case we ignore it
+            self.rtb = tcfl.ttb_client.rest_target_brokers[self.server_url]
+        else:
+            self.rtb = None
         #: (short) id of this target
         self.id = rt['id']
         #: Full id of this target
