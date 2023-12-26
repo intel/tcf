@@ -29,25 +29,26 @@ import tcfl.ttb_client
 from . import msgid_c
     
 
-def _delete(rtb, allocid):
+def _delete(server, allocid):
     try:
-        rtb.send_request(
+        server.send_request(
             "DELETE", "allocation/%s" % allocid,
             timeout_extra = None
         )
     except requests.ConnectionError as e:
         # this server is out
-        logging.warning("%s: %s", rtb, e)
+        logging.warning("%s: %s", server, e)
         return
     except requests.HTTPError as e:
-        logging.warning("%s: %s", rtb, e)
+        logging.warning("%s: %s", server, e)
         # FIXME: HACK: this means invalid allocation,
         # already wiped
 
 
 # FIXME: what happens if the target is disabled / removed while we wait
 # FIXME: what happens if the conn
-def _alloc_targets(rtb, groups, obo = None, keepalive_period = 4,
+def _alloc_targets(server, groups, obo = None,
+                   keepalive_period = 4,
                    queue_timeout = None, priority = 700, preempt = False,
                    queue = True, reason = None, wait_in_queue = True,
                    register_at = None, extra_data = None, endtime = None):
@@ -108,7 +109,7 @@ def _alloc_targets(rtb, groups, obo = None, keepalive_period = 4,
                                      (bool, int, float, str))
         data['extra_data'] = extra_data
     data['groups'] = groups
-    r = rtb.send_request("PUT", "allocation", json = data)
+    r = server.send_request("PUT", "allocation", json = data)
 
     ts0 = time.time()
     state = r['state']
@@ -143,7 +144,7 @@ def _alloc_targets(rtb, groups, obo = None, keepalive_period = 4,
             state = data[allocid]
             try:
                 #print(f"DEBUG: alloc/keepalive", file = sys.stderr)
-                r = rtb.send_request("PUT", "keepalive", json = data)
+                r = server.send_request("PUT", "keepalive", json = data)
             except requests.exceptions.RequestException as e:
                 ts = time.time()
                 if retry_ts == None:
@@ -165,7 +166,7 @@ def _alloc_targets(rtb, groups, obo = None, keepalive_period = 4,
             if allocid:
                 print("\nallocation ID %s: [+%.1fs] releasing due to user interruption" % (
                     allocid, ts - ts0))
-                _delete(rtb, allocid)
+                _delete(server, allocid)
             raise
 
         # COMPAT: old version packed the info in the 'result' field,
@@ -186,7 +187,7 @@ def _alloc_targets(rtb, groups, obo = None, keepalive_period = 4,
         else:
             new_state = r[allocid]['state']
         if new_state == 'active':
-            r = rtb.send_request("GET", "allocation/%s" % allocid)
+            r = server.send_request("GET", "allocation/%s" % allocid)
             group_allocated = r['group_allocated'].split(',')
             break
         elif new_state == 'invalid':
@@ -199,7 +200,8 @@ def _alloc_targets(rtb, groups, obo = None, keepalive_period = 4,
     return allocid, new_state, group_allocated
 
 
-def _alloc_hold(rtb, allocid, state, ts0, max_hold_time, keep_alive_period):
+def _alloc_hold(server, allocid, state, ts0, max_hold_time,
+                keep_alive_period):
     retry_ts = None
     retry_timeout = 40
     while True:
@@ -211,7 +213,7 @@ def _alloc_hold(rtb, allocid, state, ts0, max_hold_time, keep_alive_period):
         data = { allocid: state }
         try:
             #print(f"DEBUG: holding/keepalive ", file = sys.stderr)
-            r = rtb.send_request("PUT", "keepalive", json = data)
+            r = server.send_request("PUT", "keepalive", json = data)
         except requests.exceptions.RequestException as e:
             ts = time.time()
             if retry_ts == None:
@@ -322,13 +324,13 @@ def _cmdline_alloc_targets(args):
                 ts = time.time()
             if args.hold == None:	# user doesn't want us to ...
                 return			# ... keepalive while active
-            _alloc_hold(rtb, allocid, state, ts0, args.hold, args.keepalive_period)
+            _alloc_hold(server, allocid, state, ts0, args.hold, args.keepalive_period)
         except KeyboardInterrupt:
             ts = time.time()
             if allocid:
                 print("\nallocation ID %s: [+%.1fs] releasing due to user interruption" % (
                     allocid, ts - ts0))
-                _delete(rtb, allocid)
+                _delete(server, allocid)
 
 
 
