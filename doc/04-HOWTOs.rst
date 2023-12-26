@@ -779,7 +779,7 @@ redirection, adding to your script:
            target.tunnel.ip_addr = target.addr_get(ic, "ipv4")
 
            # create a tunnel from server_name:server_port -> to target:22
-           server_name = target.rtb.parsed_url.hostname
+           server_name = target.server.parsed_url.hostname
            server_port = target.tunnel.add(22)
 
            # use SSH to get the content's of the target's /etc/passwd

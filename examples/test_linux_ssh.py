@@ -89,7 +89,7 @@ class _test(tcfl.pos.tc_pos0_base):
         # by hand
 
         # create a tunnel from server_name:server_port -> to target:22
-        server_name = target.rtb.parsed_url.hostname
+        server_name = target.server.parsed_url.hostname
         server_port = target.tunnel.add(22)
         output = subprocess.check_output(
             "/usr/bin/ssh -p %d root@%s echo hello"

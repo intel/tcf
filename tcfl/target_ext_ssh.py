@@ -155,7 +155,7 @@ class ssh(tc.target_extension_c):
         if self._ssh_port != None and self._ssh_host != None:
             return
         target = self.target
-        self._ssh_host = target.rtb.parsed_url.hostname
+        self._ssh_host = target.server.parsed_url.hostname
         self._ssh_port = target.tunnel.add(self.port)
 
     def tunnel_up(self):
