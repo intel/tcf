@@ -19,7 +19,6 @@ import requests
 import requests.exceptions
 
 import tcfl.tc
-import tcfl.ttb_client
 import tcfl.ui_cli
 from . import msgid_c
 

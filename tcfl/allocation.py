@@ -20,6 +20,8 @@ There is no asynchronous method to initialize this module.
 
 import logging
 
+import requests
+
 import tcfl
 
 logger = logging.getLogger("tcfl.allocation")
@@ -64,7 +66,7 @@ def server_allocs_get(_server_name: str, self: tcfl.server_c,
     """
     try:
         r = self.send_request("GET", "allocation/")
-    except (Exception, tcfl.ttb_client.requests.HTTPError) as e:
+    except (Exception, requests.HTTPError) as e:
         self.log.error("%s", e)
         return {}
 

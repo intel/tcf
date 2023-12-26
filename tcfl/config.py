@@ -20,7 +20,6 @@ import urllib.parse
 import commonl
 import tcfl.servers
 import tcfl.tc
-from . import ttb_client
 from . import _install
 
 logger = logging.getLogger("tcfl.config")

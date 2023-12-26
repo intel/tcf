@@ -14,7 +14,6 @@ import logging
 import re
 
 from . import tc
-from . import ttb_client
 from . import msgid_c
 
 class extension(tc.target_extension_c):

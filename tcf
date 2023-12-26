@@ -44,7 +44,6 @@ import requests
 
 import commonl
 import tcfl
-import tcfl.ttb_client as ttb_client
 import tcfl.tc
 import tcfl.config
 import tcfl._install
@@ -82,7 +81,7 @@ version: {tcfl.tc.version}
 python: {" ".join(sys.version.splitlines())}""")
     commonl.data_dump_recursive(platform.uname()._asdict(), "uname")
     print(f"""\
-servers: {len(tcfl.ttb_client.rest_target_brokers)}""")
+servers: {len(tcfl.server_c.servers)}""")
     count = 0
     for url, server in sorted(tcfl.server_c.servers.items(),
                               key = lambda i: i[0]):

@@ -24,7 +24,7 @@ import os
 import traceback
 
 import commonl
-import tcfl.ttb_client		# COMPAT: FIXME remove
+import tcfl.config
 
 logger = logging.getLogger("tcfl.servers")
 
@@ -38,22 +38,28 @@ def _discover_bare(ssl_ignore = True):
     # hostname "ttbd" that is resovled
     tcfl.server_c.discover(ssl_ignore = ssl_ignore)
 
-    for _, server in tcfl.server_c.servers.items():		# create target server objects
-        # COMPAT: old style ttb_client.rest_target_broker -> being
-        # moved to tcfl.server_c
-        rtb = tcfl.ttb_client.rest_target_broker(
-            tcfl.config.state_path, server.url,
-            ignore_ssl = not server.ssl_verify,
-            aka = server.aka, origin = server.origin)
-        tcfl.ttb_client.rest_target_brokers[server.parsed_url.geturl()] = rtb
-
-    if not tcfl.ttb_client.rest_target_brokers:
+    if not tcfl.server_c.servers:
         logger.warning(
-            "No servers available; please use --url or "
-            "add to a file called conf_ANYTHING.py in any of %s with:\n"
-            "\n"
-            "  tcfl.config.url_add('https://URL:PORT', ssl_ignore = True)\n"
-            "\n" % ":".join(tcfl.config_path))
+"""
+No servers available
+
+You can:
+
+1. Provide one or more server URLs to the command line tools with
+   the --url option
+
+2. Provide one or more server URLs to to the *servers-discover* command
+   to discover more servers
+
+3. Add to any configuration file [conf_ANYTHING.py] in any of %s with: a
+   URL with:
+
+   >>> tcfl.config.url_add('https://URL:PORT', ssl_ignore = True)
+
+4. Use the tcfl.servers.discover() API call in a config file or your
+   app to force server discovery.
+
+""" % ":".join(tcfl.config_path))
 
 
 

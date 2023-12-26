@@ -52,7 +52,6 @@ import traceback
 import filelock
 
 import commonl
-import tcfl.ttb_client # ...ugh
 
 logger = logging.getLogger("tcfl")
 log_sd = logging.getLogger("server-discovery")
@@ -881,7 +880,7 @@ class server_c:
     """Describe a Remote Target Server.
 
     Historically this was called *rtb*, meaning *Remote Target
-    Broker*-- in many areas of the client code you will see *rtb* and
+    Broker*-- in areas of the client code you might see *rtb* and
     *rt* for remote target.
 
     - Constructor is very simple on purpose, so we can just use it to
@@ -1041,8 +1040,6 @@ class server_c:
 
     - fix reporting list tcfl.config.urls -> used in report to jinja2,
       move to use tcfl.server_c.servers
-
-    - replace tcfl.ttb_client.rest_target_broker with tcfl.server_c
 
     - as soon as we call a server good, start reading its inventory
       in the background
@@ -1296,7 +1293,7 @@ class server_c:
                     f" {self.origin}")
         # this is always available with no login
         try:
-            # FIXME: ttb_client.send_request, so it retries
+            # FIXME: use server.send_request, so it retries
             r = requests.get(self.url + "/ttb",
                              verify = self.ssl_verify,
                              # want fast response, go quick or go
@@ -2127,9 +2124,7 @@ class server_c:
                 # these are needed to later one be able to go from an
                 # rt straight to the server
                 rt['server'] = self.url
-                rt['rtb'] = self.url			# backwards compat
                 rt['server_aka'] = self.aka
-                # DO NOT publish rt['rtb'], it is an internal object
                 server_rts[fullid] = rt
                 server_rts_flat[fullid] = dict(rt)
                 # Note the empty_dict!! it's important; we want to
