@@ -8802,7 +8802,7 @@ from . import report_data_json
 _allocids = {}
 _allocids_mutex = threading.Lock()
 
-def _allocid_rtb_keepalive(server, allocids):
+def _allocid_server_keepalive(server, allocids):
     # send a keepalive to a single server for a list of ALLOCIds
     logging.info(f"keepalive: {server.aka}: allocids {' '.join(allocids)}")
     data = {}
@@ -8824,7 +8824,7 @@ def _allocids_keepalive_once():
         allocids_local = dict(_allocids)
 
     with concurrent.futures.ThreadPoolExecutor(len(allocids_local)) as executor:
-        _rs = executor.map(lambda i: _allocid_rtb_keepalive(i[0], i[1]),
+        _rs = executor.map(lambda i: _allocid_server_keepalive(i[0], i[1]),
                           allocids_local.items())
         # with waits for all the executors to finish
 
