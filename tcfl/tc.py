@@ -1816,6 +1816,24 @@ class target_c(reporter_c):
 
 
 
+    def properties_update(self):
+        """
+        Update the properties from the server
+
+        This updates :data:`rt` and :data:`kws`
+        """
+        server_rts, server_rts_flat, _ = self.server.targets_get(self.id)
+        ( _fullid, rts ), = server_rts.items()
+        ( _fullid, rts_flat ), = server_rts_flat.items()
+        # each one is a dict with a single item which is indexed by FULLID
+        self.rt = rts
+        self.rt.update(rts_flat)
+        # FIXME: this is VERY inneficient now -- we really need to
+        # clean it up needs to be optimized for simple properties
+        # being setup/udpated insted of just updating the whole thing
+        self._kws_update()
+
+
     def disable(self, reason = 'disabled by the administrator'):
         """
         Disable a target, setting an optional reason
