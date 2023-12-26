@@ -32,7 +32,7 @@ class _(tcfl.tc.tc_c):
         self.report_info("POS rsync server: %s" % rsync_server)
 
         rsync_host = rsync_server.split("::", 1)[0]
-        if rsync_host == ic.rtb.parsed_url.hostname:
+        if rsync_host == ic.server.parsed_url.hostname:
             rsync_port = ic.tunnel.add(873, ic.kws['ipv4_addr'])
         else:
             rsync_port = 873
