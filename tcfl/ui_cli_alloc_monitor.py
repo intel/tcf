@@ -107,7 +107,7 @@ def _cmdline_alloc_monitor(cli_args: argparse.Namespace):
                         data = {
                             'projection': json.dumps([ "_alloc*" ])
                         })
-                    #print >> sys.stderr, "DEBUG refreshed", rtb, pprint.pformat(r)
+                    #print >> sys.stderr, "DEBUG refreshed", server, pprint.pformat(r)
                     # update our knowledge of the target
                     for rt in r.get('targets', []):
                         target_name = rt.get('id', None)
@@ -115,7 +115,7 @@ def _cmdline_alloc_monitor(cli_args: argparse.Namespace):
                             continue
                         if target_name not in self.targets:
                             # FIXME: use fullid instead
-                            # FIXME: use rtb to compare too
+                            # FIXME: use server to compare too
                             continue
                         #print >> sys.stderr, "DEBUG", target_name, rt
                         self.targets[target_name].rt = rt
