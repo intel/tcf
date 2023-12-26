@@ -897,7 +897,7 @@ class extension(tc.target_extension_c):
         else:
             assert isinstance(kws, dict)
 
-        kws['server'] = target.rtb.parsed_url.hostname
+        kws['server'] = target.server.parsed_url.hostname
 
         kws['pos_boot_interconnect'] = os.environ.get(
             "POS_BOOT_INTERCONNECT",
@@ -1380,7 +1380,7 @@ EOF""")
         # Tell the tunneling interface which IP address we want to use
         target.tunnel.ip_addr = target.addr_get(ic, "ipv4")
         target.kw_set('rsync_port', target.tunnel.add(3000))
-        target.kw_set('rsync_server', target.rtb.parsed_url.hostname)
+        target.kw_set('rsync_server', target.server.parsed_url.hostname)
 
 
     def rsync(self, src = None, dst = None,
