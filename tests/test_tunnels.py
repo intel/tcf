@@ -46,7 +46,8 @@ class _test(tcfl.tc.tc_c):
         for ip_addr, protocol, port in l:
             p = target.tunnel.add(port, ip_addr, protocol)
             target.report_pass("tunnel to %s:%s:%d created to %s:%d"
-                               % (protocol, ip_addr, port, target.rtb, p))
+                               % (protocol, ip_addr, port,
+                                  target.server.parsed_url.hostname, p))
             d = target.tunnel.list()
             if len(d) != 1:
                 raise tcfl.tc.failed_e(
@@ -86,7 +87,8 @@ class _test(tcfl.tc.tc_c):
         for ip_addr, protocol, port in l:
             p = target.tunnel.add(port, ip_addr, protocol)
             target.report_pass("tunnel to %s:%s:%d created to %s:%d"
-                               % (protocol, ip_addr, port, target.rtb, p))
+                               % (protocol, ip_addr, port,
+                                  target.server.parsed_url.hostname, p))
             local_ports.add(str(p))
             count += 1
             d = target.tunnel.list()
