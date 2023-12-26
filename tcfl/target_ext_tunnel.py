@@ -176,7 +176,7 @@ class tunnel(tc.target_extension_c):
           *SERVER-PORT* is the same port returned by the :meth:`add`
           call, so that the endpoint for the tunnel would be the
           server's hostname (available at
-          *target.rtb.parsed_hostname*) and the *SERVER-PORT*.
+          *target.server.parsed_url.hostname*) and the *SERVER-PORT*.
         """
         d = dict()
         r = self.target.properties_get("interfaces.tunnel")
