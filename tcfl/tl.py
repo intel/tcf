@@ -1,6 +1,6 @@
 #! /usr/bin/python3
 #
-# Copyright (c) 2017 Intel Corporation
+# Copyright (c) 2017-2023 Intel Corporation
 #
 # SPDX-License-Identifier: Apache-2.0
 #
@@ -2028,7 +2028,7 @@ def rpyc_connect(target, component: str,
 
         target.report_info(
             f"rpyc: {component}: will use SSL cert '{cert_name}' for"
-            f" {target.rtb.parsed_url.hostname}:{rpyc_port}", dlevel = 3)
+            f" {target.server.parsed_url.hostname}:{rpyc_port}", dlevel = 3)
 
         ssl_args = dict(
             keyfile = client_key_path,
@@ -2041,7 +2041,7 @@ def rpyc_connect(target, component: str,
 
     target.report_info(
         f"rpyc: connecting to '{component}' on"
-        f" {target.rtb.parsed_url.hostname}:{rpyc_port}", dlevel = 3)
+        f" {target.server.parsed_url.hostname}:{rpyc_port}", dlevel = 3)
 
     # When we connect right after powering on a remote container,
     # sometimes it takes the container some time to spin up, so we
@@ -2061,7 +2061,7 @@ def rpyc_connect(target, component: str,
     for cnt in range(1, retries_max + 1):
         try:
             remote = rpyc.utils.classic.ssl_connect(
-                target.rtb.parsed_url.hostname,
+                target.server.parsed_url.hostname,
                 port = rpyc_port, **ssl_args)
 
             if console_check_timeout > 0:
@@ -2088,7 +2088,7 @@ def rpyc_connect(target, component: str,
             e = _e
             if cnt == retries_max:
                 message = f"rpyc: {component}: failure connecting to" \
-                    f" {target.rtb.parsed_url.hostname}:{rpyc_port}: {e}"
+                    f" {target.server.parsed_url.hostname}:{rpyc_port}: {e}"
                 raise tcfl.blocked_e(message) from e
             target.report_info(f"rpyc: {component}: soft failure connecting,"
                                f" retrying {cnt}/{retries_max}: {e}")
@@ -2097,7 +2097,7 @@ def rpyc_connect(target, component: str,
 
     target.report_info(
         f"rpyc: connected to '{component}' on"
-        f" {target.rtb.parsed_url.hostname}:{rpyc_port}", dlevel = 2)
+        f" {target.server.parsed_url.hostname}:{rpyc_port}", dlevel = 2)
 
     if sync_timeout:
         assert isinstance(sync_timeout, int) and sync_timeout > 0, \
