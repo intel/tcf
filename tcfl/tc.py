@@ -187,7 +187,6 @@ import requests.exceptions
 from . import app
 import commonl
 import commonl.expr_parser
-from . import ttb_client
 from . import msgid_c
 
 # discovered by the importer
@@ -1103,23 +1102,12 @@ class target_c(reporter_c):
         self.want_name = target_want_name
         #: Remote tags of this target
         self.rt = rt
-        # Mind those static TCs, local target has no rtb
         self.server_url = rt.get('server', None)
         # transition path to new core client code in tcfl,
         # tcfl.servers + tcfl.targets; if there is a 'server'
         # keyword, it means this has been discovered with the new
         # core code so we use it
         self.server = tcfl.server_c.servers[self.server_url]
-        # FIXME: this is here until we transition away all of the
-        # ttb_client sublibrary -- there are still a lot of users
-        # around the code that need to be translated
-        if self.server_url in tcfl.ttb_client.rest_target_brokers:
-            # note that as we transition out of the old RTB core code,
-            # in some circumstances it might have not initialized a
-            # server, which is fine -- in that case we ignore it
-            self.rtb = tcfl.ttb_client.rest_target_brokers[self.server_url]
-        else:
-            self.rtb = None
         #: (short) id of this target
         self.id = rt['id']
         #: Full id of this target
@@ -2298,8 +2286,8 @@ class target_c(reporter_c):
             rt = tcfl.rts_flat[target_name]
         else:
             rt = target_discovery_agent.rts_flat[target_name]
-        rt = dict(rt)	# clone, don't modify original
-        rt['rtb'] = tcfl.ttb_client.rest_target_brokers[rt['rtb']]
+        rt = dict(rt)			# clone, don't modify original
+        rt['rtb'] = rt['server']	# COMPAT: when server was called rtb
         target = target_c(rt, tc_global, None, "target",
                           extensions_only = extensions_only)
 
@@ -2439,7 +2427,7 @@ class target_c(reporter_c):
         kwargs['ticket'] = self.mkticket_for_call()
 
         # This looks really complex, but it is just the
-        # rtb.send_request() below call
+        # server.send_request() below call
         #
         # the rest is just a retry loop that keeps trying if
         # retry_timeout > 0 until the timeout expires, backing off an
@@ -2630,12 +2618,6 @@ class target_c(reporter_c):
         commonl.kws_update_from_rt(self.kws, self.rt)
         for key, val in commonl.dict_to_flat(self.rt,
                                              sort = False, empty_dict = True):
-            if key == 'rtb':
-                # DEPRECATED: from old times when rtb was a class object
-                # ok, this is truly a hack -- but we will get ONE value
-                # from target.rt that is the daemon representation, and we
-                # just want its url, which str() does.
-                val = str(val)
             self.kws[key] = val
 
         kws_bsp = dict()
@@ -2660,11 +2642,6 @@ class target_c(reporter_c):
 
         """
         assert isinstance(kw, str)
-        if isinstance(value, ttb_client.rest_target_broker):
-            # ok, this is truly a hack -- but we will get ONE value
-            # from target.rt that is the daemon representation, and we
-            # just want its url, which str() does.
-            value = str(value)
         assert value in ({}, None) \
             or isinstance(value, (str, int, float, bool)), \
             "keyword %s: value type %s not allowed (str, int, float, bool): %s" % (

@@ -25,7 +25,6 @@ import tabulate
 
 import commonl
 import tcfl.tc
-import tcfl.ttb_client
 from . import msgid_c
     
 
