@@ -74,6 +74,7 @@ import glob
 import ttbl
 import ttbl.config
 import ttbl.allocation
+import ttbl.power	# used by the maintenance thread
 import ttbl._install
 
 try:
@@ -1487,6 +1488,7 @@ def cleanup_process_fn():
     # daemon; for now this is only for things we want to power on/off
     # FIXME: if there is an exeception here, what do we do? do we
     # ignore it? if so we need to force soft_failure
+
     ttbl.power.execute_defer_list(ttbl.power._startup_defer_list, "startup")
 
     logi("Clean up process [period %.2fs]" % sleep_period)
