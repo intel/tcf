@@ -37,7 +37,7 @@ logger = logging.getLogger("ui_cli_tunnel")
 def _tunnel_add(target, cli_args):
     server_port = target.tunnel.add(
         cli_args.port, cli_args.ip_addr, cli_args.protocol)
-    print(f"{target.rtb.parsed_url.hostname}:{server_port}")
+    print(f"{target.parsed_url.hostname}:{server_port}")
 
 def _cmdline_tunnel_add(cli_args: argparse.Namespace):
 
@@ -69,7 +69,7 @@ def _tunnel_list_by_target(target, _cli_args):
             continue
         try:
             print(f"{data['protocol']}"
-                  f" {target.rtb.parsed_url.hostname}:{local_port}"
+                  f" {target.server.parsed_url.hostname}:{local_port}"
                   f" {data['ip_addr']}:{data['port']}")
         except KeyError:
             pass	# ignore, bad data stored
