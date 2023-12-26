@@ -108,7 +108,7 @@ class driver(tcfl.tc.report_driver_c):
             doc['target'] = {}
             doc['target']['fullid'] = target.fullid
             doc['target']['id'] = target.id
-            doc['target']['server'] = target.rtb.aka
+            doc['target']['server'] = target.server.aka
             doc['target']['type'] = target.type
 
         doc['tc_name'] = testcase.name
@@ -122,9 +122,8 @@ class driver(tcfl.tc.report_driver_c):
                 td = {}
                 td['fullid'] = target.fullid
                 td['id'] = target.id
-                td['server'] = target.rtb.aka
-                # wait until we have an official full URL field
-                #td['server_url'] = target.rtb.url
+                td['server'] = target.server.aka
+                td['server_url'] = target.server.url
                 td['type'] = target.type
                 doc['targets'][target_role] = td
 

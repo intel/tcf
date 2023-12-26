@@ -229,7 +229,7 @@ class driver(tcfl.tc.report_driver_c):
         if target:
             fullid = target.fullid
             target_name = " @" + target.fullid
-            target_server = target.rtb.aka
+            target_server = target.server.aka
             target_type = target.type
         else:
             fullid = None
@@ -390,9 +390,9 @@ class driver(tcfl.tc.report_driver_c):
             for tgname in sorted(testcase.targets.keys()):
                 target = testcase.targets[tgname]
                 doc['targets'][tgname] = dict(
-                    server = target.rtb.aka, id = target.id,
+                    server = target.server.aka, id = target.id,
                     type = target.type, bsp_model = target.bsp_model)
-                servers.add(target.rtb.aka)
+                servers.add(target.server.aka)
                 if len(target.rt.get('bsp_models', {})) > 1:
                     target_types.append(target.type + ":" + target.bsp_model)
                 else:
