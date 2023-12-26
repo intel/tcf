@@ -219,12 +219,12 @@ class _test(tcfl.tc.tc_c):
 
     def deploy_50(self, ic):
         
-        class rtb_data_c(object):
+        class server_data_c(object):
             def __init__(self):
                 self.lock = threading.Lock()
                 self.remote_file = None
 
-        rtb_datas = collections.defaultdict(rtb_data_c)
+        server_datas = collections.defaultdict(server_data_c)
         
         # Flash the new BIOS before power cycling; make sure we upload
         # the file only once per server
@@ -237,16 +237,16 @@ class _test(tcfl.tc.tc_c):
 
             # upload only once to each server
             with self.lock:
-                rtb_data = rtb_datas[target.rtb]
-            with rtb_data.lock:
-                if not rtb_data.remote_file:
-                    rtb_data.remote_file = \
+                server_data = server_datas[target.server]
+            with server_data.lock:
+                if not server_data.remote_file:
+                    server_data.remote_file = \
                         "OVMF_CODE.fd-" + self.kws['tc_hash']
                     target.report_info("uploading", level = 0)
-                    target.store.upload(rtb_data.remote_file, local_file)
+                    target.store.upload(server_data.remote_file, local_file)
                     target.report_info("uploaded", level = 0)
 
-            target.images.flash({ "bios" : rtb_data.remote_file },
+            target.images.flash({ "bios" : server_data.remote_file },
                                 upload = False)
 
         self.report_info("flashing BIOS", dlevel = -1)
