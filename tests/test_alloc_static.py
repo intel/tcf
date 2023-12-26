@@ -43,7 +43,7 @@ class _test(tcfl.tc.tc_c):
     def eval(self, target):
 
         allocid, state, _ = tcfl.target_ext_alloc._alloc_targets(
-            target.rtb, { "group": [ "t0" ] },
+            target.server, { "group": [ "t0" ] },
             queue = True, wait_in_queue = False, endtime = "static")
         assert state == "queued", \
             f"second allocation got state '{state}', expected 'queued'"

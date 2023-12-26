@@ -46,7 +46,7 @@ class _test(tcfl.tc.tc_c):
         # So we remove it and the property shall be True
 
         self.report_info("removing allocation ID %s" % self.allocid)
-        tcfl.target_ext_alloc._delete(target.rtb, self.allocid)
+        tcfl.target_ext_alloc._delete(target.server, self.allocid)
         release_hook_called = target.property_get("release_hook_called")
         assert release_hook_called == True, \
             "seems the release hook was not called, since the field " \

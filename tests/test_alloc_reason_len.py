@@ -51,12 +51,12 @@ class _test(commonl.testing.shell_client_base):
         # all these allocations will be queued, as we have the target
         # allocated; it is ok, we just want to read the reason
         allocid, _state, _group = tcfl.target_ext_alloc._alloc_targets(
-            target.rtb,
+            target.server,
             { 'group': [ target.id ] }, queue_timeout = 0,
             reason = shorter_than_32)
 
         # get the short reason
-        r = target.rtb.send_request("GET", "allocation/%s" % allocid)
+        r = target.server.send_request("GET", "allocation/%s" % allocid)
         assert r['reason'] == shorter_than_32, \
             "reason returned is not the one sent; got '%s', expected '%s'" \
             % (r['reason'], shorter_than_32)
@@ -64,12 +64,12 @@ class _test(commonl.testing.shell_client_base):
 
         # allocate with a long reason
         allocid, _state, _group = tcfl.target_ext_alloc._alloc_targets(
-            target.rtb,
+            target.server,
             { 'group': [ target.id ] }, queue_timeout = 0,
             reason = longer_than_32)
 
         # get the short reason
-        r = target.rtb.send_request("GET", "allocation/%s" % allocid)
+        r = target.server.send_request("GET", "allocation/%s" % allocid)
         assert r['reason'] == longer_than_32[:32], \
             "reason returned is not the one sent capped to 32;" \
             " got '%s', expected '%s'" \

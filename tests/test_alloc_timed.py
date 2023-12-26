@@ -52,7 +52,7 @@ class _test(tcfl.tc.tc_c):
         datetime_end = datetime_now + datetime.timedelta(seconds = 1.5 * 60)
 
         allocid, state, _ = tcfl.target_ext_alloc._alloc_targets(
-            target.rtb, { "group": [ "t0" ] },
+            target.server, { "group": [ "t0" ] },
             queue = True, wait_in_queue = False,
             endtime = datetime_end.strftime("%Y%m%d%H%M%S"))
         assert state == "queued", \
@@ -62,8 +62,8 @@ class _test(tcfl.tc.tc_c):
         time.sleep(wait_min * 60)
         # verify the current testcase's allocid is dead and the new
         # one is alive
-        r = target.rtb.send_request("PUT", "keepalive",
-                                    json = { allocid: None } )
+        r = target.server.send_request("PUT", "keepalive",
+                                       json = { allocid: None } )
 
         # at this point, the allocaton must have been expired
         state = r.get(allocid, { "state": "allocid missing" })['state']
