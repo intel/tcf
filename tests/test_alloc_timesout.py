@@ -46,11 +46,11 @@ class _test(tcfl.tc.tc_c):
 
         # we'll let this allocid timeout
         allocid, state, _ = tcfl.target_ext_alloc._alloc_targets(
-            target.rtb, { "group": [ "t0" ] },
+            target.server, { "group": [ "t0" ] },
             queue = True, wait_in_queue = False)
         # the target at the end will shall be reserved to this
         final_allocid, state, _ = tcfl.target_ext_alloc._alloc_targets(
-            target.rtb, { "group": [ "t0" ] },
+            target.server, { "group": [ "t0" ] },
             queue = True, wait_in_queue = False)
         assert state == "queued", \
             "second allocation got state '%s', expected 'queued'" % state
@@ -73,7 +73,7 @@ class _test(tcfl.tc.tc_c):
             # note tcf/run might be keepaliving the testcases's allocid
             # just in case we do it too and we let the new allocid to
             # expire by not keepaliving it
-            r = target.rtb.send_request(
+            r = target.server.send_request(
                 "PUT", "keepalive",
                 json = {
                     self.allocid: None,
@@ -83,7 +83,7 @@ class _test(tcfl.tc.tc_c):
 
         # verify the current testcase's allocid is dead and the new
         # one is alive
-        r = target.rtb.send_request("PUT", "keepalive", json = {
+        r = target.server.send_request("PUT", "keepalive", json = {
             self.allocid: None, allocid: None } )
 
         state = r[allocid]['state']

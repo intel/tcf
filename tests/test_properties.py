@@ -116,7 +116,7 @@ class _test_sorted(tcfl.tc.tc_c):
     ]
 
     def eval(self, target):
-        r = target.rtb.send_request(
+        r = target.server.send_request(
             "GET", "targets/" + target.id,
             data = { "projection": json.dumps(["interfaces.power" ]) },
             raw = True)
