@@ -165,7 +165,8 @@ def _rootfs_guess_by_image(target, image, boot_dev):
     partl = {}
     empties = []
     # refresh target information FIXME: need a better method
-    target.rt = target.rtb.rest_tb_target_update(target.id)
+    target.properties_update()
+
     for tag, value in target.rt.items():
         if not tag.startswith("pos_root_"):
             continue
