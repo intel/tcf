@@ -84,8 +84,9 @@ python: {" ".join(sys.version.splitlines())}""")
     print(f"""\
 servers: {len(tcfl.ttb_client.rest_target_brokers)}""")
     count = 0
-    for url, rtb in tcfl.ttb_client.rest_target_brokers.items():
-        print(f"server {rtb.aka}: {url} [{rtb.origin or 'n/a'}]")
+    for url, server in sorted(tcfl.server_c.servers.items(),
+                              key = lambda i: i[0]):
+        print(f"server {server.aka}: {url} [{server.origin or 'n/a'}]")
         count += 1
 
     # Get resolver information to know default search domains
