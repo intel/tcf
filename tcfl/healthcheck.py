@@ -65,7 +65,7 @@ def _target_healthcheck(target, cli_args: argparse.Namespace):
             target.report_info("allocating")
             allocid, _state, _group_allocated = \
                 tcfl.target_ext_alloc._alloc_targets(
-                    target.rtb, { "group": [ target.id ] },
+                    target.server, { "group": [ target.id ] },
                     preempt = cli_args.preempt,
                     queue = False, priority = cli_args.priority,
                     reason = "healthcheck")
@@ -75,4 +75,4 @@ def _target_healthcheck(target, cli_args: argparse.Namespace):
         _healthcheck(target, cli_args)
     finally:
         if allocid:
-            tcfl.target_ext_alloc._delete(target.rtb, allocid)
+            tcfl.target_ext_alloc._delete(target.server, allocid)
