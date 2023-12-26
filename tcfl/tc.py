@@ -2295,9 +2295,9 @@ class target_c(reporter_c):
 
         """
         if target_discovery_agent == None:
-            target_discovery_agent = tcfl.targets.discovery_agent
-
-        rt = target_discovery_agent.rts_flat[target_name]
+            rt = tcfl.rts_flat[target_name]
+        else:
+            rt = target_discovery_agent.rts_flat[target_name]
         rt = dict(rt)	# clone, don't modify original
         rt['rtb'] = tcfl.ttb_client.rest_target_brokers[rt['rtb']]
         target = target_c(rt, tc_global, None, "target",
