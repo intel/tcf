@@ -85,7 +85,7 @@ class tunnel(tc.target_extension_c):
           that provides ``target`` (target.kws['server']).
 
           >>> server_port = target.tunnel.add(3000)
-          >>> server_name = target.rtb.parsed_url.hostname
+          >>> server_name = target.server.parsed_url.hostname
           >>> server_name = target.kws['server']    # alternatively
 
         Now connecting to ``server_name:server_port`` takes you to the
@@ -122,7 +122,7 @@ class tunnel(tc.target_extension_c):
         self.target.report_info(
             "%s tunnel added from %s:%d to %s:%d" % (
                 protocol,
-                target.rtb.parsed_url.hostname, server_port,
+                target.server.parsed_url.hostname, server_port,
                 ip_addr, port)
         )
         return server_port
