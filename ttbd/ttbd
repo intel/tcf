@@ -659,6 +659,16 @@ def logout():
 @app.route(API_PREFIX + '/ui/login', methods = ['GET', 'POST'])
 def _login_ui():
     if flask.request.method == 'POST':
+
+        # If the user tries to see a route when he is not logged in. He will
+        # be redirected to the login page.
+        # We store the route he was trying to visit in the session. Here we can
+        # get that route and once he logged in successfully redirect him back
+        # to it. So the workflow is not interrupted.
+        previous_route = None
+        if 'route' in flask.session:
+            previous_route = flask.session['route']
+
         user = flask.request.form['username']
         password = flask.request.form['password']
         flask.session.clear()
@@ -669,6 +679,9 @@ def _login_ui():
             request = flask.request
         ) as audit_record:
             _ = _login(audit_record)
+
+        if previous_route:
+            return flask.redirect(previous_route)
         return flask.redirect(API_PREFIX + '/ui')
 
     return flask.render_template('login.html')
@@ -1577,6 +1590,9 @@ def unauthorized():
     do an operation
     """
     if flask.request.blueprint == 'ui':
+        # store the route the user was trying to visit, so we can redirect him
+        # back to it when he login successfully
+        flask.session['route'] = flask.request.path
         return flask.redirect(API_PREFIX + '/ui/login')
     flask_logi_abort(401, "User unauthorized; please login")
 
