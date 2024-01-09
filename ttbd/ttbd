@@ -2089,7 +2089,10 @@ if __name__ == "__main__":
                 self.cfg.set('bind', f'{host}:{port}')
                 self.cfg.set('workers', ttbl.config.processes)
                 self.cfg.set('threads', 1)
-                self.cfg.set('timeout', 120)
+                # FIXME: this is arbitrarily large to accomodate the
+                # arbitratily large wait times we might have on some
+                # sync calls -> maybe get it from there?
+                self.cfg.set('timeout', 1200)
                 # restart process after handling 10 requests, to avoid
                 # leaks
                 self.cfg.set('max_requests', 10)

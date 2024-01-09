@@ -219,7 +219,8 @@ def _cmdline_ls(cli_args):
 
     tcfl.targets.setup_by_spec(
         cli_args.target, verbosity = verbosity,
-        project = cli_args.project, targets_all = cli_args.all)
+        project = cli_args.project, targets_all = cli_args.all,
+        shorten_names = cli_args.shorten_names)
 
     if verbosity < 0:
         print(" \n".join(tcfl.targets.discovery_agent.rts_fullid_sorted))
@@ -341,6 +342,16 @@ def _cmdline_setup(arg_subparsers):
         action = "append", type = str,
         help = "consider only the given fields "
         "(default depends on verbosity")
+    ap.add_argument(
+        "--shorten-names",
+        action = "store_true", default = True,
+        help = "When unique, shorten target names"
+        " (SERVER/TARGETNAME) to TARGETNAME [default]")
+    ap.add_argument(
+        "--no-shorten-names", "-N",
+        dest = "shorten_names", action = "store_false",
+        help = "Do not shorten target names when unique"
+        " (SERVER/TARGETNAME) to TARGETNAME")
     ap.set_defaults(func = _cmdline_ls)
 
 
