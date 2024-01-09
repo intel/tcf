@@ -844,11 +844,18 @@ def _cmdline_console_wall(cli_args: argparse.Namespace):
         })
     targets = {}
     consolel = collections.defaultdict(console_descr_c)
+    noconsolel = []
     for targetid in tcfl.targets.discovery_agent.rts_fullid_sorted:
-        targets[targetid] = target = tcfl.tc.target_c.create(
-            targetid,
-            iface = "console", extensions_only = [ "console" ],
-            target_discovery_agent = tcfl.targets.discovery_agent)
+        try:
+            targets[targetid] = target = tcfl.tc.target_c.create(
+                targetid,
+                iface = "console", extensions_only = [ "console" ],
+                target_discovery_agent = tcfl.targets.discovery_agent)
+        except RuntimeError as e:
+            if "does not support the console interface" not in str(e):
+                raise
+            noconsolel.append(targetid)
+            continue
 
         for console in target.console.console_list:
             if console in target.console.aliases:
@@ -864,6 +871,13 @@ def _cmdline_console_wall(cli_args: argparse.Namespace):
         print("No targets supporting console interface found"
               " (might be disabled, try -a)", file = sys.stderr)
         return
+    if noconsolel:
+        print("""
+WARNING: the following targets do not support consoles
+      - """ + "\n      - ".join(noconsolel))
+        input("\nPress [enter] to continue <<<<<<")
+
+
 
     # Compute how many rows and columns we'll need to host all the
     # consoles
