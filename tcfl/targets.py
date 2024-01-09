@@ -192,9 +192,25 @@ class discovery_agent_c:
 
 
 
-    def update_complete(self, update_globals = False, shorten_names = True):
-        """
-        Waits for the target update process to finish
+    def update_complete(self, update_globals = False,
+                        shorten_names: bool = True):
+        """Waits for the target update process to finish
+
+        :param bool shorten_names: (optional, default *True*)
+
+          The discovery agent object will offer in the objects
+          :data:`rts`, :data:`rts_flat`, :data:`rts_fullid_disabled`
+          :data:`rts_fullid_sorted` the list of targets discovered, in
+          the long format *SEVERAKA/TARGETNAME*.
+
+          If this is *True* (default), then these names get simplified
+          to *TARGETNAME* when that target is only accessible via one
+          server (so it is a unique name). If accessible via multiple
+          servers (eg: SERVERAKA-A/target-1 and SERVERAKA-B/target-1), then
+          the long name is maintained.
+
+          If this is *False*, the names are always long.
+
         """
         for server_rts, server_rts_flat, server_inventory_keys in self.rs:
             #server_rts, server_rts_flat = self.rs.get()
@@ -297,7 +313,8 @@ def select_by_ast(rt_flat: dict,
 
 # COMPAT: removing list[str] so we work in python 3.8
 def setup_by_spec(targetspecs: list, verbosity: int = 1,
-                  project: set = None, targets_all: bool = False):
+                  project: set = None, targets_all: bool = False,
+                  shorten_names: bool = True):
     """
     Setup the target system and discover just targets that match a
     condition.
@@ -341,6 +358,7 @@ def setup_by_spec(targetspecs: list, verbosity: int = 1,
     :param bool targets_all: (optional; default *False*) consider also
       *disabled* targets (ignored by default).
 
+    :param bool shorten_names: see :meth:`update_complete`
     """
     # let's do some voodoo (for speed) -- we want to load (project)
     # only the minimum amount of fields we need for doing what we need
@@ -426,7 +444,8 @@ def setup_by_spec(targetspecs: list, verbosity: int = 1,
     else:
         logger.info("querying inventories with all fields")
     # FIXME: setup to an specific object and return it?
-    tcfl.targets.subsystem_setup(projections = fields)
+    tcfl.targets.subsystem_setup(projections = fields,
+                                 shorten_names = shorten_names)
 
     # filter targets: because this discovery agent is created just for
     # us, we can directly modify its lists, deleting any target that
@@ -706,7 +725,8 @@ _subsystem_setup = False
 
 
 
-def subsystem_setup(*args, projections = None, **kwargs):
+def subsystem_setup(*args, projections = None, shorten_names: bool = True,
+                    **kwargs):
     """
     Initialize the target discovery subsystem in a synchronous way
 
@@ -726,6 +746,7 @@ def subsystem_setup(*args, projections = None, **kwargs):
     (:mod:`tcfl.config` and :mod:`tcfl.servers )` if not already
     initialized).
 
+    :param bool shorten_names: see :meth:`update_complete`
     """
     # ensure discovery subsystem is setup
     global _subsystem_setup
@@ -741,6 +762,7 @@ def subsystem_setup(*args, projections = None, **kwargs):
     global discovery_agent
     discovery_agent = discovery_agent_c(*args, projections = projections, **kwargs)
     discovery_agent.update_start()
-    discovery_agent.update_complete(update_globals = True)
+    discovery_agent.update_complete(update_globals = True,
+                                    shorten_names = shorten_names)
 
     _subsystem_setup = True
