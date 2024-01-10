@@ -844,9 +844,9 @@ def _request_extra_data_verify_uuid(uuid_str):
 
     ts_now = time.strftime("%Y%m%d%H%M%S")
     # has it been used in the 'recent' past? check the cache
-    ts_uuid = allocid_uuid_db.get(str(uuid_validated),
-                                  default = None,
-                                  max_age = allocid_uuid_max_age_s)
+    ts_uuid, _ex = allocid_uuid_db.get(str(uuid_validated),
+                                       default = None,
+                                       max_age = allocid_uuid_max_age_s)
     if ts_uuid == None:
         # Not in the cache, means it is not known
         return

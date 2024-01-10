@@ -20,6 +20,7 @@ Command line and logging helpers
 import argparse
 import base64
 import bisect
+import codecs
 import collections
 import contextlib
 import errno
@@ -686,7 +687,8 @@ def hash_file(hash_object, filepath, blk_size = 8192):
 
 class fs_cache_c():
     """
-    Very simple disk-based cache
+    Very simple disk-based cache; use with the
+    :func:`lru_cache_disk` decorator
 
     :param type base_type: which type of database implementation to
       use as base; must be a subclass of
@@ -717,38 +719,138 @@ class fs_cache_c():
     def lock(self):
         return filelock.FileLock(self.cache_lockfile)
 
-    def set_unlocked(self, field, value):
-        self.fsdb.set(field, value)
+    def set_unlocked(self, field, value, ex = None):
+        """
+        Set *value* for field *field* without holding a lock on the cache.
 
-    def set(self, field, value):
+        See :meth:`set` for arguments.
+        """
+        if ex == None:
+            self.fsdb.set(field, pickle.dumps(( time.time(), value )),
+                          # the cache are only flat keys, no need to do nesting
+                          nested_flat_keyspace = False)
+        else:
+            self.fsdb.set(field, pickle.dumps(( time.time(), value, ex )),
+                          # the cache are only flat keys, no need to do nesting
+                          nested_flat_keyspace = False)
+
+    def set(self, field, value, ex = None):
+        """
+        Set *value* for field *field* holding a lock on the cache.
+
+        :param str field: field name to save
+        :param value: value to save (only pickable)
+        :param ex: (optional) exception information to save along the
+           value.
+           This is mainly used by the decorator :func:`lru_disk_cache`
+           to store exception information when is the return value of
+           the function.
+        """
         with self.lock():
-            self.fsdb.set(field, value)
+            self.set_unlocked(field, value, ex)
 
-    def get_unlocked(self, field: str, default = None, max_age: float = None):
+
+
+    def get_unlocked(self, field: str, default = None, max_age: float = None,
+                     include_timestamp: bool = False):
         """
         Return a fields's value (or a default if missing or too old)
 
         This accesses the database without locking for exclusive access.
 
-        :param default: value to return if missing
+        :param default: value to return if missing or too old
 
         :param float,int max_age: (optional, default None) maximum age
           in seconds. If the record was created longer than this time,
           remove and consider missing, returning *default*.
+
+        :returns tuple: *( value, exception )* or *( timestamp, value,
+          exception )* if *include_timestamp* is *True*
+
+          - *timestamp*: when the value has been stored
+
+          - *value*: the value that was stored
+
+          - *ex*: the exception value that was stored (if any, see
+            :meth:`set`); this will usually be *None*
+
         """
+        # this get is tricky because we store in the new format ( TIMESTMP,
+        # VALUE, [EX]) and if we store eception or not we need to be
+        # able to tell while at the same time suporting entries in the
+        # old format ( VALUE, EX ) and forcing them being re-generated
+        try:
+            pickled_string = self.fsdb.get(field)
+            if pickled_string == None:
+                return ( None, default, None ) if include_timestamp else ( default, None )
+            data_tuple = pickle.loads(pickled_string)
+            if not isinstance(data_tuple, tuple):
+	        # old data format, flush it and regenerate it, or bad
+                return ( None, default, None ) if include_timestamp else ( default, None )
+
+            # old format
+            #
+            # VALUE   EXCEPTION   DISPOSITION
+            # None    Data        Valid v1
+            # Data    None        Valid v1
+            # Data    Data        Invalid
+            # None    None        Invalid
+            #
+            # new format
+            #
+            # TIMESTAMP  VALUE    EXCEPTION   DISPOSITION
+            # float      None     Data        Valid v2
+            # float      Data     None        Valid v2
+            # float      None     None        Invalid v2
+            # float      Data     Data        Invalid v2
+            # float      Data                 Valid v2
+            # float      None                 Invalid v2 (data can't
+            #                                 be None if no exception)
+            if len(data_tuple) == 2:
+                timestamp, value = data_tuple
+                ex = None
+                if isinstance(timestamp, float) and value != None:
+                    # only valid combination for two fields ( float, Data)
+                    pass
+                else:
+                    # anything else is an invalid value when there are two
+                    # fields or an old format that we want to regenerate
+                    return ( None, default, None ) if include_timestamp else ( default, None )
+                # fallthrough
+            elif len(data_tuple) == 3:
+                # three fields, new format
+                timestamp, value, ex = data_tuple	# see set[_unlocked]()
+                if not isinstance(timestamp, float) \
+                   or ( value == None and ex == None ) \
+                   or ( value != None and ex != None ):
+                    # all invalids, regenerate
+                    return ( None, default, None ) if include_timestamp else ( default, None )
+                # fallthrough
+            else:
+                logging.error("BUG? DB %s field %s: tuple with %d fields"
+                              " vs 2 or 3 expected",
+                              self.cache_dir, field, len(data_tuple))
+                return ( None, default, None ) if include_timestamp else ( default, None )
+        except Exception as e:
+            logging.error("BUG? DB %s field %s: exception: %s",
+                          self.cache_dir, field, e)
+            raise
         if max_age:
             try:
-                mtime = self.fsdb.get_last_mtime(field)
                 now = time.time()
-                if now - mtime >= max_age:	# too old, wipe
-                    self.fsdb.set(field, None)
-                    return default
+                if now - timestamp >= max_age:	# too old, wipe don't
+                    # modify the cache, just return the default since
+                    # it's a miss -- this way the access is lockless
+                    return ( None, default, None ) if include_timestamp else ( default, None )
             except KeyError:
-                return default
+                return ( None, default, None ) if include_timestamp else ( default, None )
 
-        return self.fsdb.get(field, default)
+        return ( timestamp, value, ex ) if include_timestamp else ( value, ex )
 
-    def get(self, field, default = None, max_age = None):
+
+
+    def get(self, field, default = None, max_age = None,
+            include_timestamp: bool = False):
         """
         Get a field's value, locking the database for exclusive access
         see :meth:`get_unlocked`
@@ -758,7 +860,8 @@ class fs_cache_c():
             seconds this record can have existed.
         """
         with self.lock():
-            return self.get_unlocked(field, default, max_age)
+            return self.get_unlocked(field, default, max_age,
+                                     include_timestamp)
 
     def lru_cleanup_unlocked(self, max_entries):
         """
@@ -771,34 +874,34 @@ class fs_cache_c():
         """
         assert isinstance(max_entries, int) and max_entries > 0
 
-        mtimes_sorted_list = []
-        mtimes = {}
+        timestamp_sorted_list = []
+        fields_by_timestamp = collections.defaultdict(set)
 
-        for path, _dirs, filenames in os.walk(self.cache_dir):
-            # note there should be no subdirs we care for because it's
-            # asingle level
-            for filename in filenames:
-                if filename == "lockfile":
-                    continue
-                filepath = os.path.join(path, filename)
-                mtime = self.fsdb._raw_stat(filepath).st_mtime
-                mtimes[mtime] = filepath
-                bisect.insort(mtimes_sorted_list, mtime)
-            break	# only one directory level
+        for field in self.fsdb.keys():
+            if field == "lockfile":
+                continue
 
-        clean_number = len(mtimes_sorted_list) - max_entries
+            timestamp, _value, _ex = \
+                self.get_unlocked(field, include_timestamp = True)
+            if timestamp == None:	# old format, wipe
+                self.fsdb.set(field, None, nested_flat_keyspace = False)
+            else:
+                fields_by_timestamp[timestamp].add(field)
+                bisect.insort(timestamp_sorted_list, timestamp)
+
+
+        clean_number = len(timestamp_sorted_list) - max_entries
         if clean_number < 0:
             return
-        for mtime in mtimes_sorted_list[:clean_number]:
-            rm_f(mtimes[mtime])
-
+        for timestamp in timestamp_sorted_list[:clean_number]:
+            for field in fields_by_timestamp[timestamp]:
+                self.fsdb.set(field, None, nested_flat_keyspace = False)
 
 
 
 def lru_cache_disk(path, max_age_s, max_entries, key_maker = None,
                    exclude_exceptions = None):
-    """
-    Decorator to implement an aged LRU memoize pattern (like
+    """Decorator to implement an aged LRU memoize pattern (like
     :python:`functools.lru_cache`) in disk to cache value of functions.
 
     >>> @commonl.lru_cache_disk(
@@ -843,8 +946,35 @@ def lru_cache_disk(path, max_age_s, max_entries, key_maker = None,
 
     This is useful to ensure transient errors are retried insted of
     cached (which might be valid too based on circumstances).
-    """
 
+    *Design notes*
+
+    Lockless reads rely on the fact that the underlying FSDB
+    implmentation is atomic on the :meth:`commonl.fsdb_c.set`
+    operation. By storing the write timestamp with the value, reading
+    it also becomes atomic and we can verify it's age and proceed to
+    update (taking the lock to balance / expire old entries in the
+    cache).
+
+    To test scalability in a complex scenario we ran
+    tcf.git/ttbd/device-resolver.py on a system loaded with USB
+    devices (~300)--this heavily loads the cache and does a lot of
+    simultaneous reads.
+
+    While it does many more things, it is a multi-read, and no writes
+    once the cache is provisoned. It scales relatively well (previous
+    implementation had all accesses --read and write-- locked and was
+    fully serializing):
+
+    - 1 instance took ~1s
+    - 10 instances took ~2s
+    - 20 instances took ~5s
+    - 30 instances took ~8s
+    - 50 instances took ~13s
+    - 100 instances took ~26s
+    - 200 instances took ~55s
+
+    """
     if exclude_exceptions != None:
         assert isinstance(exclude_exceptions, collections.abc.Iterable)
         for exception_t in exclude_exceptions:
@@ -871,15 +1001,16 @@ def lru_cache_disk(path, max_age_s, max_entries, key_maker = None,
                 assert callable(key_maker), \
                     "key_maker: expected callable, got {callable}"
                 key = key_maker(*args, **kwargs)
-            value = fn.cache.get(key, __file__, max_age = max_age_s)
-            if value == __file__:
+            t = fn.cache.get_unlocked(key, None, max_age = max_age_s)
+            value, ex = t
+            if value == None:
                 # miss! get the return value and set the cache
                 try:
                     # call before taking the lock, it could be long
                     r = fn(*args, **kwargs)
                     with fn.cache.lock():
                         fn.cache.lru_cleanup_unlocked(max_entries)
-                        fn.cache.set_unlocked(key, pickle.dumps((r, None )))
+                        fn.cache.set_unlocked(key, r, None)
                     return r
                 except Exception as e:
                     if exclude_exceptions != None:
@@ -891,13 +1022,12 @@ def lru_cache_disk(path, max_age_s, max_entries, key_maker = None,
                         raise
                     with fn.cache.lock():
                         fn.cache.lru_cleanup_unlocked(max_entries)
-                        fn.cache.set_unlocked(key, pickle.dumps((None, e)))
+                        fn.cache.set_unlocked(key, None, e)
                     raise
 
-            r, e = pickle.loads(value)
-            if e != None:
-                raise e
-            return r
+            if ex != None:
+                raise ex
+            return value
 
         return wrapper
 
@@ -919,7 +1049,7 @@ def _hash_file_cached(filepath, digest, cache_path, cache_entries):
     cache = fs_cache_c(cache_path)
     with cache.lock():
         cache.lru_cleanup_unlocked(cache_entries)
-        value = cache.get_unlocked(filepath_stat_hash)
+        value, _ex = cache.get_unlocked(filepath_stat_hash)
         # we have read the value, so now we remove the entry and
         # if it is "valid", we recreate it, so the mtime is
         # updated and thus an LRU cleanup won't wipe it.
@@ -3373,6 +3503,7 @@ class fsdb_c(object):
     This is a very simple key/value flat database
 
     - sets are atomic and forcefully remove existing values
+      Users rely on this to be able not to lock
     - values are just strings
     - value are limited in size to 1K
     - if a field does not exist, its value is *None*
@@ -3480,23 +3611,13 @@ class fsdb_c(object):
 
         :return bool: *True* if the new value was set correctly;
           *False* if *key* already exists and *force* is *False*.
+
+        *This is an atomic operation* with regard to calls to
+        :meth:`get` on this or other processes.
         """
         assert isinstance(value, (NoneType, str, int, float, bool)), \
             f"value must be None, str, int, float, bool; got {type(value)}"
 
-
-    def get_last_mtime(self, key):
-        """
-        Return the time of the last modification (in seconds)
-
-        :param str key: name of the key that was modified
-
-        :returns: time (in seconds) of the last modification since the
-          Epoch [same time reference as :func:`time.time`.
-
-        :raises KeyError: if key not found
-        """
-        raise NotImplementedError
 
     def get(self, key, default = None):
         """
@@ -3568,10 +3689,19 @@ class fsdb_symlink_c(fsdb_c):
 
     def _raw_read(self, location):
         # we default to bytes so we return bytes
-        return os.readlink(location.encode())
+        value = os.readlink(location.encode())
+        if value[0:2] == b"x:":	# see _raw_write
+            value = codecs.decode(value, encoding = "quopri")
+        return value
 
     def _raw_write(self, location, value):
         try:
+            if value[0:2] == b"x:":
+                # when doing x: (bytes) we might have NULLs and nasty
+                # stuff, and symlink targets might not take it so
+                # well, so encode them with quoted printable, so we
+                # still can easily see some basic stuff to debug
+                value = codecs.encode(value, encoding = "quopri")
             os.symlink(value, location)
         except OSError as e:
             # symlinks have a size limit
@@ -3587,10 +3717,6 @@ class fsdb_symlink_c(fsdb_c):
 
     def _raw_rename(self, location_new, location):
         os.replace(location_new, location)
-
-    @staticmethod
-    def _raw_stat(location):
-        return os.lstat(location)
 
     @staticmethod
     def _key_quote(key):
@@ -3714,10 +3840,14 @@ class fsdb_symlink_c(fsdb_c):
             return True
 
         # New location, add a unique thing to it so there is no
-        # collision if more than one process is trying to modify
-        # at the same time; they can override each other, that's
-        # ok--the last one wins.
-        # now, this is not that atomic, but it works for what we need
+        # collision if more than one process is trying to modify at
+        # the same time; they can override each other, that's ok--the
+        # last one wins.
+        #
+        # NOW: this implements an atomicity vs the get operation since
+        # a getter in any other process will always see the data
+        # consistently written, either the old data or the new data,
+        # but never half.
         if nested_flat_keyspace:
             self._keys_cleanup(key, all_keys_index = _keys_index)
         location_new = location + "-" + str(os.getpid()) + "-" + str(threading.get_ident())
@@ -3941,14 +4071,6 @@ class fsdb_symlink_c(fsdb_c):
         return self._get_raw(self._key_quote(key), default = default)
 
 
-    def get_last_mtime(self, key):
-        _key_quoted, filepath = self._location_get(key)
-        try:
-            return self._raw_stat(filepath).st_mtime
-        except FileNotFoundError as e:
-            raise KeyError(key) from e
-
-
 class fsdb_file_c(fsdb_symlink_c):
     """
     In filesystem quick database, but with files instead of symlinks
@@ -3983,9 +4105,6 @@ class fsdb_file_c(fsdb_symlink_c):
 
     def _raw_rename(self, location_new, location):
         os.replace(location_new, location)
-
-    def _raw_stat(self, location):
-        return os.lstat(location)
 
 
 def retry_cb_tries(ExceptionToCheck,
