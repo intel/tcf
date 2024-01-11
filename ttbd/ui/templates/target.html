@@ -405,9 +405,9 @@ $ tcf ls -vv {{ targetid}}</code> </pre></p>
                     <a class='download-button' href='/ttb-v2/targets/{{targetid}}/console/read?component={{console}}' download='console-{{targetid}}-{{console}}.txt'>download ⇓</a>
                     {% if console_info.state == False %}
                         <button id='console-enable-button-{{console}}' onclick='js_console_enable("{{targetid}}", "{{console}}", "enable")' >enable</button>
-                        <button id='console-disable-button-{{console}}' onclick='js_console_enable("{{targetid}}", "{{console}}", "disable")' disabled>disable</button>
+                        <button id='console-disable-button-{{console}}' onclick='js_console_enable("{{targetid}}", "{{console}}", "disable")'>disable</button>
                     {% else %}
-                        <button id='console-enable-button-{{console}}' onclick='js_console_enable("{{targetid}}", "{{console}}", "enable")' disabled>enable</button>
+                        <button id='console-enable-button-{{console}}' onclick='js_console_enable("{{targetid}}", "{{console}}", "enable")'>enable</button>
                         <button id='console-disable-button-{{console}}' onclick='js_console_enable("{{targetid}}", "{{console}}", "disable")'>disable</button>
                     {% endif %}
                     <small>|</small>
