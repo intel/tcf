@@ -82,6 +82,7 @@ nav > ul {
     border-bottom-right-radius: 0.2em;
     margin-top: 1em;
     color: white;
+    box-shadow: 0 4px 8px 0 rgba(0,0,0,.2);
 }
 
 nav > ul > img {
@@ -190,6 +191,7 @@ main {
     background-color: white;
     border-bottom-left-radius: 0.5em;
     border-bottom-right-radius: 0.5em;
+    box-shadow: 0 2px 4px 0 rgba(0,0,0,.2);
 }
 
 main > h1 {
