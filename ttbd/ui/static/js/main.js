@@ -712,18 +712,12 @@ async function js_console_enable(targetid, terminal, enable) {
     }
 
     let label_console_state = document.getElementById('console-state-label-' + terminal);
-    let button_console_enable = document.getElementById('console-enable-button-' + terminal);
-    let button_console_disable = document.getElementById('console-disable-button-' + terminal);
     if (enable == 'enable'){
         label_console_state.textContent = 'enable';
         label_console_state.style.color = 'green';
-        button_console_enable.disabled = true;
-        button_console_disable.disabled = false;
     } else {
         label_console_state.textContent = 'disable';
         label_console_state.style.color = 'red';
-        button_console_enable.disabled = false;
-        button_console_disable.disabled = true;
     }
     $('#loading').empty();
 
