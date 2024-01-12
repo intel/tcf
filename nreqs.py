@@ -1128,8 +1128,14 @@ logging.addLevelName(7, "D4")
 logging.addLevelName(6, "D5")
 
 args = parser.parse_args()
-logging.basicConfig(format = "%(levelname)s: %(message)s",
-                    level = args.verbose)
+if 'LOG_PREFIX' in os.environ:
+    logging.basicConfig(
+        format = f"{os.environ['LOG_PREFIX']}%(levelname)s: %(message)s",
+        level = args.verbose)
+else:
+    logging.basicConfig(
+        format = "%(levelname)s: %(message)s",
+        level = args.verbose)
 
 # Instantiate installation method drivers, they self-register
 #
