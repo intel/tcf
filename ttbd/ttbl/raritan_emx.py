@@ -235,6 +235,10 @@ class pci(ttbl.power.impl_c, ttbl.capture.impl_c): # pylint: disable = abstract-
             obj = self._outlet.getState
             result = obj.parent.agent.json_rpc(obj.parent.target, obj.name, {})
             r = result['_ret_']['powerState']
+            if r == 0:
+                # Old PDUs don't seem to use the enums in the API, so
+                return False
+            return True
         except raritan.rpc.HttpException as e:
             # We sometimes get network errors but
             # we don't want them to cause the whole initialziation
