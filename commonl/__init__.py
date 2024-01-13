@@ -950,11 +950,38 @@ def lru_cache_disk(path, max_age_s, max_entries, key_maker = None,
     *Design notes*
 
     Lockless reads rely on the fact that the underlying FSDB
-    implmentation is atomic on the :meth:`commonl.fsdb_c.set`
+    implementation is atomic on the :meth:`commonl.fsdb_c.set`
     operation. By storing the write timestamp with the value, reading
     it also becomes atomic and we can verify it's age and proceed to
     update (taking the lock to balance / expire old entries in the
     cache).
+
+    We write a tuple
+
+    >>> ( time.time(), VALUE )
+    >>> ( time.time(), None, Exception-based-instance) # on exception
+
+    This then is pickled, eg:
+
+    >>> pickle.dumps(( time.time(), { "field": 34 } )
+    >>> b'\x80\x04\x95\x19\x00\x00\x00\x00\x00\x00\x00GA\xd9h\x0e\xa6p3\xda}\x94\x8c\x05field\x94K"s\x86\x94.'
+
+    Now, since in symlinks we can't have NULL chars and other nasties,
+    FSDB will encode this with Quoted Printable characters
+
+    >>> bs = codecs.encode(s, "quopri")
+    >>> print(bs)
+    >>> b'=80=04=95=19=00=00=00=00=00=00=00GA=D9h=0E=B0W=86=A7}=94=8C=05field=94K"s=\n=86=94.'
+
+    which is then created as the symlink target
+
+    >>> os.symlink(bs, "FIELDNAME")
+
+    ::
+
+       $ ls -l FIELDNAME
+       lrwxrwxrwx. 1 inaky inaky 82 Jan 11 11:02 FIELDNAME -> '=80=04=95=19=00=00=00=00=00=00=00GA=D9h=0E=B0W=86=A7}=94=8C=05field=94K"s='$'\n''=86=94.'
+
 
     To test scalability in a complex scenario we ran
     tcf.git/ttbd/device-resolver.py on a system loaded with USB
