@@ -1129,8 +1129,12 @@ logging.addLevelName(6, "D5")
 
 args = parser.parse_args()
 if 'LOG_PREFIX' in os.environ:
+    # in this case, throw in nreqs.py -- this is needed to help add
+    # more namespacing if called from inside a place where we can't
+    # set so much info (eg: our tool that sets LOG_PREFIX calls a
+    # container that calls something else that calls this
     logging.basicConfig(
-        format = f"{os.environ['LOG_PREFIX']}%(levelname)s: %(message)s",
+        format = f"{os.environ['LOG_PREFIX']}nreqs.py: %(levelname)s: %(message)s",
         level = args.verbose)
 else:
     logging.basicConfig(
