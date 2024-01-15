@@ -2,3 +2,9 @@
     display: flex;
     margin-top: 1.5em;
 }
+
+.acquire-targets {
+    padding: 0.5em 1em;
+    border-bottom-left-radius: 0.5em;
+    border-bottom-right-radius: 0.5em;
+}
