@@ -552,6 +552,11 @@ def _allocation(allocid):
                 'allocation.html',
                 allocid = allocid, state = state, guests = guests)
 
+        except commonl.fsdb_symlink_c.invalid_e as e:
+            # lets not crash if the user is trying to access an allocation
+            # that does not exist. We can just redirect him to the
+            # allocations table
+            return flask.redirect(flask.url_for('ui._allocation_ui'))
         except Exception as e:
             flask_logi_abort(
                 400, f"exception rendering /ui/allocation/{allocid}: {e}",
