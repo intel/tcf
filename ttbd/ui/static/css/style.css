@@ -417,6 +417,7 @@ button:hover:enabled {
 
 #t-targets_wrapper {
     padding: 1em 1em;
+    margin-top: 0;
 }
 
 #t-alloc_wrapper {
@@ -534,7 +535,7 @@ hr {
   width: 25em;
   opacity: 1;
   text-align: left;
-  background-color: #aaa;
+  background-color: #eee;
   color: black;
   padding: 2em;
   font-size: 0.7em;
@@ -543,6 +544,7 @@ hr {
   border: 1px solid rgb(190,190,190);
   border-bottom-left-radius: 0.5em;
   border-bottom-right-radius: 0.5em;
+  box-shadow: 0 0 11px rgba(33,33,33,.4);
 
   /* Position the tooltip */
   position: absolute;
