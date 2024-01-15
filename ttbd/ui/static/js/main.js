@@ -1,46 +1,6 @@
 "use strict";
 
 /*
-* make an http request to make an allocation for the current user
-*
-* @param {targetid} str -> target to acquire
-*
-* return {void} -> it reloads the windows though
-*/
-async function acquire(targetid) {
-    let r = await fetch('/ttb-v2/allocation', {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-            'groups': {
-                targetid: [targetid]
-            },
-            'queue': true,
-            "endtime": 'static',
-      })
-    });
-
-    let b = await r.text();
-
-    if (r.status == 401) {
-        alert(
-            'oops, seems that you are not logged in. Please log in to' +
-            ' acquire machines (top right corner)'
-        );
-        return
-    }
-
-    if (r.status != 200) {
-        alert(b);
-        return
-    }
-
-    window.location.reload()
-}
-
-/*
 * releases target based on an allocation id
 *
 * @param {allocid} str -> allocation id that you want to remove
