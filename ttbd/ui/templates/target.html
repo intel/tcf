@@ -55,7 +55,7 @@
 
     {% if not state.acquired %}
       <div class = "tooltip">
-        <button class='acquire' onclick='acquire("{{targetid}}")'>acquire</button>
+        <button class='acquire' onclick='acquire(["{{targetid}}"])'>acquire</button>
         <span class = "tooltiptext">
           Allocate this target so you can use it.
           <p>
