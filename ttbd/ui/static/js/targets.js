@@ -26,7 +26,7 @@ async function acquire(target_list) {
             'groups': {
                 group_id: target_list
             },
-            'queue': false,
+            'queue': false, //FIXME show the user the reservation did not queue
             "endtime": 'static',
       })
     });
