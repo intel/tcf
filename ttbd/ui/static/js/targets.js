@@ -49,3 +49,30 @@ async function acquire(target_list) {
     window.location.reload()
 }
 
+/*
+* Acquire targets selected with checkboxes.
+*
+* For selecting the targets the table must have an input tag with the following
+* requirements.
+* -  value shall be the target id
+* -  type shall be set to checkbox
+*
+* Note that you will only be able to have a one target per checkbox.
+*
+* @param {checkboxes_class} str -> class all the checkboxes representing
+*                                  targets share
+*
+* return {void}
+*/
+function js_acquire_selected_targets(checkboxes_class) {
+
+    let checkboxes = document.getElementsByClassName(checkboxes_class)
+    let targets = new Array()
+
+    for (let i = 0; i < checkboxes.length; i++) {
+        if (checkboxes[i].checked) {
+            targets.push(checkboxes[i].value);
+        }
+    }
+    acquire(targets);
+}

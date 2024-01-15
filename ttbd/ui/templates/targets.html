@@ -23,10 +23,27 @@ no permissions, use the <i>report issue</i> link above</p>
 
 {% else %}
 
+<div class='toolbar-targets'>
+      <div class = "tooltip">
+        <button onclick='js_acquire_selected_targets("checkbox-acquire-target")'>acquire selected</button>
+        <span class = "tooltiptext">
+          Allocate multiple targets so you can use them.
+          <p>
+            Any operation on targets requires them being acquired by
+            you; you can later add guests in the allocations menu.
+          </p>
+          <p>
+            On the command line, you can use:
+            <pre><code class="language-bash">$ tcf acquire target1 target2 target3</code></pre>
+          </p>
+        </span>
+      </div>
+</div>
+<hr>
 <table id='t-targets' class='display'>
 <thead>
   <tr>
-    <!--<th>&nbsp;</td>-->
+    <th>&nbsp;</td>
     <th>target id</td>
     <th>type</td>
     <th>ipv4 address</td>
@@ -38,6 +55,7 @@ no permissions, use the <i>report issue</i> link above</p>
 
   {% for k, v in targets.items() %}
   <tr>
+    <td> <input class='checkbox-acquire-target' value='{{k}}' type='checkbox'> </td>
     <td> <a href='/ttb-v2/ui/target/{{k}}'>{{ k }}</td>
     <td>{{ v.type }}</td>
 
