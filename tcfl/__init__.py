@@ -61,8 +61,13 @@ log_sd = logging.getLogger("server-discovery")
 config_path = []
 
 class result_c:
-    def __init__(self, passed = 0, errors = 0, failed = 0,
-                 blocked = 0, skipped = 0):
+    def __init__(self, passed: int = 0, errors: int = 0, failed: int = 0,
+                 blocked: int = 0, skipped: int = 0):
+        assert isinstance(passed, int)
+        assert isinstance(errors, int)
+        assert isinstance(failed, int)
+        assert isinstance(blocked, int)
+        assert isinstance(skipped, int)
         self.passed = passed
         self.errors = errors
         self.failed = failed
