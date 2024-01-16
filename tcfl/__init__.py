@@ -2570,6 +2570,23 @@ class tc_info_c:
         self._axes_randomizer_impl = None
 
 
+    def __data_dump__(self):
+        #
+        # Dump data in dict format, kinda like __repr__ but more
+        # structured; called by commonl.data_dump_recursive(). See it
+        # for rules.
+        d = {
+            "name": self.name,
+            "result": self.result,
+        }
+        if self.exception:
+            d["exception"] = self.exception
+        if self.exception:
+            d["traceback"] = self.formatted_traceback
+        if self.output != None:
+            d["output"] = self.output
+        return d
+
 
     @property
     def axes_permutations(self):
