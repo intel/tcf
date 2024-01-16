@@ -2698,6 +2698,17 @@ def data_dump_recursive(d, prefix = u"", separator = u".", of = sys.stdout,
       for creating the generator is called and then the generator
       iterated to gather the data.
 
+    - if *d* has an attribute called *__data_dump* and it is callable,
+      it is considered to be a function that will return a dictionary
+      keyed by string, kinda like __repr__ but structured.
+
+      Rules: return a dict keyed by string; values have to be
+      scalar (bool, int, float, str) or other dicts following the
+      same rules
+
+      This is meant to be easily representable for user reporting
+      and/or debugging, so add fields only when they make sense
+
     See also :func:`data_dump_recursive_tls`
 
     :param d: data to print
@@ -2748,6 +2759,14 @@ def data_dump_recursive(d, prefix = u"", separator = u".", of = sys.stdout,
         d.seek(0, 0)
         of.write(prefix)
         of.writelines(d)
+    elif hasattr(d, "__data_dump__") and callable(d.__data_dump__):
+        # this is like __repr__, but nested-dict oriented and with more detail
+        data_dump = d.__data_dump__()
+        for key, val in sorted(data_dump.items(), key = lambda i: i[0]):
+            with tls_prefix_c(tls, str(key) + ": "):
+                data_dump_recursive_tls(val, tls,
+                                        separator = separator, of = of,
+                                        depth_limit = depth_limit - 1)
     else:
         of.write(prefix + u": " + mkutf8(d) + u"\n")
 
@@ -2805,6 +2824,14 @@ def data_dump_recursive_tls(d, tls, separator = u".", of = sys.stdout,
         of.writelines(d)
     elif isinstance(d, types.GeneratorType):
         of.writelines(d)
+    elif hasattr(d, "__data_dump__") and callable(d.__data_dump__):
+        # this is like __repr__, but nested-dict oriented and with more detail
+        data_dump = d.__data_dump__()
+        for key, val in sorted(data_dump.items(), key = lambda i: i[0]):
+            with tls_prefix_c(tls, str(key) + ": "):
+                data_dump_recursive_tls(val, tls,
+                                        separator = separator, of = of,
+                                        depth_limit = depth_limit - 1)
     else:
         of.write(mkutf8(d) + u"\n")
 
