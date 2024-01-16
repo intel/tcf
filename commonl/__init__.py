@@ -247,6 +247,29 @@ class Process(fork_c):	# COMPAT
     pass
 
 
+
+def format_dict_as_str(d: dict, separator: str = ' ') -> str:
+    """
+    Format a dictionary as a string of K:V separated by *separator*
+
+    :param dict d: input dictionary; keys and values need to be
+      representable as string
+
+      **WARNING!** keep it small
+
+    :param str separator: (optional, default one space) string used to
+      separate each entry in the dictionary in the final string
+
+    :returns str: the formated string
+    """
+    assert isinstance(d, dict), \
+        f"d: expected dict, got {type(d)}"
+    assert isinstance(separator, str), \
+        f"separator: expected str, got {type(separator)}"
+    return separator.join(f"{k}:{v}" for k, v in d.items())
+
+
+
 class thread_periodical_runner_c(threading.Thread):
     """
     A simple class to run a function periodically
