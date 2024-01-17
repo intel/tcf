@@ -49,8 +49,27 @@ class authenticator_ldap_c(ttbl.authenticator_c):
     If *'groups'* is a *None*, it means give that role to anyone, they
     don't have to be part of any group. This allows to permit the role
     to anyone that can authenticate with LDAP.
+
+    If there is no *users* mapping, all users that authorize correctly
+    are allowed access.
+
+    If *map_ldap_groups_to_roles* is defined, then all groups in LDAP
+    the user is a member of will be exposed as roles in the server (in
+    addition to those defined in roles).
+
+    To gain *admin* access in the server, there has to be a mapping
+    *admin* to LDAP groups, eg:
+
+    >>> roles = {
+    >>>     'admin': {
+    >>>         'users': [ "john", "lamar", ],
+    >>>         'groups': [ "Admin Group"  ],
+    >>>     },
+    >>> },
+
     """
-    def __init__(self, url, roles = None, group_ou = None, user_ou = None):
+    def __init__(self, url, roles = None, group_ou = None, user_ou = None,
+                 map_ldap_groups_to_roles: bool = False):
         """
         :param str url: URL of the LDAP server
         :param dict roles: map of roles to users and groups
@@ -59,14 +78,20 @@ class authenticator_ldap_c(ttbl.authenticator_c):
         :param str user_ou: ldap org unit name for users
             e.g. 'Employees', 'Workers'
 
+        :param bool map_ldap_groups_to_roles: (optional, default
+          *False*) when turned on, creates a role for every LDAP group
+          the user is a member of.
+
         example class instance:
         >>> authenticator_ldap_c("ldap://somehost:31312", roles = [etc etc],
         >>>                 group_ou = "Groups", users_ou = "Emplyees")
+
         """
         if not roles:
             roles = {}
         assert isinstance(url, str)
         assert isinstance(roles, dict)
+        assert isinstance(map_ldap_groups_to_roles, bool)
 
         if user_ou:
             logging.warning(
@@ -104,6 +129,7 @@ class authenticator_ldap_c(ttbl.authenticator_c):
                                              (role, tag, value))
         self.conn = None
         self.roles = roles
+        self.map_ldap_groups_to_roles = map_ldap_groups_to_roles
         if ttbl.config.ssl_enabled_check_disregard == False \
                 and ttbl.config.ssl_enabled == False:
             raise RuntimeError("LDAP can't run as HTTPS is disabled")
@@ -315,6 +341,15 @@ class authenticator_ldap_c(ttbl.authenticator_c):
 
         # Given the group list @groups, check which more roles we
         # need to add based on group membership
+        if self.map_ldap_groups_to_roles:
+            # map all LDAP groups as roles
+            token_roles.update(groups)
+
+        if 'users' not in self.roles:
+            # there is no users role mapping, so any user that has
+            # authorized succesfully with LDAP is a valid user
+            token_roles.add('user')
+
         for role_name, role in self.roles.items():
             role_groups = role.get('groups', [])
 
