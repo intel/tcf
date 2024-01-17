@@ -2453,6 +2453,38 @@ def dict_to_flat(d, projections = None, sort = True, empty_dict = False):
                                        projections, depth_limit - 1,
                                        prefix = prefix + "    ",
                                        sort = sort, empty_dict = empty_dict)
+                # finally, add the field some.field.that.is.a.dict =
+                # THEDICT it self; this allows doing things like
+                # "'somestring' in some.field.that.is.a.dict"; we only
+                # do it if this is a flattened dictionary, since
+                # otherwise, it is already done
+                #
+                # Longer: when we are creating the flat version of a dictionary
+                #
+                # - A:
+                #   - i:
+                #     - x: 2
+                #     - y: 4
+                #
+                # we were expanding as
+                #
+                # a.i.x: 2
+                # a.i.y: 4
+                # a: { i: { x: 2, y: 4 } }
+                #
+                # this adds
+                #
+                # a.i: { x: 2, y: 4 }
+                #
+                # so we have
+                #
+                # a.i.x: 2
+                # a.i.y: 4
+                # a.i: { x: 2, y: 4 }
+                # a: { i: { x: 2, y: 4 } }
+                if '.' in field_flat:
+                    _add(field_flat, val)
+
         elif field_needed(field_flat, projections):
             _add(field_flat, val)
 
