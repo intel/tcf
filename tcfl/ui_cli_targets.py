@@ -230,7 +230,7 @@ def _cmdline_ls(cli_args):
         _targets_print_v1(tcfl.targets.discovery_agent)
     elif verbosity == 2:
         for rtfullid in tcfl.targets.discovery_agent.rts_fullid_sorted:
-            rt = tcfl.targets.discovery_agent.rts_flat[rtfullid]
+            rt = tcfl.targets.discovery_agent.rts[rtfullid]
             print(rt['fullid'])
             commonl.data_dump_recursive(rt, prefix = rt['fullid'])
     elif verbosity == 3:	# late import, only when needed
