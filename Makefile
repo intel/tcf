@@ -162,10 +162,15 @@ tests:
 	python3 -m unittest discover -vv
 
 # RPM versions can't have dash (-), so use underscores (_)
-# To match Python's packaging.version:
-#  - remove the leading v (v0.14.4562.g3a33 -> 0.14.4562.g3a33)
-#  - remove the g in the commit number (0.14.4562.g3a33 -> 0.14.4562.3a33)
-export VERSION ?= $(shell git describe | sed -e 's/^v\([0-9]\+\)/\1/' -e 's/-/./g' -e 's/\.g/./')
+# To match Python's packaging.version requirements https://packaging.python.org/en/latest/specifications/version-specifiers/:
+#
+#  - remove the leading v (v0.14.4562.g9df37931 -> 0.14.4562.g9df37931)
+#  - remove the g in the commit number (0.14.4562.g9df37931 -> 0.14.4562.9df37931)
+#  - commit number has to be dec (vs hex) so we format it as a decimal integer
+#    ( 0.14.4562.9df37931 ->  0.14.4562.2649979185)
+#  - awk's $1 has to be coded as $$1 so make(1) passes it as $1
+export VERSION ?= $(shell git describe \
+	| awk -vFS=- '{ gsub("^v", "", $$1); gsub("^g", "", $$3); printf("%s.%s.%d", $$1, $$2, strtonum("0x" $$3)); }')
 
 export DISTRO        ?= $(shell source /etc/os-release && echo $$ID)
 export DISTRONAME    ?= $(shell echo $(DISTRO) | tr A-Z a-z)
@@ -204,3 +209,6 @@ rpms-tcf: setup.cfg
 	./build_rpms.sh -d $(DISTRONAME) -v $(DISTROVERSION) -p $(RPMDIR) -i $(CONTAINER)
 
 rpms: rpms-tcf rpms-tcf-zephyr rpms-ttbd rpms-ttbd-zephyr rpms-ttbd-pos
+
+version:
+	@echo $(VERSION)
