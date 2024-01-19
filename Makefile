@@ -162,7 +162,10 @@ tests:
 	python3 -m unittest discover -vv
 
 # RPM versions can't have dash (-), so use underscores (_)
-export VERSION ?= $(shell git describe | sed 's/^v\([0-9]\+\)/\1/' | sed 's/-/./g')
+# To match Python's packaging.version:
+#  - remove the leading v (v0.14.4562.g3a33 -> 0.14.4562.g3a33)
+#  - remove the g in the commit number (0.14.4562.g3a33 -> 0.14.4562.3a33)
+export VERSION ?= $(shell git describe | sed -e 's/^v\([0-9]\+\)/\1/' -e 's/-/./g' -e 's/\.g/./')
 
 export DISTRO        ?= $(shell source /etc/os-release && echo $$ID)
 export DISTRONAME    ?= $(shell echo $(DISTRO) | tr A-Z a-z)
