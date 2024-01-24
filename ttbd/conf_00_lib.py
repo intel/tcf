@@ -454,7 +454,7 @@ class vlan_pci(ttbl.power.impl_c):
 
 
 def target_vlan_add(nw_name: str,
-                    switch_target: ttbl.test_target ,
+                    switch_target: ttbl.test_target,
                     mac_addr: str, vlan_id: int,
                     ipv4_addr: str, ipv4_prefix_len: int,
                     ipv6_addr: str, ipv6_prefix_len: int,
