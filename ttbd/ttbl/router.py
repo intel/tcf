@@ -37,8 +37,12 @@ class router_c:
     """
     def __init__(self, hostname, username = None, password = None,
                  logger = None):
-        self.username, self.password, self.hostname = \
-            commonl.split_user_pwd_hostname(hostname)
+        self.hostname = None
+        self.username = None
+        self.password = None
+        if hostname:
+            self.username, self.password, self.hostname = \
+                commonl.split_user_pwd_hostname(hostname)
         # override username and password from args, if present
         if username:
             self.username = username
@@ -663,15 +667,19 @@ class vlan_manager_c(ttbl.power.impl_c):
         # So pull the data from SSH console (hackish) and create a
         # router object; they are lightweight anyway
         console, _name = self.switch_target.power.impl_get_by_name(self.switch_console)
+        if console.kws == None:
+            console.kws = {}
         username = self.switch_target.fsdb.get(
             f"interfaces.console.{self.switch_console}.parameter_user",
-            console.kws['username'])
-        password = console.keyring.get_password(
-            f"{ttbl.config.instance}.{target.id}",
-            f"interfaces.console.{self.switch_console}.parameter_password")
-        if not password:
+            console.kws.get('username', None))
+        password = None
+        if hasattr(console, "keyring"): # SSH/telnet consoles have this
+            password = console.keyring.get_password(
+                f"{ttbl.config.instance}.{target.id}",
+                f"interfaces.console.{self.switch_console}.parameter_password")
+        if not password and hasattr(console, "password"): # SSH/telnet consoles have this
             password = console.password
-        hostname = console.kws['hostname']
+        hostname = console.kws.get('hostname', None)
         router = self.switch_class(
             hostname, username = username, password = password,
             logger = target.log
