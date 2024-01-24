@@ -553,7 +553,7 @@ class router_manager_c(ttbl.power.impl_c):
                  switch_class = None, switch_console = "ssh0", **kwargs):
         ttbl.power.impl_c.__init__(self, off_on_release = True, **kwargs)
         self.name = "router-manager"
-        self.upid_set("Manager for router/switch {type(switch_class)}")
+        self.upid_set(f"Manager for router/switch {switch_class}")
         self.switch_class = switch_class
         self.switch_console = switch_console
 
