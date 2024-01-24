@@ -544,6 +544,29 @@ class cisco_c(router_c):
 
 
 
+class fake_c(router_c):
+    """
+    Class for creating a fake router for testing
+    """
+    def __init__(self, hostname, username = None, password = None, logger = None):
+        router_c.__init__(self, hostname, username, password, logger)
+        self.logger = logger
+
+    def server_link_setup(self, target, component):
+        self.logger.error(f"{component}: set up server link")
+
+    def vlan_create(self, vlan_id, vlan_name, switch_ports):
+        self.logger.error(f"{vlan_id}: created for {vlan_name=}")
+
+    def vlan_destroy(self, vlan_id, vlan_name):
+        self.logger.error(f"{vlan_id}: destroying for {vlan_name=}")
+
+    def vlan_get(self, vlan_id):
+        self.logger.error(f"{vlan_id}: getting")
+        return True	# always active
+
+
+
 class router_manager_c(ttbl.power.impl_c):
     """
     Power adaptor that will create a VLAN when powered on, remove it
