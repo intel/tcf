@@ -50,7 +50,7 @@ class router_c:
             self.logger = logger
 
 
-    def server_link_setup(self):
+    def server_link_setup(self, target: ttbl.test_target, component: str):
         """
         Setup the server's connection to the switch
 
@@ -64,7 +64,7 @@ class router_c:
         pass
 
 
-    def vlan_create(self, vlan_id, vlan_name, swich_ports):
+    def vlan_create(self, vlan_id, vlan_name, switch_ports):
         """
         Create VLAN
 
@@ -79,7 +79,7 @@ class router_c:
         raise NotImplementedError
 
 
-    def vlan_destroy(self, vlan_id):
+    def vlan_destroy(self, vlan_id, vlan_name):
         """
         Destroy a VLAN
 
