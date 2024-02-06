@@ -451,6 +451,17 @@ class driver(tc.report_driver_c):
             entry['server_url'] = target.server.url
             kws['targets'].append(entry)
 
+        # list only the servers that contain the current targets
+        servers = set(target.server for target in _tc.targets.values())
+        kws['tcfl_config_urls'] = []
+        for server in sorted(list(servers)):
+            kws['tcfl_config_urls'].append((
+                server.url,
+                not server.ssl_verify,	# ssl_ignore
+                server.aka,
+                server.ca_path,
+            ))
+
         kws['tags'] = {}
         for tag in _tc._tags:
             (value, origin) = _tc.tag_get(tag, None, None)
