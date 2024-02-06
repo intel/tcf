@@ -22,12 +22,13 @@ TCF: {{ tc_name_short }} @ {{ target_group_info }} **{{ result_past }}**
 
 {%- block TARGET_INFORMATION %}
 {%- if targets %}
-Target Name         Remote ID                     Type
-------------------- ----------------------------- -------------------------
+Target Name  Remote ID                     Type               URL
+------------ ----------------------------- ------------------ ---------
 {% for target_info in targets -%}
-{{ "%-19s %-29s %-25s"
+{{ "%-12s %-29s %-18s %s"
    | format(target_info.want_name, target_info.fullid,
-            target_info.type) }}
+            target_info.type,
+            target_info.server_url + "/ttb-v2/ui/target/" + target_info.id) }}
 {% endfor -%}
 {% else %}
 (this testcase used no remote targets and ran locally)
