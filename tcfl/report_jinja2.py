@@ -445,8 +445,10 @@ class driver(tc.report_driver_c):
         for target_want_name, target in _tc.targets.items():
             entry = {}
             entry['want_name'] = target_want_name
+            entry['id'] = target.id
             entry['fullid'] = target.fullid
             entry['type'] = _tc.type_map.get(target.type, target.type)
+            entry['server_url'] = target.server.url
             kws['targets'].append(entry)
 
         kws['tags'] = {}
