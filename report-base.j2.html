@@ -1,0 +1,221 @@
+{#
+This is a Jinja2 template which can be extended to suit your reporting
+needs
+
+report.j2.html expands this; you can define a report.j2.html this in
+.tcf:~/.tcf:/etc/tcf to override it. You can also override this file
+in any of those locations.
+
+See FIXME: location
+
+TIPS:
+
+- Note {%- and -%}, they are used to avoid adding vertcal whitespace;
+  see http://jinja.pocoo.org/docs/2.10/templates/#whitespace-control
+  Adding - basically eats out the emtpy vertical whitespace.
+
+-#}
+
+<!doctype html>
+<html>
+  <head>
+    <!--
+        SPDX-License-Identifier: Apache-2.0
+        Copyright (c) 2024 Intel Corporation
+      -->
+    <title>
+      {% block TITLE %}
+      TCF: {{ tc_name_short }} @ {{ target_group_info }} **{{ result_past }}**
+      {% endblock %}
+    </title>
+    
+  </head>
+
+  <style>
+    table {
+/*        border-collapse: collapse; */
+    }
+    
+    th, td {
+        text-align: left;	/* align text to the right */
+        padding: 8px;
+    }
+
+    tr:nth-child(even) {	/* make a grey line every other row  in a table */
+        background-color: #eeEEEE;
+    }
+  </style>
+  
+  <body>
+    <!-- repeat this, since the title is not that visible  -->
+    <h1>
+      <b>TCF:</b> {{ tc_name_short }} @ {{ target_group_info }} <b>{{result_past }}</b>
+    </h1>
+
+    {%- block TARGET_INFORMATION %}
+    <h2>Target information</h2>
+    {%- if targets %}
+    <table>
+      
+      <thead>
+        <tr>
+          <th>Target name</th>
+          <th>Remote ID</th>
+          <th>Type</th>
+        </tr>
+      </thead>
+      
+      <tbody>
+        {% for target_info in targets -%}
+        <tr>
+          <td>{{ target_info.want_name }}</td>
+          <td><a href = "{{ target_info.server_url }}/ttb-v2/ui/target/{{ target_info.id }}">{{ target_info.fullid }}</a></td>
+          <td>{{ target_info.type }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+      
+    </table>
+    
+    {% else %}
+    
+    <p>(this testcase used no remote targets and ran locally)</p>
+    
+    {% endif %}
+    {% endblock -%}
+
+
+    {# This is left empty to other templates to expand as needed #}
+    {%- block HEADER_PREFIX -%}
+    {%- endblock -%}
+
+
+    <h2>Execution Log</h2>
+
+    <ul>
+      
+      <li>console output in lines tagged 'console output'</li>
+      
+      <li>the target might have produced none; GDB might be needed at this point</li>
+      
+      <li>information for all testcase build, deployment and execution phases
+        is included; filter by the first column</li>
+
+    </ul>
+        
+    <pre>
+{% for ident, tgname, message in log -%}
+{{ "%-10s %-25s %s" | format(ident, tgname, message) }}
+{% endfor %}
+
+
+    </pre>
+
+    <hr>
+
+    {% block TAG_INFO -%}
+    <table>
+      
+      <thead>
+        <tr>
+          <th>Testcase tag</th>
+          <th>Value</th>
+          <th>Origin</th>
+        </tr>
+      </thead>
+      
+      <tbody>
+        {% for tag, tag_info in tags.items() -%}
+        <tr>
+          <td>{{ tag }}</td>
+          <td>{{ tag_info.value }}</td>
+          <td>{{ tag_info.origin }}</td>
+        </tr>
+      </tbody>
+      {% endfor %}
+    </table>
+    {%- endblock %}
+
+    
+    {% block REPRODUCTION_STEPS -%}
+    <h2>Reproduction steps</h2>
+
+    {%- if targets %}
+    {%- block TCF_CONFIGURATION %}
+    <p>
+      Make sure your TCF client can access the servers used in this run:
+
+      {% for server_url, ssl_ignore, server_aka, ca_path in tcfl_config_urls -%}
+      <pre>$ tcf servers-discover {{ server_url }}</pre>
+      {% endfor %}
+    </p>
+    {%- endblock %}
+    {%- endif %}
+
+    
+    <p>Run again:</p>
+
+    <pre>$ tcf run -vvv{{ t_option }} {{ tc_name_toplevel }}</pre>
+
+
+    {% if targets -%}
+
+    <table>
+
+      <tr>
+        <td>Find more information about targets: <td/>
+        <td><pre>$ tcf list -vv TARGETNAME1 TARGETNAME2 ...</pre><td/>
+      </tr>
+      <tr>
+        <td>
+          Acquire them for exclusive use:
+          <p>(note the daemon will relinquish them after a time of inactivity)</p>
+        <td/>
+        <td><pre>$ tcf acquire TARGETNAME1 TARGETNAME2 ...</pre><td/>
+      </tr>
+      <tr>
+        <td>Start debugging<td/>
+        <td><pre>
+$ tcf debug-start TARGETNAME
+$ tcf debug-info TARGETNAME
+        </pre><td/>
+      </tr>
+      <tr>
+        <td>Power on/off/cycle<td/>
+        <td><pre>$ tcf power-on|off|cycle TARGETNAME1 TARGETNAME2 ...</pre><td/>
+      </tr>
+      <tr>
+        <td>Read the console<td/>
+        <td><pre>$ tcf console-read TARGETNAME</pre><td/>
+      </tr>
+      <tr>
+        <td>Release when done<td/>
+        <td><pre>$ tcf release TARGETNAME1 TARGETNAME2 ...</pre><td/>
+      </tr>
+      <tr>
+        <td><td/>
+        <td><pre></pre><td/>
+      </tr>
+      <tr>
+        <td><td/>
+        <td><pre></pre><td/>
+      </tr>
+      
+    </table>
+    
+    {% endif -%}
+    {% endblock -%}
+    
+    <h2>Origin</h2>
+    
+    <p>This report was generated by <a href = "http://intel.github.com/tcf/02-QUICKSTART.html">TCF</a>
+      while executing the testcase <i>{{thisfile}}</i>.
+
+    <p>This report can be configure by modifying the Jinja2 template
+      <i>tcfl.report_jinja2.templates['html']</i> in any of
+      TCF's <i>conf_*.py</i> configuration files.</p>.
+
+    </pre>
+  </body>
+</html>
+
