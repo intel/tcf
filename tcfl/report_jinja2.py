@@ -267,6 +267,15 @@ class driver(tc.report_driver_c):
     #: before the testcase is launched, they can be used to extend the
     #: keywords available to the templates or any other things.
     templates = {
+        "html" : dict(
+            name = 'report.j2.html',
+            output_file_name = '%(report_file_prefix)shtml',
+            report_pass = False,
+            report_skip = False,
+            report_error = False,
+            report_fail = False,
+            report_block = False,
+        ),
         "text" : dict(
             name = 'report.j2.txt',
             output_file_name = '%(report_file_prefix)stxt',

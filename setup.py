@@ -109,7 +109,9 @@ This is the client and meta-testcase runner for the TCF test case framework.
         ( os.path.join('@prefix@', 'share', 'tcf'),
          [
              "mk-efi-image.sh",
+             "report-base.j2.html",
              "report-base.j2.txt",
+             "report.j2.html",
              "report.j2.txt",
              "junit-base.j2.xml",
              "junit.j2.xml",
