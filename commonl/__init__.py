@@ -2345,7 +2345,8 @@ def split_user_pwd_hostname(s):
     password = None
     hostname = None
     if '@' in s:
-        user_password, hostname = s.split('@', 1)
+        # some people use @ for passwords....split starting right so we pick
+        user_password, hostname = s.rsplit('@', 1)
     else:
         user_password = ""
         hostname = s
