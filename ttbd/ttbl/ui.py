@@ -68,6 +68,7 @@ import logging
 import json
 import os
 import re
+import time
 import werkzeug
 
 import flask
@@ -159,6 +160,45 @@ def flask_logi_abort(http_code, message, **kwargs):
     response = flask.jsonify({ "_message": message })
     response.status_code = http_code
     raise werkzeug.exceptions.HTTPException(response = response)
+
+def servers_info_get():
+    # collect info about all known servers so we can pass it to the
+    # client to be able to login to them if they want
+    #
+    # use TCFL to find the list of other servers we know about; we
+    # cache it using lru_cache_disk so it is stored in disk and shared
+    # amongst all processes; because state_path is not defined, we
+    # need the function helper so we can use the cache decorator
+
+    @commonl.lru_cache_disk(
+        path = os.path.realpath(
+            os.path.join(
+                # FIXME: ugh, we need a global for daemon cache path,
+                # then this can be moved up outside of here
+                # Also, we need this defined here so state_path is defined
+                ttbl.test_target.state_path,
+                "..", "cache", "ttbd.ui.servers_info_get"
+            )
+        ),
+        max_age_s = 20 * 60,		# refresh periodically
+        max_entries = 20,
+        exclude_exceptions = [ Exception ])
+    def _servers_info_get():
+        import tcfl.servers
+        import urllib.parse
+        tcfl.servers.subsystem_setup()
+        tcfl.servers._discover_bare()	# rediscover if oldish
+        _servers_info = dict()
+        for server_url, _server in tcfl.server_c.servers.items():
+            if 'localhost' in server_url:
+                continue
+            url_parser_obj = urllib.parse.urlparse(server_url)
+            _servers_info[server_url] = {
+                'netloc': url_parser_obj.netloc,
+            }
+        return _servers_info
+
+    return _servers_info_get()
 
 
 
@@ -267,7 +307,11 @@ def _targets():
         # single MACs are at least 18 chars
         short_field_maybe_add(targets[targetid], 'mac', 18)
 
-    return flask.render_template('targets.html', targets = targets)
+    return flask.render_template(
+        'targets.html',
+        targets = targets,
+        servers_info = servers_info_get()
+    )
 
 
 
@@ -509,7 +553,8 @@ def _target(targetid):
         images = images,
         consoles = consoles,
         paths_for_all_images_types = paths_for_all_images_types,
-        buttonls = buttons_component_description
+        buttonls = buttons_component_description,
+        servers_info = servers_info_get(),
     )
 
 
@@ -550,7 +595,9 @@ def _allocation(allocid):
 
             return flask.render_template(
                 'allocation.html',
-                allocid = allocid, state = state, guests = guests)
+                allocid = allocid, state = state, guests = guests,
+                servers_info = servers_info_get(),
+            )
 
         except commonl.fsdb_symlink_c.invalid_e as e:
             # lets not crash if the user is trying to access an allocation
@@ -740,7 +787,11 @@ def _allocation_ui():
     for k, v in allocations.items():
         _allocs_fill(k, v, "/ttb-v2/ui", "local")
 
-    return flask.render_template('allocations.html', allocs = allocs)
+    return flask.render_template(
+        'allocations.html',
+        allocs = allocs,
+        servers_info = servers_info_get()
+    )
 
 
 @bp.before_app_request

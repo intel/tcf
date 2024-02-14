@@ -182,6 +182,61 @@ nav > ul > .nav-right {
     background-color: transparent;
 }
 
+.server_list {
+    margin-left: auto;
+    padding: 0;
+}
+
+.server_list > .server_list_button {
+    background-color: transparent;
+    border-radius: 0;
+    border: 0;
+    font-size: 0.9em;
+    color: white;
+}
+
+.server_list > .server_list_button:hover {
+    color: white;
+    background-color: transparent;
+    text-decoration: underline;
+}
+
+.server_list_dropdown_class {
+    background-color: white;
+    position: absolute;
+    display: inline-block;
+    margin-top: 0;
+    z-index:2;
+    box-shadow: 0 0 11px rgba(33,33,33,.4);
+    padding: 1em;
+    border: 1px solid rgb(190,190,190);
+    border-bottom-left-radius: 0.5em;
+    border-bottom-right-radius: 0.5em;
+    color: gray;
+    font-size: 0.8em;
+}
+
+.server_list_dropdown_class > label {
+    font-size: 0.9em;
+}
+
+
+.server_list_dropdown_class > a:hover {
+    color: #3580b8;
+}
+
+.server_list_dropdown_class > a:active {
+    color: #3580b8;
+}
+
+.server_list_dropdown_class > a:link {
+    color: #3580b8;
+}
+
+.server_list_dropdown_class > a:visited {
+    color: #3580b8;
+}
+
 main {
     font-family: 'Helvetica Neue', 'Helvetica', 'Arial';
     font-size: 0.9em;
