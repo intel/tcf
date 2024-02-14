@@ -11,6 +11,8 @@
     <link rel="stylesheet" href="{{url_for('static', filename = 'css/color-brewer.min.css')}}"/>
     <script src="{{url_for('static', filename = 'js/highlight.min.js')}}"></script>
 
+    <script src="{{url_for('static', filename = 'js/main.js')}}"></script>
+
     <!-- we disable caching, since we need fresh data when we reload-->
     <meta http-equiv = "Cache-Control" content = "no-cache, no-store, must-revalidate" />
     <meta http-equiv = "Pragma" content = "no-cache" />
@@ -44,6 +46,21 @@
 
             {% include "base_help.html" %}
 
+
+            <!--list of other servers we know about-->
+            <li class='server_list'>
+                <button class="server_list_button" onclick='toggle("server_list_dropdown")';>
+                servers + <!-- TODO change this to be the actual server name -->
+                </button>
+                <div id="server_list_dropdown" class="server_list_dropdown_class" style="display: none;">
+                   <label>switch to a different server:</label>
+                   <hr>
+                  {% for server_url, server_info in servers_info.items() %}
+                    <a href = "{{ server_url }}/ttb-v2/ui">{{server_info.netloc}}</a>
+                  {% endfor %}
+                </div>
+            </li>
+
               {% if g.user %}
                 <li class='nav-right'>
                   <div class = "tooltip">
@@ -73,6 +90,7 @@
         </ul>
   </nav>
   </header>
+
   <div class = 'container'>
   <main>
       {% block content %}{% endblock %}

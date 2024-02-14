@@ -685,7 +685,10 @@ def _login_ui():
             return flask.redirect(previous_route)
         return flask.redirect(API_PREFIX + '/ui')
 
-    return flask.render_template('login.html')
+    return flask.render_template(
+        'login.html',
+        servers_info = ttbl.ui.servers_info_get()
+    )
 
 @app.route(API_PREFIX + '/ui/logout', methods = [ 'GET' ])
 def _logout_ui():
