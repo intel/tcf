@@ -968,6 +968,70 @@ class serial_pc(ttbl.power.socat_pc, generic_c):
         return ttbl.power.socat_pc.get(self, target, component)
 
 
+class tcp_pc(ttbl.power.socat_pc, generic_c):
+    """Implement a console via TCP connection
+
+    Say, for example, you are exposing a serial port via TCP in a remote host
+    using a software as hub4com or even socat. This class allow you to add that
+    stream of data as a console to any target (ttbl.test_target). Making it
+    easier to write and read from.
+
+    You can connect any stream using TCP as long as you have the host and port
+
+    >>> target.interface_impl_add(
+    >>>    'console',
+    >>>    'serial_over_tcp',
+    >>>     ttbl.console.tcp_pc('remote.host.intel.com', 8080)
+    >>> )
+
+    In this example, `remote.host.intel.com` is exposing the serial console as
+    a TCP connection on port 8080
+    """
+
+    def __init__(self, host: str, port: str, **kwargs):
+        generic_c.__init__(self, **kwargs)
+        ttbl.power.socat_pc.__init__(
+            self,
+            # note it is important to do the rawer first thing, then
+            # do the settings; rawer resets to raw state
+            "PTY,link=console-%(component)s.write,rawer"
+            "!!CREATE:console-%(component)s.read",
+            f"TCP:{host}:{port}")
+        self.upid_set(
+            f"TCP console to {host}:{port}", host = host, port = port)
+
+
+    def target_setup(self, target, iface_name, component):
+        generic_c.target_setup(self, target, iface_name, component)
+        ttbl.power.socat_pc.target_setup(self, target, iface_name, component)
+
+
+    # console interface; state() is implemented by generic_c
+    def on(self, target, component):
+        ttbl.power.socat_pc.on(self, target, component)
+        generation_set(target, component)
+        generic_c.enable(self, target, component)
+
+    def off(self, target, component):
+        generic_c.disable(self, target, component)
+        ttbl.power.socat_pc.off(self, target, component)
+
+    def enable(self, target, component):
+        self.on(target, component)
+
+    def disable(self, target, component):
+        return self.off(target, component)
+
+    def state(self, target, component):
+        # we want to use this to gather state, since the generic_c
+        # implementation relies on the console-NAME.write file
+        # existing; this can linger if a process dies or not...
+        # but the ttbl.power.socat_pc.get() implementation checks if
+        # the process is alive looking at the PIDFILE
+        # COMPONENT-socat.pid and verifying that thing is still running
+        return ttbl.power.socat_pc.get(self, target, component)
+
+
 class general_pc(ttbl.power.socat_pc, generic_c):
     """Implement a general console/data recorder
 
