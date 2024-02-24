@@ -988,7 +988,7 @@ def _target_patch(target_id):
                         ticket = data.pop('ticket', "")
                     else:
                         data.pop('ticket')
-                data_flat = commonl.dict_to_flat(data)
+                data_flat = commonl.dict_to_flat(data, add_dict = False)
                 # Set parameter via form parameters -- just the keys, it can be long
                 audit_record.kws['data_flat_keys'] = [ i[0] for i in data_flat ]
                 _target_property_set_policy_check(
