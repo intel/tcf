@@ -2398,9 +2398,9 @@ def field_needed(field, projections):
     else:
         return True	# no list, have it
 
-def dict_to_flat(d, projections = None, sort = True, empty_dict = False):
-    """
-    Convert a nested dictionary to a sorted list of tuples *( KEY, VALUE )*
+def dict_to_flat(d, projections = None, sort = True, empty_dict = False,
+                 add_dict: bool = True):
+    """Convert a nested dictionary to a sorted list of tuples *( KEY, VALUE )*
 
     The KEY is like *KEY[.SUBKEY[.SUBSUBKEY[....]]]*, where *SUBKEY*
     are keys in nested dictionaries.
@@ -2412,6 +2412,28 @@ def dict_to_flat(d, projections = None, sort = True, empty_dict = False):
       name or leave the natural order (needed to keep the order of the
       dictionaries) -- requires the underlying dict to be a
       collections.OrderedDict() in older python versions.
+
+    :param bool add_dict: (optional, default *True* for backwards
+      compatibility) for each field that is a dictionary, append also
+      the dictionary itself.
+
+      eg: if *field.subfield* is a dict of *{ a: 1, b: 2 }*, it will add
+
+      - field.subfield: { a: 1, b: 2 }
+      - field.subfield.a: 1
+      - field.subfield.b: 2
+
+      This effectively generates a mixed view (flat and deep)
+
+    :param bool empty_dict: (optional, default *False*) if adding
+      dictionary values (see *add_dict*) add also empty dictionaries.
+
+      eg: if *field.subfield* is *{}*, it will yield
+
+      - field.subfield: {}
+
+      If *False*, *field.subfield* will not be listed.
+
     :returns list: sorted list of tuples *KEY, VAL*
 
     """
@@ -2442,7 +2464,8 @@ def dict_to_flat(d, projections = None, sort = True, empty_dict = False):
         # the assignment.
 
         if isinstance(val, collections.abc.Mapping):
-            if len(val) == 0 and empty_dict == True and field_needed(field_flat, projections):
+            if len(val) == 0 and add_dict and empty_dict == True \
+               and field_needed(field_flat, projections):
                 # append an empty dictionary; do not append VAL --
                 # why? because otherwise it might be modified later by
                 # somebody else and modify our SOURCE dictionary, and
@@ -2483,7 +2506,7 @@ def dict_to_flat(d, projections = None, sort = True, empty_dict = False):
                 # a.i.y: 4
                 # a.i: { x: 2, y: 4 }
                 # a: { i: { x: 2, y: 4 } }
-                if '.' in field_flat:
+                if '.' in field_flat and add_dict:
                     _add(field_flat, val)
 
         elif field_needed(field_flat, projections):
