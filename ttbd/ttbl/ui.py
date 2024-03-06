@@ -67,6 +67,7 @@ import glob
 import logging
 import json
 import os
+import pathlib
 import re
 import time
 import werkzeug
@@ -614,6 +615,41 @@ def _allocation(allocid):
                 exc_info = True)
 
 
+def _image_display_text_default_maker(path: pathlib.Path, info: dict = {}) -> str:
+    '''
+    Return a string that will be displayed in the dropdown menu where the
+    firmwares available for flashing are.
+
+    You can overwrite this function by setting a different one to the variable
+    `image_display_text_maker`, for example, in a config file you could do:
+
+    >>> import ttbl.ui
+    >>>
+    >>> def custom_display_text_func(path, info):
+    >>>     return 'hello world' + path.split()[-1]
+    >>>
+    >>> ttbl.ui.image_display_text_maker = custom_display_text_func
+    >>>
+
+    And then in the dropdown you would see all the entries starting with 'hello
+    world'
+
+    param:path:pathlib.Path|str:
+        full path to fw file
+
+    param:info:dict:
+        dictionary that contains information on the fw, BUT, for this use case,
+        as long as you send a dict with the 'prefix' key (the path prefix that
+        is) it will work
+    '''
+    if 'prefix' in info:
+        return path[len(info['prefix']) + 1:]
+
+    # not enough context for generating a short name to display, defaulting to
+    # the whole path
+    return path
+
+image_display_text_maker = _image_display_text_default_maker
 
 def _get_images_paths(target: ttbl.test_target, inventory: dict, kws: dict):
     '''
@@ -716,18 +752,29 @@ def _get_images_paths(target: ttbl.test_target, inventory: dict, kws: dict):
                     short_name_formatted[:-(len(image_type) + len(suffix))]
 
             local_list = glob.glob(prefix_formatted + f"/*/{image_type}*" + suffix)
-            for filename in sorted(local_list):
+            for full_path in sorted(local_list):
                 file_data = {}
-                file_data["short_name"] = os.path.dirname(filename)[len(prefix_formatted) + 1:]
-                dirname, basename = os.path.split(filename)
+                directory, filename = os.path.split(full_path)
+
+                # short_name is the string that will be displayed in the ui
+                # dropdown
+                # format for short_name: 'directory - filename'
+                #
+                # we add the name of the filename at the end because you could
+                # have multiple fw in the same directory and it becomes
+                # confusing which is which to the user
+                info = {'prefix': prefix_formatted}
+                short_name = image_display_text_maker(directory, info)
+                file_data['short_name'] = f'{short_name} - {filename}'
+
                 if hasattr(ttbl.ui,'keywords_to_ignore_when_path'):
                     for keyword in ttbl.ui.keywords_to_ignore_when_path:
-                        if keyword in basename:
-                            basename = basename.split(keyword)[0]
-                file_list[filename] = file_data
-                images_by_path[dirname].setdefault("images", set())
-                images_by_path[dirname]["images"].add(basename)
-                images_by_path[dirname]["prefix"] = prefix_formatted
+                        if keyword in filename:
+                            filename = filename.split(keyword)[0]
+                file_list[full_path] = file_data
+                images_by_path[directory].setdefault("images", set())
+                images_by_path[directory]["images"].add(filename)
+                images_by_path[directory]["prefix"] = prefix_formatted
 
         images[image_type]['file_list'] = file_list
 
@@ -752,7 +799,7 @@ def _get_images_paths(target: ttbl.test_target, inventory: dict, kws: dict):
         # found all fw in the path
         list_item = {}
         list_item['paths'] = path + '/'
-        list_item['short_name'] = path[len(info['prefix']) + 1:]
+        list_item['short_name'] = image_display_text_maker(path, info)
         paths_for_all_images_types.append(list_item)
 
     return images, paths_for_all_images_types
