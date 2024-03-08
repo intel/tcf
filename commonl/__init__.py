@@ -28,8 +28,8 @@ import fnmatch
 import functools
 import glob
 import hashlib
-import imp
 import importlib
+import importlib.util
 import io
 import inspect
 import json
@@ -108,7 +108,7 @@ def config_import_file(filename, namespace = "__main__",
 
     logging.log(9, "%s: configuration file being loaded", filename)
     try:
-        imp.load_source(namespace, filename)
+        importlib.util.spec_from_file_location(namespace, filename)
         sys.stdout.flush()
         sys.stderr.flush()
         logging.debug("%s: configuration file imported", filename)
