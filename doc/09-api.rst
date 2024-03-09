@@ -207,9 +207,19 @@ Common metadata
   - *ipv4_prefix_len* (int): length in bits of the network portion of
     the IPv6 address
 
-- *idle_poweroff* (int): seconds the target will be idle before the
+- *idle_power_off* (int): seconds the target will be idle before the
   system will automatically power it off (if 0, it will never be
   powered off).
+
+  Called *idle_poweroff* before, still acknowledged for compat reaosns
+
+- *idle_power_fully_off* (int): seconds the target will be idle before the
+  system will automatically FULLY power it off (if 0, it will never be
+  powered off).
+
+  This is different from *idle_power_off* in that it also will power
+  off power rail components marked as *explicit=off* (eg: auxiliary
+  stuff).
 
 - *interfaces* (list of str): list of interface names
 

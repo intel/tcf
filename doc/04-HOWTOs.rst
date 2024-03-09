@@ -2141,13 +2141,13 @@ In your *ttbd*'s `conf_SOMETHING.py` config file, add::
 
   target_pdu_socket_add("TARGETNAME",
         pc = POWER_CONTROLLER,
-        tags = dict(idle_poweroff = 0),
+        tags = dict(idle_power_off = 0),
         power = True)
 
 this creates a target called *TARGETNAME* that you can power on, off
 or cycle. The *power* argument indicates what do do with the power at
 startup (*True* turn it on, *False* turn it off, *None*--or omitting
-this argument, leave it as is). *tags = dict(idle_poweroff = 32)* is
+this argument, leave it as is). *tags = dict(idle_power_off = 32)* is
 used to have *TARGETNAME* not being powered off when idle.
 
 Now, *PC_OBJECT* is the actual implementation of power control and you
@@ -2162,7 +2162,7 @@ instructions <conf_00_lib_pdu.dlwps7_add>`). Because this is a normal,
 
   target_pdu_socket_add("Entrance_light",
         pc = ttbl.pc.dlwps7("http://admin:1234@sp3/5"),
-        tags = dict(idle_poweroff = 0),
+        tags = dict(idle_power_off = 0),
         power = True)
 
 and like this, the target *Entrance_light* can be switched on or off

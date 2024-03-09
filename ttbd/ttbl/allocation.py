@@ -1281,14 +1281,19 @@ def _maintain_released_target(target, calling_user):
         target.log.debug("ALLOC: skiping powering off, skip_cleanup defined")
         return
 
-    idle_poweroff = target.property_get('idle_poweroff',
-                                        ttbl.config.target_max_idle)
+    idle_power_off = target.property_get(
+        'idle_power_off',
+        target.property_get(
+            'idle_poweroff',	# COMPAT
+            ttbl.config.target_max_idle
+        )
+    )
     idle_power_fully_off = target.property_get(
         'idle_power_fully_off',
         ttbl.config.target_max_idle_power_fully_off)
-    if idle_poweroff > 0 or idle_power_fully_off > 0:
+    if idle_power_off > 0 or idle_power_fully_off > 0:
         _idle_power_off(target, calling_user,
-                        idle_poweroff, idle_power_fully_off)
+                        idle_power_off, idle_power_fully_off)
 
 
 def maintenance(ts_now, calling_user, keepalive_fn = None):

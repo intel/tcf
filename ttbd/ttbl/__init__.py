@@ -1492,9 +1492,15 @@ class test_target(object):
                     or self.tags['bsp_models'][bsp_model] == None, \
                     "Value of tag 'bsp_models'/%s has to be a list " \
                     "of strings or None"
-        if 'idle_poweroff' in self.tags:
+        if 'idle_poweroff' in self.tags:	# COMPAT
             # must be an integer
             assert self.tags['idle_poweroff'] >= 0
+        if 'idle_power_off' in self.tags:
+            # must be an integer
+            assert self.tags['idle_power_off'] >= 0
+        if 'idle_power_fully_off' in self.tags:
+            # must be an integer
+            assert self.tags['idle_power_fully_off'] >= 0
         for name, data in  list(self.tags['interconnects'].items()):
             self._tags_verify_interconnect(name, data)
         roles_required = self.tags.get('_roles_required', None)
