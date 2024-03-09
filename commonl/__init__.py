@@ -1506,7 +1506,7 @@ def verify_timeout(what:str, timeout: float,
 
     :param log: logger to use to report messages with INFO level.
 
-    Any other arguments (*\*args* and *\*\*kwargs*) are passed to the
+    Any other arguments (*args* and *kwargs*) are passed to the
     verification function.
     """
     assert isinstance(what, str), \
@@ -3649,7 +3649,7 @@ class fsdb_c(object):
 
     def get_as_slist(self, *patterns):
         """
-        Return a sorted list of tuples *(KEY, VALUE)*\s available in the
+        Return a sorted list of tuples *(KEY, VALUE)* available in the
         database.
 
         :param list(str) patterns: (optional) list of patterns of fields
@@ -3664,7 +3664,7 @@ class fsdb_c(object):
 
     def get_as_dict(self, *patterns):
         """
-        Return a dictionary of *KEY/VALUE*\s available in the
+        Return a dictionary of *KEY/VALUE* available in the
         database.
 
         :param str pattern: (optional) pattern against the key names

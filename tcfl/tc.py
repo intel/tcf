@@ -8109,7 +8109,7 @@ class tc_c(reporter_c, metaclass=_tc_mc):
 
         When creating :term:`testcase driver`, the driver has to
         create its own version of this function. The default
-        implementation recognizes python files called *test_\*.py* that
+        implementation recognizes python files called *test_....py* that
         contain one or more classes that subclass :class:`tcfl.tc.tc_c`.
 
         See examples of drivers in:
