@@ -554,7 +554,7 @@ def ykush_targets_add(ykush_serial, pc_url = None, powered_on_start = None):
 
     - an upstream USB B-female port to the server (in a hub or root hub)
 
-    Note the *YKNNNNN* targets are always tagged *idle_poweroff = 0*
+    Note the *YKNNNNN* targets are always tagged *idle_power_off = 0*
     (so they are never automatically powered off) but not
     *skip_cleanup*; the later would never release them when idle and
     if a recovery fails somewhere, then none would be able to
