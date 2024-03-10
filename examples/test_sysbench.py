@@ -225,7 +225,7 @@ class _test(tcfl.pos.tc_pos0_base):
             ## events per second: 10124.10
             #
             re.compile(
-                "^\s+events per second: +(?P<value>[\.0-9]+)$",
+                r"^\s+events per second: +(?P<value>[\.0-9]+)$",
                 re.MULTILINE): {
                     'value': "CPU speed / events per second (count)",
             },
@@ -237,13 +237,13 @@ class _test(tcfl.pos.tc_pos0_base):
             ## 62167.26 MiB transferred (6215.42 MiB/sec)
             #
             re.compile(
-                "^\s*Total operations:\s+(?P<ops>[0-9]+)\s+\((?P<speed>[\.0-9]+) per second\)$",
+                r"^\s*Total operations:\s+(?P<ops>[0-9]+)\s+\((?P<speed>[\.0-9]+) per second\)$",
                 re.MULTILINE): {
                     'ops': "Memory speed / events (count)",
                     'speed': "Memory speed / events per second (events/s)",
             },
             re.compile(
-                "^\s*(?P<size>[\.0-9]+)\s+MiB transferred\s+\((?P<speed>[\.0-9]+) MiB/sec\)$",
+                r"^\s*(?P<size>[\.0-9]+)\s+MiB transferred\s+\((?P<speed>[\.0-9]+) MiB/sec\)$",
                 re.MULTILINE): {
                     'size': "Memory speed / transferred size (MiB)",
                     'speed': "Memory speed / transfer speed (MiB/s)",
@@ -253,13 +253,13 @@ class _test(tcfl.pos.tc_pos0_base):
 
     output_parse_general = {
         re.compile(
-            "^\s+total time: +(?P<value>[\.0-9]+)s$",
+            r"^\s+total time: +(?P<value>[\.0-9]+)s$",
             re.MULTILINE): {
                 'value': "General statistics / total time (s)",
         },
 
         re.compile(
-            "^\s+total number of events: +(?P<total_number_of_events>[0-9]+)$",
+            r"^\s+total number of events: +(?P<total_number_of_events>[0-9]+)$",
             re.MULTILINE): {
                 'total_number_of_events': "General statistics / total number of events",
         },

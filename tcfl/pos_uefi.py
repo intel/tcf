@@ -777,7 +777,7 @@ def boot_config_multiroot(target, boot_dev, image):
         fstype = target.pos.metadata.get('filesystems', {})\
                                     .get('/', {}).get('fstype', 'ext4')
         if 'rootflags=subvol' in linux_options and fstype != 'btrfs':
-            linux_options = re.sub("rootflags=subvol=\w+", "", linux_options)
+            linux_options = re.sub(r"rootflags=subvol=\w+", "", linux_options)
             target.report_info(
                 "linux cmdline options: removed rootflags for BTRFS"
                 f" since rootfs is '{fstype}': {linux_options}")

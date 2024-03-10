@@ -59,7 +59,7 @@ values that are inherit to the BIOS:
 
   can be tackled with::
 
-    "Press\s+\[F[67]\]\s+to show boot menu options"
+    "Press\\s+\\[F[67]\]\\s+to show boot menu options"
 
 - *bios.boot_prompt_report_backlog* (positive integer; bytes; default
   500): how many bytes of data found before the prompt have to be
@@ -125,7 +125,7 @@ highlighted, it is printed in:
 
 We can use regular Python expressions, such as::
 
-  \\x1b[1m\\x1b\[37m\\x1b\[40m\\x1b\[[0-9]+;[0-9]+HLaunch EFI Shell
+  \\x1b[1m\\x1b\\[37m\\x1b\\[40m\\x1b\\[[0-9]+;[0-9]+HLaunch EFI Shell
 
 References:
 
@@ -151,11 +151,11 @@ import tcfl.tl
 import tcfl.pos
 
 # white/grey-background menus
-normal_white_fg_black_bg = "\x1b\[0m\x1b\[37m\x1b\[40m"	# highlighted
-normal_black_fg_white_bg = "\x1b\[0m\x1b\[30m\x1b\[47m"	# normal
+normal_white_fg_black_bg = r"\x1b\[0m\x1b\[37m\x1b\[40m"	# highlighted
+normal_black_fg_white_bg = r"\x1b\[0m\x1b\[30m\x1b\[47m"	# normal
 # blue background menus
-bold_white_fg_cyan_bg =    "\x1b\[1m\x1b\[37m\x1b\[46m"	# highlighted
-normal_white_fg_blue_bg =  "\x1b\[0m\x1b\[37m\x1b\[44m" # normal
+bold_white_fg_cyan_bg =    r"\x1b\[1m\x1b\[37m\x1b\[46m"	# highlighted
+normal_white_fg_blue_bg =  r"\x1b\[0m\x1b\[37m\x1b\[44m" # normal
 
 ansi_key_codes = {
     'F2': {
@@ -276,14 +276,14 @@ def menu_scroll_to_entry(
       highlighted; defaults to ANSI normal (non bold), white
       foreground, black background::
 
-        \\x1b[0m\\x1b\[37m\\x1b\[40m
+        \\\\x1b[0m\\\\x1b\\[37m\\\\x1b\\[40m
 
 
     :param str normal_string: (optional) sequence that prefixes an
       entry not highlighted; defaults to ANSI normal, black
       foreground, white background::
 
-        \\x1b[0m\\x1b\[30m\\x1b\[47m
+        \\\\x1b[0m\\\\x1b\\[30m\\\\x1b\\[47m
 
     :param str level: (optional; defaults to *top*): the name of the
       level we are working on.
@@ -334,31 +334,31 @@ def menu_scroll_to_entry(
         # takes care of (2) in the function doc
         selected_regex = re.compile(
             highlight_string.encode('utf-8')
-            + b"\x1b\[(?P<row>[0-9]+);(?P<column_value>[0-9]+)H"
+            + rb"\x1b\[(?P<row>[0-9]+);(?P<column_value>[0-9]+)H"
             # value is anything that is not an ANSI escape char
-            + b"(?P<value>[^\x1b]+)"
+            + rb"(?P<value>[^\x1b]+)"
             # the rest for us is fluf until the entry name(key) comes
             + normal_string.encode('utf-8')
             # not sure if these two space sequences are optional
             # note we force with (?P=row) that they are all in the
             # same column; this will cause problem for multiline
             # entries...
-            + b"\x1b\[(?P=row);[0-9]+H\s+"
-            + b"\x1b\[(?P=row);[0-9]+H\s+"
-            + b"\x1b\[(?P=row);(?P<column_key>[0-9]+)H"
+            + rb"\x1b\[(?P=row);[0-9]+H\s+"
+            + rb"\x1b\[(?P=row);[0-9]+H\s+"
+            + rb"\x1b\[(?P=row);(?P<column_key>[0-9]+)H"
             # Some entries do start with a space, but it is not *all* spaces
-            + b"(?P<key>[^\x1b]*[^ \x1b][^\x1b]*)")
+            + rb"(?P<key>[^\x1b]*[^ \x1b][^\x1b]*)")
     else:
         # takes care of (1) in the function doc
         selected_regex = re.compile(
             # This won't work when we have multi line values in key/values
             # :/
             highlight_string.encode('utf-8')
-            + b"\x1b\[(?P<row>[0-9]+);(?P<column_key>[0-9]+)H"
+            + rb"\x1b\[(?P<row>[0-9]+);(?P<column_key>[0-9]+)H"
             # Some entries do start with a space, but it is not *all*
             # spaces; they might finish with a string of spaces, but
             # definitely in a escape sequence
-            + b"(?P<key>[^\x1b]*[^ \x1b][^\x1b]*) *\x1b")
+            + rb"(?P<key>[^\x1b]*[^ \x1b][^\x1b]*) *\x1b")
 
     if isinstance(entry_string, str):
         # convert to bytes
@@ -545,7 +545,7 @@ def menu_dig_to(
       entry being highlighted; defaults to ANSI normal (non bold),
       white foreground, black background::
 
-        \\x1b[0m\\x1b\[37m\\x1b\[40m
+        \\\\x1b[0m\\\\x1b\\[37m\\\\x1b\\[40m
 
     :param bool dig_last: (optional; default *True*) select the last
       menu entry once highlighted.
@@ -632,7 +632,7 @@ def submenu_header_expect(
       |                                    |
       |           Submenu title            |
       |                                    |
-      \------------------------------------/
+      \\------------------------------------/
 
     wider or narrower or depending on the dialog or full  width (for a
     submenu).
@@ -716,7 +716,7 @@ def multiple_entry_select_one(
       /------------\\
       | Enable     |
       | Disable    |
-      \------------/
+      \\------------/
 
     In ANSI terms, this is a string as::
 
@@ -734,14 +734,14 @@ def multiple_entry_select_one(
        ^[[11;34H|^[[11;47H|^[[12;34H|^[[12;47H|	 <--- vertical bars |
        ^[[1m^[[37m^[[46m^[[11;36HEnable
        ^[[0m^[[37m^[[44m^[[12;36HDisable
-       ^[[13;34H\------------/
+       ^[[13;34H\\------------/
 
     selection highlight here is ^[[1m^[[37m^[[46m; this function thus
     waits for:
 
       - ^[[1m^[[37m^[[46m as highlight (selected)
       - ^[[0m^[[37m^[[44m as normal (not selected)
-      - end of menu at \------------/
+      - end of menu at \\------------/
 
     and scroll until what we want is selected
     """
@@ -760,9 +760,9 @@ def multiple_entry_select_one(
         b"/-+"
         + b".*"
         + highlight_string.encode('utf-8')
-        + b"\x1b\[[0-9]+;[0-9]+H"
-        + b"(?P<key>[^\x1b]+)"
-        + b".*"
+        + rb"\x1b\[[0-9]+;[0-9]+H"
+        + rb"(?P<key>[^\x1b]+)"
+        + rb".*"
         + rb"-+/")
     target.report_info("BIOS: %s: scrolling for '%s'"
                        % (level, select_entry))
@@ -865,7 +865,7 @@ def menu_escape_to_main(target, esc_first = True):
     regexl = []
     main_level_entries = main_level_entries_get(target)
     for entry in main_level_entries:
-        regexl.append("\[[0-9]+;[0-9]+H" + entry)
+        regexl.append(r"\[[0-9]+;[0-9]+H" + entry)
     main_menu_regex = re.compile(".*".join(regexl))
     offset = target.console.size()
     for level in range(max_levels):
@@ -928,7 +928,7 @@ def dialog_changes_not_saved_expect(target, action):
       |           Changes have not saved. Save Changes and exit?            |
       |Press 'Y' to save and exit, 'N' to discard and exit, 'ESC' to cancel.|
       |                                                                     |
-      \---------------------------------------------------------------------/
+      \\---------------------------------------------------------------------/
     """
     assert isinstance(target, tcfl.tc.target_c)
     assert action in [ "y", "Y", "n", "N", "0x1b" ]
