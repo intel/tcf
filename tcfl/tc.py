@@ -95,7 +95,8 @@ import copy
 import datetime
 import errno
 import functools
-import imp
+import importlib
+import importlib.util
 import inspect
 import json
 import logging
@@ -8161,7 +8162,20 @@ class tc_c(reporter_c, metaclass=_tc_mc):
             # are in the same directory are loaded
             sys.path.insert(0, os.path.dirname(path))
             name = path.translate(str.maketrans("/.", "__"))
-            module = imp.load_source(name, path)
+            # load the file into __main__ (name) space
+            spec = importlib.util.spec_from_file_location(name, path)
+            module = importlib.util.module_from_spec(spec)
+            module.__file__ = path
+            spec.loader.exec_module(module)
+            # Ok, this is neeed because seems
+            # spec.loader.exec_module() do not add to sys.modules[]
+            # which later inspect.getsourcefile() relies on to find
+            # the source file which we need further down in the for
+            # loop -- TBF, we could just use @path? but this way it'll
+            # work for other code that might expect getsourcefile() to
+            # work.
+            sys.modules[module.__name__] = module
+
         except exception as e:
             raise
         except (ImportError, Exception) as e:

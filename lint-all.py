@@ -15,7 +15,7 @@ current directory or any path given with -p.
 
 import tempfile
 import argparse
-import imp
+import importlib
 import logging
 import os
 import re
@@ -91,7 +91,9 @@ def config_import_file(filename, raise_on_fail = True):
         # will use later in the printing functions to extract the
         # module name again
         module_name = filename.translate(str.maketrans("/.", "__"))
-        module = imp.load_source(module_name, filename)
+        spec = importlib.util.spec_from_file_location(module_name, filename)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
         sys.stdout.flush()
         sys.stderr.flush()
         logging.debug("%s: configuration file imported", filename)

@@ -108,7 +108,10 @@ def config_import_file(filename, namespace = "__main__",
 
     logging.log(9, "%s: configuration file being loaded", filename)
     try:
-        importlib.util.spec_from_file_location(namespace, filename)
+        spec = importlib.machinery.SourceFileLoader(namespace, filename)
+        # make sure the file's contents are loaded inside the module
+        # denoted to by 'namespace'
+        spec.exec_module(sys.modules[namespace])
         sys.stdout.flush()
         sys.stderr.flush()
         logging.debug("%s: configuration file imported", filename)
