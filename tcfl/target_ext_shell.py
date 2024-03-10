@@ -330,9 +330,9 @@ class shell(tc.target_extension_c):
             # stuff incl ANSI stuff and latching to it without false
             # positives is close to impossible.
             self.prompt_regex = re.compile(
-                "TCF-%(tc_hash)s:.+ %%%% [\$#] " % self.target.kws)
+                r"TCF-%(tc_hash)s:.+ %%%% [\$#] " % self.target.kws)
             self.run(
-                'export PS1="TCF-%(tc_hash)s:\w %%%% \$ "' % self.target.kws,
+                r'export PS1="TCF-%(tc_hash)s:\w %%%% \$ "' % self.target.kws,
                 console = console)
         # disable line editing for proper recording of command line
         # when running bash; otherwise the scrolling readline does

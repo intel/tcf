@@ -855,7 +855,7 @@ def _reqs_grok(packages, req_method_details, filename, y):
             logging.info(
                 f"{req}: RECORD package will be installed with any available method")
 
-_filename_regex = re.compile("^.*\.nreqs\.yaml$")
+_filename_regex = re.compile(r"^.*\.nreqs\.yaml$")
 
 def _parse_file(filename, packages, method_details):
     # regular filename

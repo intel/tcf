@@ -2687,7 +2687,7 @@ def ipxe_seize_and_boot(target, boot_ic, dhcp = None, kws = None):
         ## Connection timed out (http://ipxe.org/4c0a6092)
         #
         # So, if we find that URL, raise an error
-        re.compile("\(http://ipxe\.org/[0-9a-f]+\)"),
+        re.compile(r"\(http://ipxe\.org/[0-9a-f]+\)"),
         name = f"{target.want_name}: iPXE error",
         timeout = 0, poll_period = 1,
         raise_on_found = tc.error_e("iPXE error detected")
@@ -3231,7 +3231,7 @@ def edkii_pxe_ipxe_target_power_cycle_to_pos(target, boot_ic, kws_pos = None):
     # doesn't override other targets/consoles we might be
     # touching in parallel
     error_pxe_N = target.console.text(
-        re.compile("PXE-E[0-9]+:[ \w]+"),
+        re.compile(r"PXE-E[0-9]+:[ \w]+"),
         name = f"{target.want_name}: UEFI PXE boot error",
         timeout = 0, poll_period = 1,
         raise_on_found = tc.error_e("UEFI PXE boot error detected")

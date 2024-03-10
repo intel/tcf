@@ -104,7 +104,7 @@ how to make the columns narrower so it is readable
      - List of integers separated with colons (eg: 1:2:3) describing
        on which channels this user entry shall be created; defaults to
        those specifed in all the network entries
-       (*bmcs.bmcN.network\*.channel*).
+       (*bmcs.bmcN.network\\*.channel*).
 
    * - bmcs.bmc0.user0.uid
      - integer (>= 0)

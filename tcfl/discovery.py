@@ -127,7 +127,7 @@ def is_tcf_testcase(path, from_path, tc_name, subcases_cmdline,
 
     When creating :term:`testcase driver`, the driver has to
     create its own version of this function. The default
-    implementation recognizes python files called *test_\*.py* that
+    implementation recognizes python files called *test_\\*.py* that
     contain one or more classes that subclass :class:`tcfl.tc.tc_c`.
 
     See examples of drivers in:
