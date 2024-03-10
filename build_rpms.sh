@@ -1,4 +1,8 @@
-#! /bin/bash
+#! /bin/bash -x
+
+# this is the sourcedir
+topdir=$PWD
+echo I: VERSION is $VERSION
 
 # Get the options passed by the Makefile
 while getopts ":d:v:t:p:i:" o; do
@@ -21,19 +25,9 @@ while getopts ":d:v:t:p:i:" o; do
 done
 
 # Use docker if a container is specified, otherwise just run locally
-if [ "${CONTAINER}" == "None" ]; then
-    BDIST_OPTS="--dist-dir=${RPM_DIR}/ --bdist-base=${PWD}/dist/"
-    cd ${PWD}/${TARGET_DIR} && python3 ./setup.py bdist_rpm ${BDIST_OPTS}
-elif [ "${CONTAINER}" == "True" ]; then
+if [ x"${CONTAINER}" != "x" ]; then
     BUILD_DEPS="dnf install -y python3 rpm-build"
 
-    # Add necessary dependencies depending on the distro and build target
-    if [ "${TARGET_DIR}" == "" ]; then
-        if [ "${DISTRO}" == "centos" ]; then 
-            BUILD_DEPS="dnf install -y dnf-plugins-core && dnf config-manager --set-enabled PowerTools && ${BUILD_DEPS}"
-        fi
-        BUILD_DEPS="${BUILD_DEPS} python3-sphinx python3-sphinx_rtd_theme make git"
-    fi
     if [ "${TARGET_DIR}" == "ttbd" ]; then
         # Find the build dependencies from the generated setup.cfg file
         BUILD_DEPS+=$(awk '/build_requires/ && \
@@ -43,27 +37,21 @@ elif [ "${CONTAINER}" == "True" ]; then
                     ttbd/setup.cfg)
     fi
 
-    BDIST_OPTS="--dist-dir=/home/rpms/ --bdist-base=/home/tcf/dist/"
+    BDIST_OPTS="--dist-dir=$topdir/dist/ --bdist-base=$topdir/dist/"
     RUN_SETUP="python3 ./setup.py bdist_rpm ${BDIST_OPTS}"
 
-    docker run -i --rm \
-            -v ${PWD}:/home/tcf -v ${RPM_DIR}:/home/rpms \
+    # --rm
+    podman run \
+            -v $HOME/.cache/dnf:/var/cache/dnf -v ${PWD}:${PWD}  \
             --env HTTP_PROXY=${HTTP_PROXY} --env http_proxy=${http_proxy} \
             --env HTTPS_PROXY=${HTTPS_PROXY} --env https_proxy=${https_proxy} \
             ${DISTRO}:${DISTROVERSION} \
-            /bin/bash -c \
-            "${BUILD_DEPS} && \
-            useradd -u ${UID} ${USER} && \
-            su - ${USER} -c \
-            'export http_proxy=${http_proxy} && export https_proxy=${https_proxy} &&\
-            cd /home/tcf/${TARGET_DIR} && ${RUN_SETUP}'"
-else
-    BDIST_OPTS="--dist-dir=/home/rpms/ --bdist-base=/home/tcf/dist/"
-    RUN_SETUP="python3 ./setup.py bdist_rpm ${BDIST_OPTS}"
+            /bin/bash -c "dnf install -y python-yaml rpm-build; cd $topdir/${TARGET_DIR}; $topdir/nreqs.py install build.nreqs.yaml; ${RUN_SETUP}"
 
-    docker run -i --rm --user=${USER}\
-            -v ${PWD}:/home/tcf -v ${RPM_DIR}:/home/rpms \
-            ${CONTAINER}:${DISTROVERSION} \
-            /bin/bash -c \
-            "cd /home/tcf/${TARGET_DIR} && ${RUN_SETUP}"
+else
+
+    cd ${PWD}/${TARGET_DIR}
+    $topdir/nreqs.py install build.nreqs.yaml
+    python3 ./setup.py bdist_rpm --dist-dir=${RPM_DIR}/ --bdist-base=${PWD}/dist/
+
 fi
