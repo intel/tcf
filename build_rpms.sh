@@ -25,7 +25,8 @@ while getopts ":d:v:t:p:i:" o; do
 done
 
 # Use docker if a container is specified, otherwise just run locally
-if [ x"${CONTAINER}" != "x" ]; then
+# None -> Backwards compat
+if [ x"${CONTAINER}" != "x" -a "${CONTAINER}" != "None" ]; then
     BUILD_DEPS="dnf install -y python3 rpm-build"
 
     if [ "${TARGET_DIR}" == "ttbd" ]; then
