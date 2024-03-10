@@ -1,0 +1,32 @@
+#
+# Install with::
+#
+#   $ tcf.git/nreqs.py install base.nreqs.yaml
+#
+
+#
+# Common deps
+#
+gcc:
+
+git:
+
+make:
+
+sphinx:
+  dnf: python3-sphinx
+
+sphinx_rtd_theme:
+  dnf: python3-sphinx_rtd_theme
+
+# ttbd specific
+filelock:
+  dnf: python3-filelock
+
+python3-devel:
+
+pyserial:
+  dnf: python3-pyserial
+
+pyusb:
+  dnf: python3-pyusb

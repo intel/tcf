@@ -1,0 +1,17 @@
+#
+# Install with::
+#
+#   $ tcf.git/nreqs.py install base.nreqs.yaml
+#
+git:
+
+make:
+
+sphinx:
+  dnf: python3-sphinx
+
+sphinx_rtd_theme:
+  dnf: python3-sphinx_rtd_theme
+
+pyusb:
+  dnf: python3-pyusb
