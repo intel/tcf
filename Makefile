@@ -188,10 +188,6 @@ CONTAINER   ?= True
 %.cfg: %.cfg.in .FORCE
 	./setup-requirements.py -d $(DISTRONAME) -v $(DISTROVERSION) --config $@ $(dir $@)requirements.txt 
 
-rpms-ttbd-zephyr: ttbd/zephyr/setup.cfg
-	mkdir -p $(RPMDIR)
-	./build_rpms.sh -d $(DISTRONAME) -v $(DISTROVERSION) -t ttbd/zephyr -p $(RPMDIR) -i $(CONTAINER)
-
 rpms-ttbd-pos: ttbd/pos/setup.cfg
 	mkdir -p $(RPMDIR)
 	./build_rpms.sh -d $(DISTRONAME) -v $(DISTROVERSION) -t ttbd/pos -p $(RPMDIR) -i $(CONTAINER)
@@ -200,15 +196,11 @@ rpms-ttbd: ttbd/setup.cfg
 	mkdir -p $(RPMDIR)
 	./build_rpms.sh -d $(DISTRONAME) -v $(DISTROVERSION) -t ttbd -p $(RPMDIR) -i $(CONTAINER)
 
-rpms-tcf-zephyr: zephyr/setup.cfg
-	mkdir -p $(RPMDIR)
-	./build_rpms.sh -d $(DISTRONAME) -v $(DISTROVERSION) -t zephyr -p $(RPMDIR) -i $(CONTAINER)
-
 rpms-tcf: setup.cfg
 	mkdir -p $(RPMDIR)
-	./build_rpms.sh -d $(DISTRONAME) -v $(DISTROVERSION) -p $(RPMDIR) -i $(CONTAINER)
+	./build_rpms.sh -d $(DISTRONAME) -v $(DISTROVERSION) -t . -p $(RPMDIR) -i $(CONTAINER)
 
-rpms: rpms-tcf rpms-tcf-zephyr rpms-ttbd rpms-ttbd-zephyr rpms-ttbd-pos
+rpms: rpms-tcf rpms-ttbd rpms-ttbd-pos
 
 version:
 	@echo $(VERSION)
