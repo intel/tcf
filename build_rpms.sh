@@ -1,4 +1,4 @@
-#! /bin/bash -x
+#! /bin/bash
 
 # this is the sourcedir
 topdir=$PWD
@@ -43,6 +43,7 @@ if [ x"${CONTAINER}" != "x" ]; then
     # --rm
     podman run \
             -v $HOME/.cache/dnf:/var/cache/dnf -v ${PWD}:${PWD}  \
+            --env VERSION="$VERSION" \
             --env HTTP_PROXY=${HTTP_PROXY} --env http_proxy=${http_proxy} \
             --env HTTPS_PROXY=${HTTPS_PROXY} --env https_proxy=${https_proxy} \
             ${DISTRO}:${DISTROVERSION} \
