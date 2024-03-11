@@ -189,7 +189,11 @@ def servers_info_get():
         tcfl.servers.subsystem_setup()
         tcfl.servers._discover_bare()	# rediscover if oldish
         _servers_info = dict()
-        for server_url, _server in tcfl.server_c.servers.items():
+        # sort the server list, so the user has a better time looking
+        # for them note we sort by top level domains first and equal
+        # domains will short by hostname
+        for server_url, _server in sorted(tcfl.server_c.servers.items(),
+                                          key = lambda k: k[0].split(".")[::-1]):
             if 'localhost' in server_url:
                 continue
             url_parser_obj = urllib.parse.urlparse(server_url)
