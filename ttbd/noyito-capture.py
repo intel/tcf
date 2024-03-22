@@ -65,6 +65,11 @@
 #  $ noyito-capture.py /dev/ttyUSB0 kk.json 0:mode=bool:name=CH0:cutoff=2.3
 #  $ noyito-capture.py /dev/ttyUSB0 kk.json 1:name=CH1 0:mode=bool:name=CH0:cutoff=2.3
 #
+# note the device can be specified in URL for, where more modes are
+# supported; see code doc
+#
+# rpyc+usb://REMOTEHOST:PORT/VID:PID=1234:4532
+#
 import contextlib
 import re
 import socket
@@ -77,7 +82,6 @@ import ttbl.capture_cli
 #
 line_regex = re.compile(
     r"^CH(?P<channel>[0-9]+):(?P<sample>[0-9]+)\t(?P<voltage>[\.0-9]+)V$")
-unix_domain_socket = sys.argv[1]
 outputfilename = sys.argv[2]
 modes = {}
 mode_args = {}
@@ -227,16 +231,62 @@ import fcntl
 import stat
 import os
 
-s = os.stat(sys.argv[1])
+import urllib.parse
+
+
+# EG: url = urllib.parse.urlparse("usb:///VID:PID=1A86:7523")
+# (note three slashes)
+url = urllib.parse.urlparse(sys.argv[1])
+if "+" in url.scheme:		# eg: rpyc+usb://
+    schemes = url.scheme.split("+")
+else:
+    schemes = [ url.scheme ]
+
+if "rpyc" in schemes:
+    #
+    # rpyc+usb://hostname:PORT/VID:PID=1A86:7523
+    # rpyc://hostname:PORT/dev/ttyUSB0
+    #
+    # establish a normal RPYC connection to a host/port
+    import rpyc.utils
+    remote = rpyc.utils.classic.connect(url.hostname, port = url.port)
+    serial = remote.modules['serial']
+    serial.tools = remote.modules['serial.tools']
+    serial.tools.list_ports = remote.modules['serial.tools.list_ports']
+
+if 'usb' in schemes:
+    #
+    # rpyc+usb://hostname:PORT/VID:PID=1A86:7523
+    # usb:///VID:PID=1A86:7523
+    # usb:///SERIAL=SOMESERIALNUMBER
+    #
+    # (all fields from usb_info in serial.tools.list_ports.comports())
+    #
+    # eg VID:PID=1A86:7523 -> 1: remove leading /
+    import serial.tools
+    import serial.tools.list_ports
+    device_spec = url.path[1:]
+    devicel = list(serial.tools.list_ports.grep(device_spec))
+    if len(devicel) != 1:
+        raise RuntimeError(
+            f"{sys.argv[1]}: spec matches {len(devicel)} devices; expected 1")
+    device = devicel[0].device
+
+else:	# anything else we assume is a local device path
+    device = sys.argv[1]
+
+s = os.stat(device)
+
 if stat.S_ISSOCK(s[stat.ST_MODE]):
-    with \
-         contextlib.closing(socket.socket(socket.AF_UNIX,
+    # it's a Unix doman socket -> using with multiplexor
+    with contextlib.closing(socket.socket(socket.AF_UNIX,
                                           socket.SOCK_STREAM)) as inf:
-        inf.connect(unix_domain_socket)
+        inf.connect(device)
         ttbl.capture_cli.main(outputfilename, sample, xlat, inf,
                               period_s = 0.5)
 else:
-    with serial.Serial(unix_domain_socket, 115200) as inf:
+    # it's a normal device, maybe in a remote machine
+    with serial.Serial(device, 115200) as inf:
         flag = fcntl.fcntl(inf.fileno(), fcntl.F_GETFD)
         fcntl.fcntl(inf, fcntl.F_SETFD, flag | os.O_NONBLOCK)
         flag = fcntl.fcntl(inf, fcntl.F_GETFD)
