@@ -69,6 +69,7 @@
 # supported; see code doc
 #
 # rpyc+usb://REMOTEHOST:PORT/VID:PID=1234:4532
+# tcp://REMOTEHOST:PORT
 #
 import contextlib
 import re
@@ -273,15 +274,39 @@ if 'usb' in schemes:
     devicel = list(serial.tools.list_ports.grep(device_spec))
     if len(devicel) != 1:
         raise RuntimeError(
-            f"{sys.argv[1]}: spec matches {len(devicel)} devices; expected 1")
+            f"{device_spec}: spec matches {len(devicel)} devices; expected 1")
     device = devicel[0].device
 
 else:	# anything else we assume is a local device path
     device = sys.argv[1]
 
-s = os.stat(device)
+if remote == None:
+    try:
+        s = os.stat(device)
+    except FileNotFoundError as e:
+        pass	# might be a remote file, it's ok
 
-if stat.S_ISSOCK(s[stat.ST_MODE]):
+if url.scheme == "tcp":
+    # We are reading data from a TCP port
+    #
+    # To redirect a windows serial port to TCP you can use hub4com
+    #
+    # 1. download https://sourceforge.net/projects/com0com/ (GPLv2)
+    #   https://downloads.sourceforge.net/project/com0com/com0com/3.0.0.0/com0com-3.0.0.0-i386-and-x64-signed.zip?ts=gAAAAABl_iHtN4q_KvwLkIp6jj6sPoF2ZiZjYWpgK897AgAXaDebt2sG_u8dVbaZE7A4ajurL4rAZ2GCOTDQVujSKR_4HzmbBg%3D%3D&r=https%3A%2F%2Fsourceforge.net%2Fprojects%2Fcom0com%2Ffiles%2Flatest%2Fdownload
+    #
+    # 2. unzip to C:\Program Files
+    #
+    # 3. Run, eg::
+    #
+    #    C:\> 'c:\Program Files\hub4com-2.1.0.0-386\hub4com.exe --baud=115200 --create-filter=pin2con --add-filters=0:pin2con COM4 --use-driver=tcp --reconnect=1000 5000'
+    #
+    # 4. now that is serving our serial port on port #5000
+    with contextlib.closing(socket.socket(socket.AF_INET,
+                                          socket.SOCK_STREAM)) as inf:
+        inf.connect(( url.hostname, url.port ))
+        ttbl.capture_cli.main(outputfilename, sample, xlat, inf,
+                              period_s = 0.5)
+elif remote == None and stat.S_ISSOCK(s[stat.ST_MODE]):
     # it's a Unix doman socket -> using with multiplexor
     with contextlib.closing(socket.socket(socket.AF_UNIX,
                                           socket.SOCK_STREAM)) as inf:
