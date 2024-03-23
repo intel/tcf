@@ -226,7 +226,6 @@ def xlat(d, data):
 first = True
 period_s = 0.5	# wait at least one sec between reads
 
-import serial
 import fcntl
 import stat
 import os
@@ -254,7 +253,14 @@ if "rpyc" in schemes:
     serial.tools = remote.modules['serial.tools']
     serial.tools.list_ports = remote.modules['serial.tools.list_ports']
 
+else:
+    remote = None
+    import serial
+    import serial.tools
+    import serial.tools.list_ports
+
 if 'usb' in schemes:
+    # Do this after rpyc, since we might have to access remotely
     #
     # rpyc+usb://hostname:PORT/VID:PID=1A86:7523
     # usb:///VID:PID=1A86:7523
@@ -263,8 +269,6 @@ if 'usb' in schemes:
     # (all fields from usb_info in serial.tools.list_ports.comports())
     #
     # eg VID:PID=1A86:7523 -> 1: remove leading /
-    import serial.tools
-    import serial.tools.list_ports
     device_spec = url.path[1:]
     devicel = list(serial.tools.list_ports.grep(device_spec))
     if len(devicel) != 1:
