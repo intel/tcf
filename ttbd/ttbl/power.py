@@ -3170,7 +3170,8 @@ def defer(target: ttbl.test_target, state: bool,
 
 
 
-def execute_defer_list(defer_list: list, name: str, serialize: bool = False):
+def execute_defer_list(defer_list: list, name: str, serialize: bool = False,
+                       keepalive_fn: callable = None):
     """
     Execute the deferred power actions in @defer_list
 
@@ -3181,7 +3182,13 @@ def execute_defer_list(defer_list: list, name: str, serialize: bool = False):
 
     :param bool serialize: (optional; defaults to *False*) execute the
       actions in a serial manner.
+
+    :param callable keepalive_fn: (optional; defaults to *None*) if
+      defined, function to call every ten seconds while waiting for
+      *defer_list*.
+
     """
+    assert keepalive_fn == None or callable(keepalive_fn)
     logging.info("power defer list '%s': executing", name)
     if serialize:
         for ( target, state, soft_failure ) in defer_list:
@@ -3201,18 +3208,41 @@ def execute_defer_list(defer_list: list, name: str, serialize: bool = False):
                                 )
                 for ( target, state, soft_failure ) in defer_list
             }
-            for future in concurrent.futures.as_completed(futures):
-                target, state, soft_failure = futures[future]
+            ts0 = time.time()
+            while True:
+                # We are going to run this in a loop and timeout every 10s
+                # so we can keepalive
                 try:
-                    _ = future.result()
-                except Exception as e:
-                    logging.error(
-                        "%s: exception running deferred power-%s operation: %s",
-                        target.id, "on" if state else "off", e)
-                    if not soft_failure:
-                        raise
-            executor.shutdown(wait = True)
+                    for future in concurrent.futures.as_completed(
+                            futures, timeout = 10):
+                        target, state, soft_failure = futures[future]
+                        try:
+                            _ = future.result()
+                        except Exception as e:
+                            logging.error(
+                                "%s: exception running deferred power-%s"
+                                " operation: %s",
+                                target.id, "on" if state else "off", e)
+                            if not soft_failure:
+                                raise
+                    # if we end up here, it means the as_completed()
+                    # process is done with all tasks, so we can stop
+                    # repeating the loop
+                    break
+                except TimeoutError:
+                    # if this is being used from the cleanup process, we
+                    # want to run the keepalive function evrynow and then,
+                    # to notify the service manager this process is alive
+                    if keepalive_fn:
+                        ts = time.time()
+                        logging.info(
+                            "power defer list '%s': keepaliving @%.02fs",
+                            name, ts - ts0)
+                        keepalive_fn()
+                    continue
         finally:
+            executor.shutdown(wait = True)
+            del executor
             _config['daemon'] = daemon_orig
 
     logging.warning("power defer list '%s': executed", name)
