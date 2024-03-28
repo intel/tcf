@@ -1505,7 +1505,8 @@ def cleanup_process_fn():
     # FIXME: if there is an exeception here, what do we do? do we
     # ignore it? if so we need to force soft_failure
 
-    ttbl.power.execute_defer_list(ttbl.power._startup_defer_list, "startup")
+    ttbl.power.execute_defer_list(ttbl.power._startup_defer_list, "startup",
+                                  keepalive_fn = _systemd_keepalive)
 
     logi("Clean up process [period %.2fs]" % sleep_period)
     ts_now = datetime.datetime.now()
