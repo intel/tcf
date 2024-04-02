@@ -37,7 +37,7 @@ logger = logging.getLogger("ui_cli_tunnel")
 def _tunnel_add(target, cli_args):
     server_port = target.tunnel.add(
         cli_args.port, cli_args.ip_addr, cli_args.protocol)
-    print(f"{target.parsed_url.hostname}:{server_port}")
+    print(f"{target.server.parsed_url.hostname}:{server_port}")
 
 def _cmdline_tunnel_add(cli_args: argparse.Namespace):
 
