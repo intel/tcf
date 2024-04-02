@@ -1206,7 +1206,7 @@ class extension(tc.target_extension_c):
             self.target.ttbd_iface_call("console", "write",
                                         component = console, data = data)
         else:
-            for i in range((len(data) + chunk_size - 1) / chunk_size):
+            for i in range(int((len(data) + chunk_size - 1) / chunk_size)):
                 chunk = data[chunk_size * i : chunk_size * i + chunk_size]
                 self.target.ttbd_iface_call("console", "write",
                                             component = console, data = chunk)
