@@ -17,6 +17,7 @@ import logging
 import numbers
 import os
 import pprint
+import re
 import subprocess
 import time
 
@@ -386,6 +387,17 @@ class sol_console_pc(ttbl.power.socat_pc, ttbl.console.generic_c):
         if password:
             self.env_add['IPMITOOL_PASSWORD'] = password
         self.re_enable = True
+
+        self.stderr_restart_regex = re.compile(
+            "("
+            "tcgetattr: Inappropriate ioctl for device"
+            "|"
+            "Error sending SOL data: FAIL"
+            "|"
+            "Error: No response to keepalive - Terminating session"
+            ")",
+            re.DOTALL | re.MULTILINE)
+
 
 
     def target_setup(self, target, iface_name, component):
