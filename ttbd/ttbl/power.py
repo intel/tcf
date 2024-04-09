@@ -1443,6 +1443,16 @@ class daemon_c(impl_c):
         if kws:
             assert isinstance(kws, dict)
             self.kws = kws
+        # resolve the first component -- the executable -- since
+        # sometimes they do a symlink (eg: /usr/bin/socat ->
+        # /usr/bin/socat1) and then the resolver to kill doesn't work
+        # because it looks for socat but finds socat1...
+        executable = os.path.realpath(shutil.which(cmdline[0]))
+        if executable != cmdline[0]:
+            logging.warning(
+                "converting cmdline %s to realpath: %s",
+                cmdline[0], executable)
+            cmdline[0] = executable
         if path == None:
             self.path = cmdline[0]
         else:
@@ -1454,21 +1464,27 @@ class daemon_c(impl_c):
             assert isinstance(check_path, str) and os.path.isfile(check_path), \
                 f"{check_path}: invalid file or non existing"
             self.check_path = check_path
-        # resolve check_path -- the executable -- since sometimes they
-        # do a symlink (eg: /usr/bin/socat -> /usr/bin/socat1) and
-        # then the resolver to kill doesn't work because it looks for
-        # socat but finds socat1...
-        executable = os.path.realpath(self.check_path)
-        if executable != self.check_path:
-            logging.warning(
-                "%s: converting check_path %s to realpath: %s"
-                % (name, self.check_path, executable))
-            self.check_path = executable
         if name == None:
             self.name = os.path.basename(self.path)
         else:
             assert isinstance(name, str)
             self.name = name
+        # resolve the first component -- the executable -- since
+        # sometimes they do a symlink (eg: /usr/bin/socat ->
+        # /usr/bin/socat1) and then the resolver to kill doesn't work
+        # because it looks for socat but finds socat1...
+        executable = os.path.realpath(shutil.which(self.path))
+        if executable != self.path:
+            logging.warning(
+                "%s: converting path %s to realpath: %s",
+                name, self.path, executable)
+            self.path = executable
+        executable = os.path.realpath(shutil.which(self.check_path))
+        if executable != self.check_path:
+            logging.warning(
+                "%s: converting check_path %s to realpath: %s",
+                name, self.check_path, executable)
+            self.check_path = executable
         self.pidfile = pidfile
         assert isinstance(mkpidfile, bool)
         self.mkpidfile = mkpidfile
@@ -1580,16 +1596,6 @@ class daemon_c(impl_c):
             target.log.error(message)
             raise self.power_on_e(message)
 
-        # resolve the first component -- the executable -- since
-        # sometimes they do a symlink (eg: /usr/bin/socat ->
-        # /usr/bin/socat1) and then the resolver to kill doesn't work
-        # because it looks for socat but finds socat1...
-        executable = os.path.realpath(_cmdline[0])
-        if executable != _cmdline[0]:
-            target.log.warning(
-                "%s: converting executable %s to realpath: %s"
-                % (component, _cmdline[0], executable))
-            _cmdline[0] = executable
         target.log.info("%s: command line: %s"
                         % (component, " ".join(_cmdline)))
         if self.env_add:
