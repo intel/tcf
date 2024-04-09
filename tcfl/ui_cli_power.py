@@ -157,7 +157,7 @@ def _power_list_by_target(target, cli_args):
     verbosity = cli_args.verbosity - cli_args.quietosity
     if verbosity < 2:
         _state = _state_to_str(state)
-        print(f"{target.id}: overall: {_state} ({substate})")
+        print(f"{target.fullid}: overall: {_state} ({substate})")
         for component, data in components.items():
             state = data['state']
             explicit = data.get('explicit', None)
