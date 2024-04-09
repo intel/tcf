@@ -84,7 +84,8 @@ def ansi_render_approx(s, width = 80, height = 2000):
 
 def ipxe_sanboot_url(target, sanboot_url, dhcp = None,
                      power_cycle: bool = True,
-                     precommands: list = None):
+                     precommands: list = None,
+                     mac_addr: str = None):
     """Use iPXE to sanboot a given URL
 
     Given a target than can boot iPXE via a PXE boot entry (normally
@@ -119,12 +120,22 @@ def ipxe_sanboot_url(target, sanboot_url, dhcp = None,
       launching
 
       >>> ( "set server 192.34.12.1" )
+
+    :param str mac_addr: (optional; default is obtained from the
+      inventory) MAC address to select boot option
+
+      >>> mac_addr = "4a:b0:15:5f:98:a1"
+
     """
     if power_cycle:
         target.power.cycle()
 
-    boot_ic = target.kws['pos_boot_interconnect']
-    mac_addr = target.kws['interconnects'][boot_ic]['mac_addr']
+    if mac_addr != None:
+        commonl.assert_macaddr(mac_addr)
+    else:
+        boot_ic = target.kws['pos_boot_interconnect']
+        mac_addr = target.kws['interconnects'][boot_ic]['mac_addr']
+
     tcfl.biosl.boot_network_pxe(
         target,
         # Eg: UEFI PXEv4 (MAC:4AB0155F98A1)
@@ -205,12 +216,6 @@ def ipxe_sanboot_url(target, sanboot_url, dhcp = None,
         # FIXME: block on anything here? consider infra issues
         # on "Connection timed out", http://ipxe.org...
         target.shell.prompt_regex = "iPXE>"
-        kws = dict(target.kws)
-        boot_ic = target.kws['pos_boot_interconnect']
-        mac_addr = target.kws['interconnects'][boot_ic]['mac_addr']
-        ipv4_addr = target.kws['interconnects'][boot_ic]['ipv4_addr']
-        ipv4_prefix_len = target.kws['interconnects'][boot_ic]['ipv4_prefix_len']
-        kws['ipv4_netmask'] = commonl.ipv4_len_to_netmask_ascii(ipv4_prefix_len)
 
         # Find what network interface our MAC address is; the
         # output of ifstat looks like:
@@ -269,13 +274,26 @@ def ipxe_sanboot_url(target, sanboot_url, dhcp = None,
 
         if dhcp:
             target.shell.run("dhcp " + ifname, re.compile("Configuring.*ok"))
-            target.shell.run("show %s/ip" % ifname, "ipv4 = %s" % ipv4_addr)
+            target.shell.run("show %s/ip" % ifname)
         else:
             # static is much faster and we know the IP address already
             # anyway; but then we don't have DNS as it is way more
             # complicated to get it
+
+            boot_ic = target.kws.get(
+                'pos.boot_interconnect',
+                target.kws.get('pos_boot_interconnect', None))
+            if boot_ic == None:
+                raise tcfl.error_e(
+                    "can't configure IP statically:"
+                    " no pos.boot_interconnect in inventory to get MAC addr",
+                    { "target": target })
+            mac_addr = target.kws['interconnects'][boot_ic]['mac_addr']
+            ipv4_addr = target.kws['interconnects'][boot_ic]['ipv4_addr']
+            ipv4_prefix_len = target.kws['interconnects'][boot_ic]['ipv4_prefix_len']
+
             target.shell.run("set %s/ip %s" % (ifname, ipv4_addr))
-            target.shell.run("set %s/netmask %s" % (ifname, kws['ipv4_netmask']))
+            target.shell.run("set %s/netmask %s" % (ifname, commonl.ipv4_len_to_netmask_ascii(ipv4_prefix_len)))
             target.shell.run("ifopen " + ifname)
 
         if precommands:
