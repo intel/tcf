@@ -968,6 +968,7 @@ def _console_ls(target):
         else:
             real_name = ""
         size = target.console.size(console)
+        print(target.fullid)
         if size != None:
             print("%s%s: %d" % (console, real_name, size))
         else:
@@ -978,7 +979,6 @@ def _cmdline_console_ls(cli_args: argparse.Namespace):
 
     return tcfl.ui_cli.run_fn_on_each_targetspec(
         _console_ls, cli_args,
-        only_one = True,
         iface = "console", extensions_only = [ "console" ])[0]
 
 
