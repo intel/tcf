@@ -168,6 +168,9 @@ class _console_reader_c:
             # \n to \r\n xlation for us.
             # So we chunk it and add the \r ourselves; there might
             # be a better method to do this.
+            logging.warning(
+                "console-reader/%s: pre-read generation %s, offset %d",
+                self.console, self.generation_prev, self.offset)
             generation, self.offset, data = \
                 self.target.console.read_full(
                     self.console, self.offset,
@@ -175,11 +178,17 @@ class _console_reader_c:
                     # this is an idempotent operation
                     retry_backoff = self.backoff_wait,
                     retry_timeout = 60)
-            #print(f"DEBUG generation {generation} offset {self.offset}", file = sys.stderr)
+            logging.warning(
+                "console-reader/%s: read generation %d, offset %d, len %dB",
+                self.console, generation, self.offset, len(data))
             if self.generation_prev != None and self.generation_prev != generation:
                 sys.stderr.write(
                     "\n\r\r\nWARNING: console was restarted\r\r\n\n")
                 self.offset = len(data)
+                logging.warning(
+                    "console-reader/%s: restart detected generation %d vs prev %d,"
+                    " offset updated to %d",
+                    self.console, generation, self.generation_prev, len(data))
             self.generation_prev = generation
 
             if data:
@@ -207,14 +216,26 @@ class _console_reader_c:
 
         if data_len == 0:
             self.backoff_wait *= 2
+            logging.warning(
+                "console-reader/%s: doubled backoff to %.2fs after no data received",
+                self.console, self.backoff_wait)
         else:
             self.backoff_wait = 0.1
+            logging.warning(
+                "console-reader/%s: reset backoff to %.2fs after data received",
+                self.console, self.backoff_wait)
         # in interactive mode we want to limit the backoff to
         # one second so we have time to react
         if self.backoff_wait >= self.backoff_wait_max:
+            logging.warning(
+                "console-reader/%s: capping backoff %.2fs at %.2fs",
+                self.console, self.backoff_wait, self.backoff_wait_max)
             self.backoff_wait = self.backoff_wait_max
         time.sleep(self.backoff_wait)	# no need to bombard the server..
         if self.server_connection_errors > 0:
+            logging.warning(
+                "console-reader/%s: reseting backoff to 0.1s after %d server errors",
+                self.console, self.server_connection_errors)
             self.server_connection_errors = 0	# successful, restart the count
             self.backoff_wait = 0.1
 
