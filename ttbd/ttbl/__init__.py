@@ -2801,8 +2801,18 @@ class device_resolver_c:
 
               >>> spec = "usb,idProduct=3f41,usb_depth=2"
 
-            - *device* (str): name of the device entry (eg: for
+            - *device_name* (str): name of the device entry (eg: for
               */sys/bus/usb/devices/21-3.4 this would be 21-3.4)
+
+            - *device_path* (str): bus-view long name of the device
+              *path (eg: for /sys/bus/usb/devices/21-3.4 this would be
+              *it)
+
+            - *device_realpath* (str): system-physical-view long name
+              of the device path after resolving symlinks, and thus
+              the physical path (eg: for
+              */sys/bus/usb/devices/21-0:1.0/* that would be
+              */sys/devices/pci0000:d7/0000:d7:00.0/0000:d8:00.0/0000:d9:05.0/0000:db:00.0/usb21/21-0:1.0*)
 
             - *device_ancestor* (str): name of the current parent of
                the *device* entry we are searching in; during
@@ -3125,6 +3135,8 @@ class device_resolver_c:
         # find the file/field in there, we try one directory up, etc.
         #
         match = False
+        # resolve symlinks
+        realpath_original = os.path.realpath(path_original)
 
         # use this to cache, in this call the synthetic fields for
         # each path, since we'll access it a lot and even the other
@@ -3154,7 +3166,9 @@ class device_resolver_c:
                         fields_synth = fields_synth_by_path.setdefault(
                             path, self.synthetic_fields_make(path, expensive))
                         fields_synth['device_ancestor'] = device_ancestor
-                        fields_synth['device'] = device
+                        fields_synth['device_name'] = device
+                        fields_synth['device_path'] = path_original
+                        fields_synth['device_realpath'] = realpath_original
                         logging.debug(
                             "%s: %s synth fields in path %s: %s",
                             path_original, cost, path, fields_synth)
