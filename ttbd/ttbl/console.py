@@ -140,14 +140,32 @@ class impl_c(ttbl.tt_interface_impl_c):
       - ``\\n``: one new line
       - ``\\r\\n``: one carriage return followed by a new line
 
+
+    :param re.Pattern stderr_restart_regex: (optional; default
+      *None*). While reading or writing, the
+      :class:`ttbl.console.generic_c` code will check if the low level
+      implementation of the console has died; if this is set to a
+      regular expression, it will also check against the contents of the
+      *.stderr* file that captures the output of a process that
+      implements the console looking for errors and if found, restart the
+      console driver.
+
+      Basically used to fix badly broken things that fail frequently and
+      there is nothing we an do about it (IPMI, looking at you); look at
+      :class:`ttbl.ipmi.sol_console_pc` for an example.
+
     """
     def __init__(self, command_sequence = None, command_timeout = 5,
-                 crlf = '\r'):
+                 crlf = '\r', stderr_restart_regex: re.Pattern = None):
         assert command_sequence == None \
             or isinstance(command_sequence, list), \
             "command_sequence: expected list of tuples; got %s" \
             % type(command_sequence)
         assert command_timeout > 0
+        assert stderr_restart_regex == None \
+            or isinstance(stderr_restart_regex, re.Pattern), \
+            "stderr_restart_regex: expected None or re.Pattern," \
+            f" got {type(stderr_restart_regex)}"
         self.command_sequence = command_sequence
         self.command_timeout = command_timeout
         self.parameters = {}
@@ -166,6 +184,9 @@ class impl_c(ttbl.tt_interface_impl_c):
         #: enabled, it will be automatically re-enabled.
         self.re_enable_if_dead = False
         self.crlf = crlf
+        self.stderr_restart_regex = stderr_restart_regex
+
+
 
     def target_setup(self, target, iface_name, component):
         # if it declares a CRLF string, publish it
@@ -706,31 +727,13 @@ class generic_c(impl_c):
       contains a *\\x1b* (the ESC character), it will be prefixed with
       another one. If it contains a *~*, it will be prefixed with a
       backslash.
-
-    :param re.Pattern stderr_restart_regex: (optional; default
-      *None*). While reading or writing, the
-      :class:`ttbl.console.generic_c` code will check if the low level
-      implementation of the console has died; if this is set to a
-      regular expression, it will also check against the contents of the
-      *.stderr* file that captures the output of a process that
-      implements the console looking for errors and if found, restart the
-      console driver.
-
-      Basically used to fix badly broken things that fail frequently and
-      there is nothing we an do about it (IPMI, looking at you); look at
-      :class:`ttbl.ipmi.sol_console_pc` for an example.
-
     """
     def __init__(self, chunk_size = 0, interchunk_wait = 0.2,
-                 escape_chars = None, stderr_restart_regex: re.Pattern = None,
+                 escape_chars = None,
                  **kwargs):
         assert chunk_size >= 0
         assert interchunk_wait > 0
         assert escape_chars == None or isinstance(escape_chars, dict)
-        assert stderr_restart_regex == None \
-            or isinstance(stderr_restart_regex, re.Pattern), \
-            "stderr_restart_regex: expected None or re.Pattern," \
-            f" got {type(stderr_restart_regex)}"
         self.chunk_size = chunk_size
         self.interchunk_wait = interchunk_wait
         impl_c.__init__(self, **kwargs)
@@ -738,7 +741,8 @@ class generic_c(impl_c):
             self.escape_chars = {}
         else:
             self.escape_chars = escape_chars
-        self.stderr_restart_regex = stderr_restart_regex
+
+
 
     def state(self, target, component):
         # if the write file is gone, most times this means the thing
