@@ -1318,6 +1318,47 @@ class inverter_c(impl_c):
             return state
         return not state
 
+
+
+def shutil_which_lenient(cmd: str, **kwargs) -> str:
+    #
+    # Hack around the fact that some binaries are symlinked to others
+    #
+    # eg: socat -> socat1
+    #
+    # then when we try to determine if the process is alive or not, we
+    # are looking for socat but find socat1 and it doesn't match, so
+    # we fail.
+    #
+    # This tries to determine the real binary name, but it is actually
+    # a mess.
+    #
+    # Real fix: go to the verification functions and do the resolution
+    # there, places like:
+    #
+    # - commonl.kill_by_cmdline()
+    # - commonl.process_started()
+    # - commonl.process_terminate()
+    # - commonl.process_alive()
+
+    if os.path.isabs(cmd):
+        return os.path.realpath(cmd)
+
+    which_cmd = shutil.which(cmd, **kwargs)
+    if which_cmd == None:
+        return cmd
+    # if this returns /<CMD>, then it didn't really find it, so
+    # just pass the cmd -- this also happens when we run
+    # daemon_container_c, where the binary might not be available
+    # in the daemon but yes in the container -- so this needs to
+    # be re-run in on() anyway...fsck
+
+    if which_cmd[0] == "/" and which_cmd[1:] == cmd:
+        return cmd
+    return which_cmd
+
+
+
 # FIXME: daemon_c and daemon_podman_container_c need to be split into
 # a third base class containing all the basic functionality shared by
 # both (commonl.kws_expand and friends, verify prototypes, verify_timeout,
@@ -1447,7 +1488,7 @@ class daemon_c(impl_c):
         # sometimes they do a symlink (eg: /usr/bin/socat ->
         # /usr/bin/socat1) and then the resolver to kill doesn't work
         # because it looks for socat but finds socat1...
-        executable = os.path.realpath(shutil.which(cmdline[0]))
+        executable = shutil_which_lenient(cmdline[0])
         if executable != cmdline[0]:
             logging.warning(
                 "converting cmdline %s to realpath: %s",
@@ -1473,13 +1514,13 @@ class daemon_c(impl_c):
         # sometimes they do a symlink (eg: /usr/bin/socat ->
         # /usr/bin/socat1) and then the resolver to kill doesn't work
         # because it looks for socat but finds socat1...
-        executable = os.path.realpath(shutil.which(self.path))
+        executable = shutil_which_lenient(self.path)
         if executable != self.path:
             logging.warning(
                 "%s: converting path %s to realpath: %s",
                 name, self.path, executable)
             self.path = executable
-        executable = os.path.realpath(shutil.which(self.check_path))
+        executable = shutil_which_lenient(self.check_path)
         if executable != self.check_path:
             logging.warning(
                 "%s: converting check_path %s to realpath: %s",
