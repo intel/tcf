@@ -982,14 +982,17 @@ class extension(tc.target_extension_c):
                                        **ttbd_iface_call_kwargs)
             ret = self._newline_convert(r.text, newline)
             l = len(ret)
-        target.report_info("%s: read %dB from console @%d"
-                           % (console, l, offset), dlevel = 3)
         generation_s, offset_s = \
             r.headers.get('X-Stream-Gen-Offset', "0 0").split()
         generation = int(generation_s)
-        new_offset = \
-            int(offset_s) \
-            + int(r.headers.get('Content-Length', 0))
+        # when servers provide chunked encoding, there is no Content-Length
+        if 'Content-Length' in r.headers:
+            content_length = int(r.headers.get('Content-Length', 0))
+        else:
+            content_length = len(r.content)
+        target.report_info("%s: read %dB, generation %d, offset_s %s from console @%d"
+                           % (console, l, generation, offset_s, offset), dlevel = 3)
+        new_offset = int(offset_s) + content_length
         return generation, new_offset, ret
 
 

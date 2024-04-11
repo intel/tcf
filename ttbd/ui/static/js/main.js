@@ -570,7 +570,14 @@ async function terminal_get_content(term, targetid, terminal, offset) {
     let b = await r.text();
     term.write(b);
 
-    let content_length = r.headers.get('Content-Length');
+
+    var content_length = 0;
+    if ('content-length' in r.headers) {
+        content_length = r.headers.get('Content-Length');
+    } else {
+        content_length = b.length
+    }
+
     let generation = r.headers.get('X-Stream-Gen-Offset');
 
     return {

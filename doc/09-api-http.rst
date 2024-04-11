@@ -3113,11 +3113,18 @@ The process is:
 
 6. process the data
 
-   - if *Content-Length* is zero, there is no new data to report
+   - determine the data length:
+
+     - there is a *Content-Length* header, the data length can be
+       obtained from the *Content-Length* data header; this happens
+       when there is no chunk encoding
+
+     - If there is chunk encoding, calculate it after dechunking the
+       data per HTTP/1.1
 
    - report the data as needed
 
-   - increase *OFFSET* by *Content-Length*
+   - increase *OFFSET* by the data length
 
 7. pause for a client-chosen time period
 
@@ -3324,7 +3331,10 @@ that came out of it. This call allows the user to query that data. See
   - the offset of the data that is returned; this allows the client to
     calculate how big the stream is at precisely the time the last
     byte was sent by the server, but adding *READ-OFFSET* to the
-    *Content-Length* reported by the HTTP response.
+    *Content-Length* reported by the HTTP response. If the output
+    encoding is chunked, there will be no *Content-Length* header and
+    the data length needs to be calculated by dechunking the data
+    stream.
 
     If the offset requested is longer than the amount of data
     available, no data will be returned and the *X-Stream-Gen-Offset*
