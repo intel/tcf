@@ -7956,7 +7956,11 @@ class tc_c(reporter_c, metaclass=_tc_mc):
                     if icgid == "all":	# No interconnects?
                         tg_name = tgid
                     else:
-                        tg_name = "%s-%s" % (icgid, tgid)
+                        # fugly combination of both, to keep this
+                        # short -- we don't use it an dit is getting
+                        # in the way. all this code is being reworked
+                        # anyway
+                        tg_name = icgid[0:2] + tgid[0:2]
                 # create a representation of the name that indicates
                 # the twn/role, such as
                 #
