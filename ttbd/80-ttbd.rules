@@ -24,3 +24,16 @@ KERNEL == "hidraw*", ACTION == "add", ATTRS{product}=="*CMSIS-DAP*", \
 #
 SUBSYSTEM == "macvtap", ACTION == "add", KERNEL == "tap*", \
           GROUP = "ttbd", MODE = "0660"
+
+
+# Set the g+w bit on for the drivers, so ttbd's
+# ttbl.power.device_reset_c() driver can reset a device when running
+# under the daemon (which has group root for this).
+#
+# To debug, change this to
+#
+##     RUN += "/bin/bash -xc 'THECOMMAND >> /tmp/log 2>&1'"
+#
+# Note some drivers don't offer bind/unbind, so we need to test for that
+ACTION == "add", SUBSYSTEM == "drivers", \
+    RUN += "/bin/bash -xc '[ -e /sys/%E{DEVPATH}/bind ] && chmod g+w /sys/%E{DEVPATH}/bind /sys/%E{DEVPATH}/unbind'",

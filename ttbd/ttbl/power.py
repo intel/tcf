@@ -1199,6 +1199,128 @@ class interface(ttbl.tt_interface):
             return {}
 
 
+class device_reset_c(impl_c):
+    """Driver to reset a device
+
+    This driver resets a given device when the :meth`on` function is
+    called; the reset is achieved by unbinding the device from it's
+    driver and then rebinding it. In most cases, in Linux, this
+    achieves a device reset.
+
+    Note also that in general, most devices are *always* bound to a
+    driver; the code finds the driver on its own.
+
+    :param str device_path_or_spec: Path to device
+      (/sys/bus/BUSNAME/devices/DEVICENAME) or device spec (see
+      :class:`ttbl.device_resolver_c`)
+
+    **System Setup**
+
+    This will need write access to the *bind/unbind* files in
+    `/sys/bus/*/drivers/*`.
+
+    Normally the daemon is executed with *root* group, so the driver
+    entries need *g+w* permission added. This is accomplished by a
+    rule in /etc/rules.d/80-ttbd.rules (from
+    tcf.git/ttbd/80-ttbd.rules).
+
+    **Examples**
+
+    >>> ttbl.power.device_reset_c("/sys/bus/usb/device/11-3.2")
+
+    Note that to device a USB hub, it is important to ensure that:
+
+    - all instrumentation for a target is in the same hub
+    - pick the top level USB device for the hub, for example::
+
+        $ lsusb.py
+        usb15             1d6b:0002 09 1IF  [USB 2.00,   480 Mbps,   0mA] (xhci-hcd 0000:62:00.0) hub
+          15-1              05e3:0610 09 1IF  [USB 2.00,   480 Mbps, 100mA] (Genesys Logic, Inc. Hub) hub
+            15-1.2            05e3:0610 09 1IF  [USB 2.00,   480 Mbps, 100mA] (Genesys Logic, Inc. Hub) hub
+              15-1.2.1          0403:6001 00 1IF  [USB 2.00,    12 Mbps,  90mA] (FTDI FT232R USB UART A10NWF29)
+              ...<other instruments>...
+
+      if all the instrumentation is connected to hub 15-1.2, a
+      device-resolver rule that matches the hub 15-1.2 shall be something like::
+
+        usb,only_one,idVendor=05e3,idProduct=0610,usb_depth=1,!bInterfaceClass
+
+      (!bInterfaceClass to ensure it picks the USB device and not USB interfaces)
+
+    """
+    def __init__(self, device_path_or_spec: str, *args, **kwargs):
+        impl_c.__init__(self, *args, **kwargs)
+        self.device_path_or_spec = device_path_or_spec
+        self.upid_set("Device reseter",
+                      device_path_or_spec = device_path_or_spec)
+
+
+    def _resolve(self, target: str):
+
+        if self.device_path_or_spec.startswith("/sys/bus"):
+            device_path = self.device_path_or_spec
+        else:	# a device resolver spec, resolve it
+            device_resolver = ttbl.device_resolver_c(
+                target, self.device_path_or_spec,
+                f"instrumentation.{self.upid_index}.device_spec")
+            device_path = device_resolver.device_find_by_spec()
+
+        # extract bus name
+        parts = device_path.split("/")
+        if len(parts) != 6:
+            raise RuntimeError(
+                f"device_reset_c: device path '{device_path}';"
+                f" got {len(parts)}, expected 6 components"
+                " (eg: /sys/bus/usb/devices/11-3.2.1)")
+
+        # first component is empty (before the first /)
+        device_name = parts[5]	# eg: 11-3.2.1
+        bus_name = parts[3]		# eg: usb
+        # /sys/sys/bus/usb/devices/11-3.2.1 -> driver -> ../../../../../bus/usb/drivers/usb
+        if not os.path.exists(device_path + "/driver"):
+            return bus_name, None, device_name
+
+        driver_path = os.path.realpath(device_path + "/driver")
+        driver_name = os.path.basename(driver_path)	# eg: usb
+        return bus_name, driver_name, device_name
+
+
+    def on(self, target: str, _component: str):
+        bus_name, driver_name, device_name = self._resolve(target)
+        if driver_name == None:
+            raise RuntimeError(
+                f"/sys/bus/{bus_name}/devices/{device_name}:"
+                " can't reset; no driver assigned")
+        target.log.warning(
+            "device_reset_c: unbinding %s device %s from driver %s",
+            bus_name, device_name, driver_name)
+        with open(f"/sys/bus/{bus_name}/drivers/{driver_name}/unbind", "w") as f:
+            f.write(device_name)
+        time.sleep(2)	# give it time to settle
+        target.log.error("device_reset_c: binding %s device %s to driver %s",
+                         bus_name, device_name, driver_name)
+        with open(f"/sys/bus/{bus_name}/drivers/{driver_name}/bind", "w") as f:
+            f.write(device_name)
+
+
+    def off(self, _target, _component):
+        # note we cannot off the on operation is reset -> unbind, then
+        # bind, because before unbinding it implies we know the
+        # driver; if we have it split as on/off, when we on, we need
+        # to know the driver...and we do not
+        pass
+
+
+    def get(self, _target, _component):
+        # We have no state -- return None
+        #
+        # This way, whenever we press the button -> call on(),
+        # instrumentation will be reset; otherwise the layers on top
+        # of us try to be smart
+        return None
+
+
+
 class fake_c(impl_c):
     """Fake power component which stores state in disk
 
