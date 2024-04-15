@@ -227,10 +227,10 @@ class driver(tc.report_driver_c):
 
         if target:
             reporter = target
-            fullid = "|" + target.fullid
+            target_fullid = "|" + target.fullid
         else:
             reporter = testcase
-            fullid = ""
+            target_fullid = ""
         # reporter contains the target report_prefix to each message,
         # which indicates where the message comes from
 
@@ -256,18 +256,19 @@ class driver(tc.report_driver_c):
                 _prefix = _taglevel + \
                     f"/{termcolor.colored(testcase.runid_hashid, attrs = [ 'bold' ])}{testcase.ident()}" \
                     f" {termcolor.colored(testcase._report_prefix, *args)}" \
+                    f"{termcolor.colored(target_fullid, *args)}" \
                     f" [+{delta:0.1f}s]: "
             else:
                 _prefix = \
                     f"{tag}{level}/{testcase.runid_hashid}{testcase.ident()}" \
-                    f" {testcase._report_prefix} [+{delta:0.1f}s]: "
+                    f" {testcase._report_prefix}{target_fullid} [+{delta:0.1f}s]: "
             with commonl.tls_prefix_c(self.tls, _prefix):
                 message += "\n"
                 self.consolef.write(message)
         if logfile_p:
             _prefix = \
                 f"{tag}{level}/{testcase.runid_hashid}{testcase.ident()}" \
-                f" {testcase._report_prefix}{fullid} [+{delta:0.1f}s]: "
+                f" {testcase._report_prefix}{target_fullid} [+{delta:0.1f}s]: "
             with commonl.tls_prefix_c(self.tls, _prefix):
                 message += "\n"
                 if self.logf and logfile_p:
@@ -282,7 +283,7 @@ class driver(tc.report_driver_c):
                 # easier to read
                 _aprefix = \
                     f"{tag}{alevel}/{testcase.runid_hashid}{testcase.ident()}"  \
-                    f" {testcase._report_prefix}{fullid} [+{delta:0.1f}s]:   "
+                    f" {testcase._report_prefix}{target_fullid} [+{delta:0.1f}s]:   "
                 with commonl.tls_prefix_c(self.tls, _aprefix):
                     if console_p:
                         commonl.data_dump_recursive_tls(attachments, self.tls,
