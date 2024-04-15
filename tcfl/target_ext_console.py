@@ -935,6 +935,9 @@ class extension(tc.target_extension_c):
 
         target = self.target
         console = self._console_get(console)
+        # NOTE! if the content is encoded with chunks, we can't read
+        # r.content more than once, so ensure we gather content-length
+        # early!
         if fd:
             target.report_info("%s: reading from @%d"
                                % (console, offset), dlevel = 4)
@@ -950,11 +953,13 @@ class extension(tc.target_extension_c):
                 # bytes--it's up to the customer to pass the right
                 # file descriptor
                 chunk_size = 1024
+                content_length = 0
                 total = 0
                 for chunk in r.iter_content(chunk_size):
                     while True:
                         try:
                             chunk_len = len(chunk)
+                            content_length += chunk_len
                             fd.write(chunk)
                             break
                         except IOError as e:
@@ -981,17 +986,12 @@ class extension(tc.target_extension_c):
                                        raw = True,
                                        **ttbd_iface_call_kwargs)
             ret = self._newline_convert(r.text, newline)
-            l = len(ret)
+            content_length = len(r.content)
         generation_s, offset_s = \
             r.headers.get('X-Stream-Gen-Offset', "0 0").split()
         generation = int(generation_s)
-        # when servers provide chunked encoding, there is no Content-Length
-        if 'Content-Length' in r.headers:
-            content_length = int(r.headers.get('Content-Length', 0))
-        else:
-            content_length = len(r.content)
         target.report_info("%s: read %dB, generation %d, offset_s %s from console @%d"
-                           % (console, l, generation, offset_s, offset), dlevel = 3)
+                           % (console, content_length, generation, offset_s, offset), dlevel = 3)
         new_offset = int(offset_s) + content_length
         return generation, new_offset, ret
 
