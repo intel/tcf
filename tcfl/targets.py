@@ -238,10 +238,12 @@ class discovery_agent_c:
             targetid_counts = collections.Counter(rt['id'] for rt in self.rts.values())
             for rtfullid, rt in list(self.rts.items()):
                 rtid = rt['id']
+                rt['fullid_always'] = rt['fullid']
                 if targetid_counts[rtid] != 1:	# this target appears
                     continue			# more than once, skip
                 # rename SERVERSHORTNAME/TARGETNAME -> TARGETNAME
                 disabled = rt.get('disabled', False)
+                rt['fullid'] = rt['id']		# shorten this, it's unique
                 self.rts[rtid] = self.rts[rtfullid]
                 del self.rts[rtfullid]
                 self.rts_flat[rtid] = self.rts_flat[rtfullid]
