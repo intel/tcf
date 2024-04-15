@@ -56,7 +56,7 @@ class extension(tc.target_extension_c):
             raise self.unneeded
         tc.target_extension_c.__init__(self, target)
 
-    def _sequence(self, sequence, timeout = None):
+    def _sequence(self, sequence, timeout = 30):
         self.target.ttbd_iface_call(self.iface_name, "sequence",
                                     method = "PUT",
                                     sequence = sequence, timeout = timeout)
