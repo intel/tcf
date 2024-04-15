@@ -180,7 +180,7 @@ def cmdline_setup_intermediate(arg_subparser):
         help = "press a button / turn relay on / short jumper."
         " NOTE! this doesn't release it after--see *click*")
     tcfl.ui_cli.args_verbosity_add(ap)
-    tcfl.ui_cli.args_targetspec_add(ap)
+    tcfl.ui_cli.args_targetspec_add(ap, targetspec_n = True)
     ap.add_argument(
         "button_name",
         metavar = "BUTTON-NAME", action = "store",
@@ -191,7 +191,7 @@ def cmdline_setup_intermediate(arg_subparser):
         "button-release",
         help = "release a button / turn relay off / open a jumper")
     tcfl.ui_cli.args_verbosity_add(ap)
-    tcfl.ui_cli.args_targetspec_add(ap)
+    tcfl.ui_cli.args_targetspec_add(ap, targetspec_n = True)
     ap.add_argument(
         "button_name",
         metavar = "BUTTON-NAME", action = "store",
@@ -202,7 +202,7 @@ def cmdline_setup_intermediate(arg_subparser):
         "button-click",
         help = "press & release a button / relay / jumper")
     tcfl.ui_cli.args_verbosity_add(ap)
-    tcfl.ui_cli.args_targetspec_add(ap)
+    tcfl.ui_cli.args_targetspec_add(ap, targetspec_n = True)
     ap.add_argument(
         "-w", "--click-time", metavar = "CLICK-TIME",
         action = "store", type = float, default = 0.25,
@@ -217,7 +217,7 @@ def cmdline_setup_intermediate(arg_subparser):
         "button-double-click",
         help = "double press & release a button / relay / jumper")
     tcfl.ui_cli.args_verbosity_add(ap)
-    tcfl.ui_cli.args_targetspec_add(ap)
+    tcfl.ui_cli.args_targetspec_add(ap, targetspec_n = True)
     ap.add_argument(
         "-w", "--click-time", metavar = "CLICK-TIME",
         action = "store", type = float, default = 0.25,
@@ -236,7 +236,7 @@ def cmdline_setup_intermediate(arg_subparser):
         "button-sequence",
         help = "Execute a button / relay / jumper sequence")
     tcfl.ui_cli.args_verbosity_add(ap)
-    tcfl.ui_cli.args_targetspec_add(ap, targetspec_n = 1)
+    tcfl.ui_cli.args_targetspec_add(ap, targetspec_n = True)
     ap.add_argument(
         "sequence",
         metavar = "STEP", action = "store", nargs = "+",
