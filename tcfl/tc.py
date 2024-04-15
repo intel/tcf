@@ -8673,7 +8673,9 @@ def _targets_discover(args, rt_all, rt_selected, ic_selected):
     # List all the targets available
     import tcfl.targets
     tcfl.targets.setup_by_spec(
-        args.target, verbosity = args.verbosity - args.quietosity,
+        args.target,
+        # zero verbosity will get only minimal fields (names, etc) from the servers
+        verbosity = 1,
         targets_all = args.all)
 
     # HACK to remove old tcfl.ttb_client and plug tcfl.targets; all
