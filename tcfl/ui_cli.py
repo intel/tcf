@@ -87,8 +87,13 @@ def args_targetspec_add(
             " multiple targets")
         ap.add_argument(
             "--parallelization-factor",
-            action = "store", type = int, default = -4,
-            help = "(advanced) parallelization factor")
+            action = "store", type = int, default = -4, metavar = "N",
+            help = "(xu) parallelization factor (1: serialize;"
+            " > 1: number of threads to use;"
+            " 0: use as many threads as CPUs available;"
+            " -N: use as many threads as CPUs available times N"
+            " [defaults to %(default)d]"
+        )
     if nargs != None:
         nargs = nargs
     elif isinstance(targetspec_n, bool):
