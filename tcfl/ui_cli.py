@@ -76,7 +76,10 @@ def args_targetspec_add(
     ap.add_argument(
         "-a", "--all", action = "store_true", default = False,
         help = "Consider also disabled targets")
-    if targetspec_n != 1:
+    # careful testing here bool True compares equal to one, and when
+    # we are an integer one is when we want to disable parallelization
+    # -- so this is why we test like this
+    if isinstance(targetspec_n, bool) or targetspec_n > 1:
         ap.add_argument(
             "--serialize",
             action = "store_const", dest = "parellization_factor", const = 1,
@@ -97,7 +100,7 @@ def args_targetspec_add(
         nargs = int(targetspec_n)
     else:
         raise ValueError(
-            f"targetspec_n: invalid; expeted True, False or positive integer"
+            f"targetspec_n: invalid; expected True, False or positive integer"
             f" got {type(targetspec_n)}")
 
     ap.add_argument(
