@@ -211,44 +211,72 @@ def _cmdline_capture_get(cli_args: argparse.Namespace):
 
 def _capture(target: tcfl.tc.target_c, cli_args: argparse.Namespace):
 
-    logger = logging.getLogger(cli_args.capturer)
-    cli_args.verbosity += 2	# default to informational messages
+    logger = logging.getLogger(f"{target.fullid}/capture")
     tcfl.ui_cli.logger_verbosity_from_cli(logger, cli_args)
 
-    capturer = cli_args.capturer
-    capturers = target.capture.list()
-    if capturer not in target.kws['interfaces'].get('capture', {}):
-        raise RuntimeError(f"{capturer}: unknown capturer: {capturers}")
-    streaming = capturers[capturer]
+    cli_args.verbosity += 2	# default to informational messages
+
     if cli_args.prefix:
         prefix = cli_args.prefix
     else:
         prefix = target.id + "."
-    if streaming == None:
-        # snapshot
-        logger.info("taking snapshot")
-        target.capture.start(capturer)
-        logger.warning("downloading capture")
-        r = target.capture.get(capturer, prefix = prefix)
-    elif streaming == False:
-        # not snapshot, start, wait, stop, get
-        logger.info("non-snapshot capturer was stopped, starting")
-        target.capture.start(cli_args.capturer)
+
+    capturers = target.capture.list()
+    for capturer in cli_args.capturer:
+        if capturer not in target.kws['interfaces'].get('capture', {}):
+            raise RuntimeError(f"{capturer}: unknown capturer: {capturers}")
+
+    got_to_wait = False
+
+    # start capturing
+
+    # We might want to parallelize for snapshot taking, since it might
+    # be a more resource consuming thing; for streams, start is a
+    # quick operations, so we don't really need to.
+    for capturer in cli_args.capturer:
+
+        streaming = capturers[capturer]
+        if streaming == None:
+            # snapshot
+            logger.info(f"{capturer}: taking snapshot")
+            target.capture.start(capturer)
+
+        elif streaming == False:
+            # not snapshot, start, wait, stop, get
+            logger.info(f"{capturer}: non-snapshot capturer was stopped, starting")
+            target.capture.start(capturer)
+            got_to_wait = True
+
+        elif streaming == True:
+            # already capturing, do nothing
+            logger.info(f"{capturer}: already capturing")
+            got_to_wait = True
+
+    if got_to_wait:
         logger.info(f"capturing for {cli_args.wait} seconds")
         time.sleep(cli_args.wait)
-        logger.info("stopping capture")
-        target.capture.stop(cli_args.capturer)
-        logger.warning("downloading capture")
+
+    # Stop the capture
+    for capturer in cli_args.capturer:
+        streaming = capturers[capturer]
+        if streaming == None:	# snapshots need no stopping
+            continue
+
+        logger.info(f"{capturer}: stopping capture")
+        target.capture.stop(capturer)
+
+    # Download the capture
+
+    # We won't gain much by parallelizing because this is downloading
+    # from the same server, if it becomes a problem we might do it in
+    # the future but for now...meh
+    for capturer in cli_args.capturer:
+        streaming = capturers[capturer]
+        logger.warning(f"{capturer}: downloading capture")
         r = target.capture.get(capturer, prefix = prefix)
-    elif streaming == True:
-        logger.info(f"capturing for {cli_args.wait} seconds")
-        time.sleep(cli_args.wait)
-        logger.info("stopping capture")
-        target.capture.stop(cli_args.capturer)
-        logger.warning("downloading capture")
-        r = target.capture.get(capturer, prefix = prefix)
-    for stream_name, file_name in r.items():
-        logger.warning(f"downloaded stream {stream_name} -> {file_name}")
+        for stream_name, file_name in r.items():
+            logger.warning(f"{capturer}: downloaded stream {stream_name} -> {file_name}")
+
 
 def _cmdline_capture(cli_args: argparse.Namespace):
     retval, _r = tcfl.ui_cli.run_fn_on_each_targetspec(
@@ -311,9 +339,9 @@ def cmdline_setup_intermediate(arg_subparser):
         "capture", help = "Generic capture; takes a snapshot or captures"
         " for given SECONDS (default 5) and downloads captured data")
     tcfl.ui_cli.args_verbosity_add(ap)
-    tcfl.ui_cli.args_targetspec_add(ap, targetspec_n = 1)
+    tcfl.ui_cli.args_targetspec_add(ap, targetspec_n = True, nargs = 1)
     ap.add_argument(
-        "capturer", metavar = "CAPTURER-NAME", action = "store",
+        "capturer", metavar = "CAPTURER-NAME", action = "store", nargs = "+",
         type = str, help = "Name of capturer where to capture from")
     ap.add_argument(
         "--prefix", action = "store", type = str, default = None,
