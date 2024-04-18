@@ -1954,6 +1954,25 @@ if __name__ == "__main__":
     else:
         ssl_key_password = None
 
+    server = args.server
+    if ttbl.config.server != None:
+        server = ttbl.config.server
+
+    if server == "gunicorn":
+        import gunicorn
+        major, minor, pl = gunicorn.version_info
+        if major < 20 or major == 20 and minor <= 2:
+            # gunicorn >= 20.2 accepts just using the ssl_context
+            # variable we created above, but it's quite new, so
+            # default for now to just do this...
+            if args.ssl_crt and args.ssl_key:
+                logging.error(
+                    "gunicorn: falling back to ad-hoc SSL context,"
+                    " running gunicorn version that can't decrypt keys,"
+                    " need > 20.2")
+                args.ssl_crt = None
+                args.ssl_key = None
+
     # SSL config: default to at least TLS v1.2
     ssl_options = ssl.OP_NO_SSLv3 | ssl.OP_NO_SSLv2 | ssl.OP_NO_TLSv1
     if args.ssl == False:
@@ -2056,10 +2075,6 @@ if __name__ == "__main__":
             raise
         # It is already a session leader...can ignore
 
-    server = args.server
-    if ttbl.config.server != None:
-        server = ttbl.config.server
-
     daemon_user = ttbl.user_control.User('local', roles = [ "admin" ])
     if server == "gunicorn":
         # gunicorn conflicts with MP and kills cleanup, so just fork
@@ -2084,6 +2099,11 @@ if __name__ == "__main__":
         # https://docs.gunicorn.org/en/stable/custom.html
         logging.error("serving with gunicorn")
 
+        # gunicorn needs this function to provide the SSL context to
+        # use; we'll set it in gunicorn_app_c
+        def _ssl_context_get(_config, default_ssl_context_factory):
+            return ssl_context
+
         import gunicorn.app.base
         class gunicorn_app_c(gunicorn.app.base.BaseApplication):
 
@@ -2099,16 +2119,14 @@ if __name__ == "__main__":
                 # arbitratily large wait times we might have on some
                 # sync calls -> maybe get it from there?
                 self.cfg.set('timeout', 1200)
-                # restart process after handling 10 requests, to avoid
+                # restart process after handling N requests, to avoid
                 # leaks
-                self.cfg.set('max_requests', 10)
+                self.cfg.set('max_requests', 50)
                 self.cfg.set('max_requests_jitter', 5)
-                # gunicorn >= 20.2 accepts just using the ssl_context
-                # variable we created above, but it's quite new, so
-                # default for now to just do this...
                 if args.ssl_crt and args.ssl_key:
+                    # this forces gunicorn to enable https
                     self.cfg.set('certfile', args.ssl_crt)
-                    self.cfg.set('keyfile', args.ssl_key)
+                    self.cfg.set('ssl_context', _ssl_context_get)
                 elif args.ssl == True:
                     # take from generated above
                     self.cfg.set('certfile', cert_fn)
