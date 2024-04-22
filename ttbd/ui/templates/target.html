@@ -380,6 +380,7 @@ $ tcf ls -vv {{ targetid}}</code> </pre></p>
                     </div>
                 </td>
                 <td>
+                <div class='wrapper_select'>
                   <select class='list_versions'
                           id='flash_images_version_for_component_{{image_type}}' onchange='flash_images_onchange_select("{{image_type}}")'>
                     {% for full_image_path, short_image_path in image_info.file_list.items() %}
@@ -387,6 +388,7 @@ $ tcf ls -vv {{ targetid}}</code> </pre></p>
                     {% endfor %}
                         <option value='upload'>upload file</option>
                   <select>
+                  </div>
                   <div id="flash_file_input_div_{{image_type}}" style="display: none;">
                     <label>Choose a file for <label style='color: blue;'>{{image_type}}</label> flash:</label>
                     <input type="file" id="flash_file_input_{{image_type}}" name="fileInput">
