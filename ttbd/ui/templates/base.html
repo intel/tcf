@@ -6,6 +6,11 @@
     Copyright (c) 2023 Intel Corporation
   -->
   <title>{% block title %} {% endblock %} - ttbdweb </title>
+
+  <!-- load stylesheets -->
+  <link rel='stylesheet' href="{{url_for('static', filename = 'css/style.css')}}">
+  <link rel='stylesheet' href="{{url_for('static', filename = 'css/navbar.css')}}">
+  <link rel='stylesheet' href="{{url_for('static', filename = 'css/normalize.css')}}">
   <link rel='stylesheet' href="{{url_for('static', filename = 'css/style.css')}}">
 
   <!-- load external stylesheets -->
