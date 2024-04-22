@@ -1,0 +1,205 @@
+/*
+/*
+ * Copyright (c) 2023 Intel Corporation
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * Navbar stylesheet
+ *
+ */
+header {
+    position: sticky;
+    top: 0;
+    z-index: 999;
+}
+
+header > h1 {
+    font-family: monospace;
+    font-weight: normal;
+}
+
+header > h1 > a{
+    text-decoration: none;
+    color: black;
+}
+
+header > h1 > a:active {
+    color: black;
+}
+
+header > h1 > a:visited {
+    color: black;
+}
+
+nav {
+    margin-top: 0;
+}
+
+nav > ul {
+    display: flex;
+    padding: 1em;
+    list-style-type: none;
+    background-color: var(--nav-bg-color);
+    border-bottom-left-radius: 0.2em;
+    border-bottom-right-radius: 0.2em;
+    margin-top: 1em;
+    color: white;
+    box-shadow: 0 4px 8px 0 rgba(0,0,0,.2);
+}
+
+nav > ul > img {
+    padding: 0 0.5em;
+}
+
+nav > ul> li {
+    margin-top: 0;
+    margin-left: 0.3em;
+}
+
+
+/* nav anchor tags without tooltip formating */
+nav > ul> li > a {
+    display: block;
+    background-color: transparent;
+    padding: 0.1em 1em;
+    color: white;
+    text-decoration: none;
+    border-radius: 0.1em;
+    font-size: 0.9em;
+}
+
+nav > ul> li > a:link {
+    color: white;
+    background-color: transparent;
+}
+
+nav > ul> li > a:visited{
+    color: white;
+    background-color: transparent;
+}
+
+nav > ul> li > a:hover {
+    color: white;
+    text-decoration: underline;
+    background-color: transparent;
+}
+
+nav > ul> li > a:active {
+    color: white;
+    text-decoration: underline;
+    background-color: transparent;
+}
+
+/* nav anchor tags with tooltip formating */
+nav > ul> li > div >  a {
+    display: block;
+    background-color: transparent;
+    padding: 0.1em 1em;
+    color: white;
+    text-decoration: none;
+    border-radius: 0.1em;
+    font-size: 0.9em;
+}
+
+nav > ul> li > div > a:link {
+    color: white;
+    background-color: transparent;
+}
+
+nav > ul> li > div > a:visited{
+    color: white;
+    background-color: transparent;
+}
+
+nav > ul> li > div > a:hover {
+    color: white;
+    text-decoration: underline;
+    background-color: transparent;
+}
+
+nav > ul> li > div > a:active {
+    color: white;
+    text-decoration: underline;
+    background-color: transparent;
+}
+
+
+nav > ul>  li + li {
+    margin-left: 1.5em;
+}
+
+nav > ul > .nav-right {
+    margin-left: auto;
+}
+
+.nav-right > a {
+    margin-left: auto;
+    background-color: transparent;
+    border-radius: 0;
+    border-left: 1px solid white;
+}
+
+.nav-right > a:hover {
+    color: #0071c5;
+    background-color: transparent;
+}
+
+/* opposed to the rest of the nav bar components, server_list is the class
+ * of a button not an anchor tag, so we need to handle it a bit different
+ * */
+.server_list {
+    margin-left: auto;
+    padding: 0;
+}
+
+.server_list > .server_list_button {
+    background-color: transparent;
+    border-radius: 0;
+    border: 0;
+    font-size: 0.9em;
+    color: white;
+    padding: 0;
+    box-shadow: none;
+}
+
+.server_list > .server_list_button:hover {
+    color: white;
+    background-color: transparent;
+    text-decoration: underline;
+}
+
+.server_list_dropdown_class {
+    background-color: white;
+    position: absolute;
+    display: inline-block;
+    margin-top: 0;
+    z-index:2;
+    box-shadow: 0 0 11px rgba(33,33,33,.4);
+    padding: 1em;
+    border: 1px solid rgb(190,190,190);
+    border-bottom-left-radius: 0.5em;
+    border-bottom-right-radius: 0.5em;
+    color: gray;
+    font-size: 0.8em;
+}
+
+.server_list_dropdown_class > label {
+    font-size: 0.9em;
+}
+
+
+.server_list_dropdown_class > a:hover {
+    color: #3580b8;
+}
+
+.server_list_dropdown_class > a:active {
+    color: #3580b8;
+}
+
+.server_list_dropdown_class > a:link {
+    color: #3580b8;
+}
+
+.server_list_dropdown_class > a:visited {
+    color: #3580b8;
+}
+
