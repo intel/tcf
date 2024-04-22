@@ -1,5 +1,10 @@
 {% extends 'login_content.html' %}
 
+{% block head %}
+  <!-- load stylesheets -->
+    <link rel="stylesheet" href="{{url_for('static', filename = 'css/buttons.css')}}"/>
+{% endblock %}
+
 {% block login %}
 <!-- default from ttbd/ui/templates/login.html;
   -- customize me:
