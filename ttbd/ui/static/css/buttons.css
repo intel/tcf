@@ -1,0 +1,192 @@
+/*
+ * Copyright (c) 2023 Intel Corporation
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * Buttons module, all css related to buttons go here
+ */
+
+button {
+	background: none;
+	color: inherit;
+	border: none;
+	padding: 0;
+	font: inherit;
+	cursor: pointer;
+	outline: inherit;
+    margin-top: 0;
+}
+
+button {
+    margin-right: 0.5em;
+    padding: 0 0.5em;
+    background-color: #fff;
+    border: 1px #adadad solid;
+    border-radius: 1px;
+}
+
+button:hover:enabled {
+    background-color: #eee;
+    color: #3182bd;
+}
+
+
+button:disabled {
+	cursor: not-allowed;
+    opacity: 0.65
+}
+
+/* remove all decoration from buttons */
+.allocate-btn {
+	background: none;
+	color: inherit;
+	border: none;
+	padding: 0;
+	font: inherit;
+	cursor: pointer;
+	outline: inherit;
+    margin-top: 0;
+}
+
+/* remove default decoration */
+.toolbox > .subsection > button {
+	background: none;
+	color: inherit;
+	border: none;
+	padding: 0;
+	font: inherit;
+	cursor: pointer;
+	outline: inherit;
+    margin-top: 0;
+}
+
+/* make our own config for buttons */
+.toolbox > .subsection > button {
+    margin-right: 0.5em;
+    padding: 0 0.5em;
+    background-color: #fff;
+    border: 1px #adadad solid;
+    border-radius: 1px;
+}
+
+.toolbox > .subsection > button:hover:enabled {
+    color: #333;
+    background-color: #d4d4d4;
+    border-color: #8c8c8c;
+}
+
+
+/* acquire button */
+.toolbox > .subsection > .acquire {
+    color: #fff;
+    background-color: #b46102;
+    border-color:  #b46102
+}
+
+.toolbox > .subsection > .acquire:hover:enabled {
+    color: #fff;
+    background-color: #d58512;
+    border-color:  #985f0d;
+}
+
+.toolbox > .subsection > .release {
+    color: #fff;
+    background-color: #489FB5;
+    border-color:  #82C0CC;
+}
+
+.toolbox > .subsection > * > .release {
+    color: #fff;
+    background-color: #489FB5;
+    border-color:  #82C0CC;
+}
+
+.toolbox > .subsection > .release:hover:enabled {
+    color: #fff;
+    background-color: #16697A;
+    border-color:  #82C0CC;
+}
+
+.toolbox > .subsection > * > .release:hover:enabled {
+    color: #fff;
+    background-color: #16697A;
+    border-color:  #82C0CC;
+}
+
+
+.toolbox > .subsection > * > .minor {
+    background-color: #eee;
+    border-color: #eee;
+    height: 2em;
+}
+
+.toolbox > .subsection > .minor {
+    background-color: #eee;
+    border-color: #eee;
+    height: 2em;
+}
+
+.toolbox > .subsection > * > .minor:disabled {
+    color: gray;
+    cursor: not-allowed;
+}
+
+
+.power-on-btn:hover:enabled {
+    color: white;
+    background-color: green;
+    border-color: #8c8c8c;
+}
+
+.power-off-btn:hover:enabled {
+    color: white;
+    background-color: red;
+    border-color: #8c8c8c;
+}
+
+.power-cycle-btn:hover:enabled {
+    color: black;
+    background-color: yellow;
+    border-color: #8c8c8c;
+}
+
+
+.download-button {
+    border: 1px #adadad solid;
+    padding: 0em 1em;
+    background-color: white;
+}
+
+.download-button:link {
+    text-decoration: none;
+    color: black;
+}
+
+.download-button:visited {
+    text-decoration: none;
+    color: black;
+}
+
+.download-button:hover {
+    text-decoration: none;
+    color: white;
+    background-color: #d58512;
+    border-color: #985f0d;
+}
+
+.download-button:active {
+    text-decoration: none;
+    color: black;
+}
+
+
+#reload-button {
+    background-color: transparent;
+    border: 0px;
+    color: blue;
+    font-size: 1.2em;
+}
+
+#reload-button:hover {
+    background-color: transparent;
+    text-decoration: underline;
+}
