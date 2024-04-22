@@ -4,239 +4,6 @@
  *
  */
 
-
-/* define some properties for all the document */
-:root {
-    box-sizing: border-box;
-    --body-bg-color: #EEF0F2;
-    --nav-bg-color: #e7e7e7;
-    --nav-bg-color: #022d51;
-}
-
-
-/*
- * set the box-sizing property to inherit for all elements, including the
- * content before and after each element. It ensures consistent box-sizing
- * behavior throughout the webpage.
- */
-*,
-::before,
-::after {
-    box-sizing: inherit;
-}
-
-body {
-    background-color: var(--body-bg-color);
-    font-family: 'Helvetica', 'Arial';
-    margin-top: 0;
-    max-width: 1080px;
-    margin: 0 auto;
-}
-
-/* the famous lobotomized owl notation (* + *)
- * this adds a 1.5em top margin to all elements inside the body element, except
- * the first child, using the "lobotomized owl" notation. */
-body * + * {
-    margin-top: 1.5em;
-}
-
-.container {
-    max-width: 1080px;
-    margin: 0 auto;
-}
-
-header {
-    position: sticky;
-    top: 0;
-    z-index: 999;
-}
-
-header > h1 {
-    font-family: monospace;
-    font-weight: normal;
-}
-
-header > h1 > a{
-    text-decoration: none;
-    color: black;
-}
-
-header > h1 > a:active {
-    color: black;
-}
-
-header > h1 > a:visited {
-    color: black;
-}
-
-nav {
-    margin-top: 0;
-}
-
-nav > ul {
-    display: flex;
-    padding: 1em;
-    list-style-type: none;
-    background-color: var(--nav-bg-color);
-    border-bottom-left-radius: 0.2em;
-    border-bottom-right-radius: 0.2em;
-    margin-top: 1em;
-    color: white;
-    box-shadow: 0 4px 8px 0 rgba(0,0,0,.2);
-}
-
-nav > ul > img {
-    padding: 0 0.5em;
-}
-
-nav > ul> li {
-    margin-top: 0;
-    margin-left: 0.3em;
-}
-
-
-/* nav anchor tags without tooltip formating */
-nav > ul> li > a {
-    display: block;
-    background-color: transparent;
-    padding: 0.1em 1em;
-    color: white;
-    text-decoration: none;
-    border-radius: 0.1em;
-    font-size: 0.9em;
-}
-
-nav > ul> li > a:link {
-    color: white;
-    background-color: transparent;
-}
-
-nav > ul> li > a:visited{
-    color: white;
-    background-color: transparent;
-}
-
-nav > ul> li > a:hover {
-    color: white;
-    text-decoration: underline;
-    background-color: transparent;
-}
-
-nav > ul> li > a:active {
-    color: white;
-    text-decoration: underline;
-    background-color: transparent;
-}
-
-/* nav anchor tags with tooltip formating */
-nav > ul> li > div >  a {
-    display: block;
-    background-color: transparent;
-    padding: 0.1em 1em;
-    color: white;
-    text-decoration: none;
-    border-radius: 0.1em;
-    font-size: 0.9em;
-}
-
-nav > ul> li > div > a:link {
-    color: white;
-    background-color: transparent;
-}
-
-nav > ul> li > div > a:visited{
-    color: white;
-    background-color: transparent;
-}
-
-nav > ul> li > div > a:hover {
-    color: white;
-    text-decoration: underline;
-    background-color: transparent;
-}
-
-nav > ul> li > div > a:active {
-    color: white;
-    text-decoration: underline;
-    background-color: transparent;
-}
-
-
-nav > ul>  li + li {
-    margin-left: 1.5em;
-}
-
-nav > ul > .nav-right {
-    margin-left: auto;
-}
-
-.nav-right > a {
-    margin-left: auto;
-    background-color: transparent;
-    border-radius: 0;
-    border-left: 1px solid white;
-}
-
-.nav-right > a:hover {
-    color: #0071c5;
-    background-color: transparent;
-}
-
-.server_list {
-    margin-left: auto;
-    padding: 0;
-}
-
-.server_list > .server_list_button {
-    background-color: transparent;
-    border-radius: 0;
-    border: 0;
-    font-size: 0.9em;
-    color: white;
-}
-
-.server_list > .server_list_button:hover {
-    color: white;
-    background-color: transparent;
-    text-decoration: underline;
-}
-
-.server_list_dropdown_class {
-    background-color: white;
-    position: absolute;
-    display: inline-block;
-    margin-top: 0;
-    z-index:2;
-    box-shadow: 0 0 11px rgba(33,33,33,.4);
-    padding: 1em;
-    border: 1px solid rgb(190,190,190);
-    border-bottom-left-radius: 0.5em;
-    border-bottom-right-radius: 0.5em;
-    color: gray;
-    font-size: 0.8em;
-}
-
-.server_list_dropdown_class > label {
-    font-size: 0.9em;
-}
-
-
-.server_list_dropdown_class > a:hover {
-    color: #3580b8;
-}
-
-.server_list_dropdown_class > a:active {
-    color: #3580b8;
-}
-
-.server_list_dropdown_class > a:link {
-    color: #3580b8;
-}
-
-.server_list_dropdown_class > a:visited {
-    color: #3580b8;
-}
-
 main {
     font-family: 'Helvetica Neue', 'Helvetica', 'Arial';
     font-size: 0.9em;
@@ -278,39 +45,6 @@ form {
     flex-direction: column;
 }
 
-/* remove all decoration from buttons */
-.allocate-btn {
-	background: none;
-	color: inherit;
-	border: none;
-	padding: 0;
-	font: inherit;
-	cursor: pointer;
-	outline: inherit;
-    margin-top: 0;
-}
-
-.manage {
-    padding: 0 1em;
-    background-color: #fff;
-    text-decoration: none;
-    border: 1px #adadad solid;
-}
-
-.manage:link {
-    color: #333;
-}
-.manage:visited {
-    color: #333;
-}
-.manage:hover {
-    color: #333;
-    background-color: #d4d4d4;
-    border-color: #8c8c8c;
-}
-.manage:active {
-    color: #333;
-}
 
 .toolbox {
     background-color: #eee;
@@ -328,39 +62,6 @@ form {
 }
 
 
-/* remove default decoration */
-.toolbox > .subsection > button {
-	background: none;
-	color: inherit;
-	border: none;
-	padding: 0;
-	font: inherit;
-	cursor: pointer;
-	outline: inherit;
-    margin-top: 0;
-}
-
-/* make our own config for buttons */
-.toolbox > .subsection > button {
-    margin-right: 0.5em;
-    padding: 0 0.5em;
-    background-color: #fff;
-    border: 1px #adadad solid;
-    border-radius: 1px;
-}
-
-.toolbox > .subsection > button:hover:enabled {
-    color: #333;
-    background-color: #d4d4d4;
-    border-color: #8c8c8c;
-}
-
-button:disabled {
-	cursor: not-allowed;
-    opacity: 0.65
-}
-
-
 .toolbox > .subsection > button:disabled {
 	cursor: not-allowed;
     opacity: 0.65
@@ -368,42 +69,6 @@ button:disabled {
 
 .subsection > h4 {
     margin: 0em;
-}
-
-.toolbox > .subsection > .acquire {
-    color: #fff;
-    background-color: #b46102;
-    border-color:  #b46102
-}
-
-.toolbox > .subsection > .acquire:hover:enabled {
-    color: #fff;
-    background-color: #d58512;
-    border-color:  #985f0d;
-}
-
-.toolbox > .subsection > .release {
-    color: #fff;
-    background-color: #489FB5;
-    border-color:  #82C0CC;
-}
-
-.toolbox > .subsection > * > .release {
-    color: #fff;
-    background-color: #489FB5;
-    border-color:  #82C0CC;
-}
-
-.toolbox > .subsection > .release:hover:enabled {
-    color: #fff;
-    background-color: #16697A;
-    border-color:  #82C0CC;
-}
-
-.toolbox > .subsection > * > .release:hover:enabled {
-    color: #fff;
-    background-color: #16697A;
-    border-color:  #82C0CC;
 }
 
 .info {
@@ -437,29 +102,6 @@ button:disabled {
     margin-top: 1em;
 }
 
-button {
-	background: none;
-	color: inherit;
-	border: none;
-	padding: 0;
-	font: inherit;
-	cursor: pointer;
-	outline: inherit;
-    margin-top: 0;
-}
-button {
-    margin-right: 0.5em;
-    padding: 0 0.5em;
-    background-color: #fff;
-    border: 1px #adadad solid;
-    border-radius: 1px;
-}
-
-button:hover:enabled {
-    background-color: #eee;
-    color: #3182bd;
-}
-
 #alloc-tbl {
     background-color: var(--nav-bg-color);
     border-bottom-left-radius: 0.5em;
@@ -479,22 +121,6 @@ button:hover:enabled {
     padding: 1em 1em;
 }
 
-.toolbox > .subsection > * > .minor {
-    background-color: #eee;
-    border-color: #eee;
-    height: 2em;
-}
-
-.toolbox > .subsection > .minor {
-    background-color: #eee;
-    border-color: #eee;
-    height: 2em;
-}
-
-.toolbox > .subsection > * > .minor:disabled {
-    color: gray;
-    cursor: not-allowed;
-}
 
 .arrow {
   border: solid black;
@@ -518,23 +144,6 @@ table.dataTable.row-border > thead {
     background-color: #eee;
 }
 
-.power-on-btn:hover:enabled {
-    color: white;
-    background-color: green;
-    border-color: #8c8c8c;
-}
-
-.power-off-btn:hover:enabled {
-    color: white;
-    background-color: red;
-    border-color: #8c8c8c;
-}
-
-.power-cycle-btn:hover:enabled {
-    color: black;
-    background-color: yellow;
-    border-color: #8c8c8c;
-}
 
 .flex {
     display: flex;
@@ -652,43 +261,3 @@ hr {
     margin-left: auto;
 }
 
-
-.download-button {
-    border: 1px #adadad solid;
-    padding: 0em 1em;
-    background-color: white;
-}
-
-.download-button:link {
-    text-decoration: none;
-    color: black;
-}
-
-.download-button:visited {
-    text-decoration: none;
-    color: black;
-}
-
-.download-button:hover {
-    text-decoration: none;
-    color: white;
-    background-color: #d58512;
-    border-color: #985f0d;
-}
-
-.download-button:active {
-    text-decoration: none;
-    color: black;
-}
-
-#reload-button {
-    background-color: transparent;
-    border: 0px;
-    color: blue;
-    font-size: 1.2em;
-}
-
-#reload-button:hover {
-    background-color: transparent;
-    text-decoration: underline;
-}
