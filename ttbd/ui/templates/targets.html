@@ -3,12 +3,16 @@
 {% block title %} targets {% endblock %}
 
 {% block head %}
-<script src="{{url_for('static', filename = 'js/targets.js')}}"></script>
 <link rel="stylesheet" href="{{url_for('static', filename = 'css/targets.css')}}"/>
 
-<script src="{{url_for('static', filename = 'js/jquery-3.6.4.slim.min.js')}}" integrity="sha256-a2yjHM4jnF9f54xUQakjZGaqYs/V1CYvWpoqZzC2/Bw=" crossorigin="anonymous"></script>
-<link rel="stylesheet" href="{{url_for('static', filename = 'css/jquery.dataTables.css')}}"/>
-<script src="{{url_for('static', filename = 'js/jquery.dataTables.js')}}"></script>
+<script src="{{url_for('static', filename = 'js/targets.js')}}"></script>
+
+
+<link rel="stylesheet" href="{{url_for('static', filename = 'css/external/jquery.dataTables.css')}}"/>
+
+<script src="{{url_for('static', filename = 'js/external/jquery-3.6.4.slim.min.js')}}" integrity="sha256-a2yjHM4jnF9f54xUQakjZGaqYs/V1CYvWpoqZzC2/Bw=" crossorigin="anonymous"></script>
+<script src="{{url_for('static', filename = 'js/external/jquery.dataTables.js')}}"></script>
+
 {% endblock %}
 
 {% block navbar %}{% endblock %}

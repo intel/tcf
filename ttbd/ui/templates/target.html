@@ -2,17 +2,24 @@
 
 
 {% block head %}
-<!-- link our js file -->
-<script src="{{url_for('static', filename = 'js/targets.js')}}"></script>
-<script type="text/javascript" src="{{url_for('static', filename = 'js/main.js')}}"></script>
 
-<script src="{{url_for('static', filename = 'js/jquery-3.6.4.slim.min.js')}}" integrity="sha256-a2yjHM4jnF9f54xUQakjZGaqYs/V1CYvWpoqZzC2/Bw=" crossorigin="anonymous"></script>
-<link rel="stylesheet" href="{{url_for('static', filename = 'css/jquery.dataTables.css')}}"/>
 
-<script src="{{url_for('static', filename = 'js/jquery.dataTables.js')}}"></script>
+  <!-- load js scripts -->
+    <script type="text/javascript" src="{{url_for('static', filename = 'js/targets.js')}}"></script>
+    <script type="text/javascript" src="{{url_for('static', filename = 'js/main.js')}}"></script>
 
-<script src="{{url_for('static', filename = 'js/xterm.js')}}"></script>
-<link rel="stylesheet" href="{{url_for('static', filename = 'css/xterm.css')}}"/>
+
+  <!-- load external js scripts -->
+    <script src="{{url_for('static', filename = 'js/external/jquery-3.6.4.slim.min.js')}}" integrity="sha256-a2yjHM4jnF9f54xUQakjZGaqYs/V1CYvWpoqZzC2/Bw=" crossorigin="anonymous"></script>
+    <script src="{{url_for('static', filename = 'js/external/jquery.dataTables.js')}}"></script>
+    <script src="{{url_for('static', filename = 'js/external/xterm.js')}}"></script>
+    <script src="{{url_for('static', filename = 'js/external/highlight.min.js')}}"></script>
+
+
+  <!-- load external stylesheets -->
+    <link rel="stylesheet" href="{{url_for('static', filename = 'css/external/jquery.dataTables.css')}}"/>
+    <link rel="stylesheet" href="{{url_for('static', filename = 'css/external/xterm.css')}}"/>
+    <link rel="stylesheet" href="{{url_for('static', filename = 'css/external/color-brewer.min.css')}}"/>
 
 {% endblock %}
 
@@ -21,8 +28,6 @@
 {% block navbar %}{% endblock %}
 
 {% block content %}
-<link rel="stylesheet" href="{{url_for('static', filename = 'css/color-brewer.min.css')}}"/>
-<script src="{{url_for('static', filename = 'js/highlight.min.js')}}"></script>
 
 <script>hljs.highlightAll();</script>
 

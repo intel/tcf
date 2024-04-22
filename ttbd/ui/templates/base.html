@@ -7,16 +7,18 @@
   -->
   <title>{% block title %} {% endblock %} - ttbdweb </title>
   <link rel='stylesheet' href="{{url_for('static', filename = 'css/style.css')}}">
+
+  <!-- load external stylesheets -->
+  <link rel="stylesheet" href="{{url_for('static', filename = 'css/external/color-brewer.min.css')}}"/>
+
+
   {% block head %}{% endblock %}
-    <link rel="stylesheet" href="{{url_for('static', filename = 'css/color-brewer.min.css')}}"/>
-    <script src="{{url_for('static', filename = 'js/highlight.min.js')}}"></script>
 
-    <script src="{{url_for('static', filename = 'js/main.js')}}"></script>
+  <!-- load js scripts -->
+  <script src="{{url_for('static', filename = 'js/main.js')}}"></script>
 
-    <!-- we disable caching, since we need fresh data when we reload-->
-    <meta http-equiv = "Cache-Control" content = "no-cache, no-store, must-revalidate" />
-    <meta http-equiv = "Pragma" content = "no-cache" />
-    <meta http-equiv = "Expires" content = "0" />
+  <!-- load external js scripts -->
+  <script src="{{url_for('static', filename = 'js/external/highlight.min.js')}}"></script>
 
 </head>
 <body>
