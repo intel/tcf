@@ -1,0 +1,47 @@
+/*
+/*
+ * Copyright (c) 2023 Intel Corporation
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * Generic rules that apply to the whole website
+ *
+ */
+
+:root {
+    box-sizing: border-box;
+    --body-bg-color: #EEF0F2;
+    --nav-bg-color: #e7e7e7;
+    --nav-bg-color: #022d51;
+}
+
+
+/*
+ * set the box-sizing property to inherit for all elements, including the
+ * content before and after each element. It ensures consistent box-sizing
+ * behavior throughout the webpage.
+ */
+*,
+::before,
+::after {
+    box-sizing: inherit;
+}
+
+body {
+    background-color: var(--body-bg-color);
+    font-family: 'Helvetica', 'Arial';
+    margin-top: 0;
+    max-width: 1080px;
+    margin: 0 auto;
+}
+
+/* the famous lobotomized owl notation (* + *)
+ * this adds a 1.5em top margin to all elements inside the body element, except
+ * the first child, using the "lobotomized owl" notation. */
+body * + * {
+    margin-top: 1.5em;
+}
+
+.container {
+    max-width: 1080px;
+    margin: 0 auto;
+}
