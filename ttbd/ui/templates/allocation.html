@@ -55,7 +55,7 @@ ttbd's /ttb-v2/ui/allocation.
           <div class='subsection'>
             <div class="tooltip">
 
-                <button class='release' onclick='js_alloc_remove("{{allocid}}")'>
+                <button class='secundary' onclick='js_alloc_remove("{{allocid}}")'>
                     remove myself as guest
                 </button>
 
@@ -89,9 +89,7 @@ ttbd's /ttb-v2/ui/allocation.
           <div class='subsection'>
             <div class = "tooltip">
 
-                {# FIXME: this should be in red!!! kinda DANGER zone #}
-                <button style='background-color: red;'
-                        class='release' onclick='js_alloc_remove("{{allocid}}")'>
+                <button class='warning' onclick='js_alloc_remove("{{allocid}}")'>
                     release allocation
                 </button>
 
