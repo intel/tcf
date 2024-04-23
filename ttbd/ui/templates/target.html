@@ -62,7 +62,7 @@
 
     {% if not state.acquired %}
       <div class = "tooltip">
-        <button class='acquire' onclick='acquire(["{{targetid}}"])'>acquire</button>
+        <button class='primary' onclick='acquire(["{{targetid}}"])'>acquire</button>
         <span class = "tooltiptext">
           Allocate this target so you can use it.
           <p>
@@ -78,7 +78,7 @@
 
     {% elif state.user_is_guest %}
       <div class = "tooltip">
-        <button class='release' onclick='js_alloc_remove("{{state.alloc}}")'>remove myself as a guest</button>
+        <button class='warning' onclick='js_alloc_remove("{{state.alloc}}")'>remove myself as a guest</button>
         <span class = "tooltiptext">
           You ({{ state.user }}) are a <b>guest</b> in this
           target's allocation.
@@ -97,7 +97,7 @@
 
     {% else %}
       <div class = "tooltip">
-       <button style='background-color: red;' class='release' onclick='js_alloc_remove("{{state.alloc}}")'>release</button>
+       <button class='warning' onclick='js_alloc_remove("{{state.alloc}}")'>release</button>
         <span class = "tooltiptext">
           Release this target from its allocation.
 
