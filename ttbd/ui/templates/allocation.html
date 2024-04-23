@@ -195,10 +195,11 @@ ttbd's /ttb-v2/ui/allocation.
 
         {% else %}
             <div class = "tooltip">
-              <label>You </label> <span class = "tooltiptext">Logged-in
-              user {{ state.user }} </span> have no permissions to
-              manipulate this allocation (need be either the creator,
-              owner or admin)
+                <span class = "tooltiptext">
+                  Logged-in user {{ state.user }}. You have no permissions to
+                  manipulate this allocation (need be either the creator, owner
+                  or admin)
+                </span>
             </div>
         {% endif %}
 
