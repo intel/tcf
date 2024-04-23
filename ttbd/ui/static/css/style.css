@@ -266,3 +266,8 @@ hr {
     overflow-x: auto;
     border: 1px solid gray;
 }
+
+.toolbar-targets {
+    display: flex;
+    margin-top: 1.5em;
+}
