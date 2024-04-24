@@ -127,6 +127,35 @@
 $ tcf ls -vv {{ targetid}}</code> </pre></p>
           </span>
       </div>
+
+      {# Adding button to automatically add the user as a guest to the
+         allocation. This option is only available to admins.
+
+         If the target is not allocated both user_is_admin and user_is_guest
+         are None so it will not show the button.
+
+         Also if user is already guest, no need to display this button.
+
+         And finally lets make sure we are not the owner of the system.
+      #}
+      {% if state.user_is_admin == True and state.user_is_guest == False and state.user != state.owner %}
+          <div class = "tooltip">
+            <button class='secundary'
+                    onclick='js_alloc_guest_add("{{state.alloc}}","{{state.user}}"); window.location.reload();'>
+                add myself as a guest
+           </button>
+            <span class = "tooltiptext">
+              Add yourself as a guest to this allocation.
+              <p>
+                You can do this becuase you are an <mark>admin</mark>
+              </p>
+              <p>
+                On the command line, you can use:
+                <pre><code class="language-bash">$ tcf guest-add {{ state.user }} </code></pre>
+              </p>
+            </span>
+          </div>
+      {% endif %}
     </div>
     <hr>
     {% if state.acquired %}

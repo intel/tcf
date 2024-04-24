@@ -476,16 +476,13 @@ def _target(targetid):
     who = ttbl.who_create(flask_login.current_user.get_id(), None)
     if who:
         acquired = target.target_is_owned_and_locked(who)
-        user_is_guest = who != target.owner_get()
     else:
         acquired = False
-        user_is_guest = False
 
     state = {
         'owner': owner,
         "user": calling_user.get_id(),
         'acquired': acquired,
-        'user_is_guest': user_is_guest,
         'type': target_type,
         'mac': _interconnect_values_render(inventory, "mac_addr", separator = " "),
         'ip': _interconnect_values_render(inventory, "ipv4_addr", separator = " "),
@@ -497,9 +494,14 @@ def _target(targetid):
         if allocdb == None:	# allocation was removed...shrug
             state["creator"] = "n/a"
             state['alloc'] = "n/a"
+            state['user_is_admin'] = None
+            state['user_is_guest'] = None
         else:
             state["creator"] =  allocdb.get("creator")
             state['alloc'] = allocdb.allocid
+            state['user_is_admin'] = allocdb.check_user_is_admin(calling_user)
+            state['user_is_guest'] = \
+                allocdb.check_userid_is_guest(calling_user.get_id())
 
     # single IPs are at least 16 chars
     short_field_maybe_add(state, 'ip', 16)
