@@ -2256,12 +2256,9 @@ def password_get(domain, user, password):
     :param str password: a password obtained from the user or a
       configuration setting; can be *None*. If the *password* is
 
-      - *KEYRING* will ask the accounts keyring for the password
-        for domain *domain* for username *user*
-
-      - *KEYRING=DOMAIN* (or *KEYRING:DOMAIN*) will ask the accounts
-        keyring for the password for domain *DOMAIN* for username
-        *user*, ignoring the *domain* parameter.
+      - *KEYRING[:DOMAIN[:USER]]* will ask the keyring for the
+        password for domain *DOMAIN* for username *USER*; if *DOMAIN*
+        or *USER* are not specified, they are taken from the arguments.
 
       - *FILE=PATH* (or *FILE:PATH*) will read the password from
         filename *PATH*.
@@ -2287,47 +2284,52 @@ def password_get(domain, user, password):
 
     """
     assert domain == None or isinstance(domain, str)
-    assert isinstance(user, str)
+    assert isinstance(user, str) or user == None
     assert password == None or isinstance(password, str)
+
+    if not password:
+        return
+
+    # Load from the keyring
+    def _keyring_get(domain, user):
+        if keyring_available == False:
+            raise RuntimeError("keyring: not available")
+
+        password = keyring.get_password(domain, user)
+        if password == None:
+            raise RuntimeError(
+                f"keyring: no password for user {user} @ {domain}")
+        return password
+
     if password == "KEYRING":
-        if keyring_available == False:
-            raise RuntimeError(
-                "keyring: functionality to load passwords not available,"
-                " please install keyring support")
-        password = keyring.get_password(domain, user)
-        if password == None:
-            raise RuntimeError("keyring: no password for user %s @ %s"
-                               % (user, domain))
-    elif password and password.startswith("KEYRING:"):
-        if keyring_available == False:
-            raise RuntimeError(
-                "keyring: functionality to load passwords not available,"
-                " please install keyring support")
+        return _keyring_get(domain, user)
+
+    if password.startswith("KEYRING:"):
         _, domain = password.split(":", 1)
-        password = keyring.get_password(domain, user)
-        if password == None:
-            raise RuntimeError("keyring: no password for user %s @ %s"
-                               % (user, domain))
-    elif password and password.startswith("KEYRING="):
-        if keyring_available == False:
-            raise RuntimeError(
-                "keyring: functionality to load passwords not available,"
-                " please install keyring support")
+        if ":" in domain:	# override user to load if specified
+            domain, user = domain.split(":", 1)
+        return _keyring_get(domain, user)
+
+    if password.startswith("KEYRING="):
         _, domain = password.split("=", 1)
-        password = keyring.get_password(domain, user)
-        if password == None:
-            raise RuntimeError("keyring: no password for user %s @ %s"
-                               % (user, domain))
-    elif password and password.startswith("FILE:"):
+        if ":" in domain:	# override user to load if specified
+            domain, user = domain.split(":", 1)
+        return _keyring_get(domain, user)
+
+    # Load form a file?
+    def _file_get(filename):
+        with open(filename) as f:
+            return f.read().strip()
+
+    if password.startswith("FILE:"):
         _, filename = password.split(":", 1)
-        with open(filename) as f:
-            password = f.read().strip()
-    elif password and password.startswith("FILE="):
+        return _file_get(filename)
+
+    if password.startswith("FILE="):
         _, filename = password.split("=", 1)
-        with open(filename) as f:
-            password = f.read().strip()
-    # fallthrough, if none of them, it's just a password
-    return password
+        return _file_get(filename)
+
+    return password			# passthough, no special handling
 
 
 def split_user_pwd_hostname(s):
