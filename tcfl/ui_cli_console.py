@@ -983,17 +983,17 @@ WARNING: the following targets do not support consoles
 
 
 def _console_ls(target):
+    print(target.fullid)
     for console in target.console.list():
         if console in target.console.aliases:
             real_name = "|" + target.console.aliases[console]
         else:
             real_name = ""
         size = target.console.size(console)
-        print(target.fullid)
         if size != None:
-            print("%s%s: %d" % (console, real_name, size))
+            print("  %s%s: %d" % (console, real_name, size))
         else:
-            print("%s%s: disabled" % (console, real_name))
+            print("  %s%s: disabled" % (console, real_name))
 
 
 def _cmdline_console_ls(cli_args: argparse.Namespace):
