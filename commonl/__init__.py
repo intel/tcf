@@ -60,16 +60,11 @@ import urllib.parse
 
 debug_traces = False
 
-if False:
-    # disabling all this until we have a proper fix for the import
-    # mess they keyring package has
-    try:
-        import keyring
-        keyring_available = True
-    except ImportError as e:
-        logging.warning("can't import keyring, functionality disabled")
-        keyring_available = False
-else:
+try:
+    import keyring
+    keyring_available = True
+except ImportError as e:
+    logging.warning("can't import keyring, functionality disabled")
     keyring_available = False
 
 from . import expr_parser
