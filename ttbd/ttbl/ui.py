@@ -576,8 +576,8 @@ def _allocation(allocid):
         try:
             allocdb = ttbl.allocation.get_from_cache(allocid)
             if not allocdb.check_query_permission(calling_user):
-                # FIXME: this should be a render of a template?
-                flask_logi_abort(400, f"{calling_user} not allowed")
+                return flask.render_template(
+                    'forbidden.html', servers_info = servers_info_get()), 403
 
             # we'll collect stuff here to send up to the Jinja2 renderer
             state = {
