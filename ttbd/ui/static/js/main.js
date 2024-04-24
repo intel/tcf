@@ -182,29 +182,19 @@ function common_error_check(r) {
 *
 * return {void}
 */
-async function js_alloc_guest_add(allocid, input_field_id) {
+async function js_alloc_guest_add_from_input_field(allocid, input_field_id) {
 
     $('.diagnostics').empty();
 
     // the selector_id element in the HTML document has picked up something
     let input_field_item = document.getElementById(input_field_id);
-    console.log('DEBUG 1')
     if (input_field_item == null) {
         // this means do nothing
         return
     }
-    console.log('DEBUG 2')
     let user_name = input_field_item.value;
 
-    console.log('DEBUG user_name is ' + user_name)
-
-    let r = await fetch('/ttb-v2/allocation/' + allocid + '/' + user_name, {
-        method: 'PATCH',
-    });
-
-    if (common_error_check(r)) {
-        return
-    }
+    await js_alloc_guest_add(allocid, user_name)
 
     $('#loading').empty();
     $('#loading').append(
@@ -214,6 +204,15 @@ async function js_alloc_guest_add(allocid, input_field_id) {
     window.location.reload()
 }
 
+async function js_alloc_guest_add(allocid, username) {
+    let r = await fetch('/ttb-v2/allocation/' + allocid + '/' + username, {
+        method: 'PATCH',
+    });
+
+    if (common_error_check(r)) {
+        return
+    }
+}
 
 /*
 * Remove a guest from an allocation
