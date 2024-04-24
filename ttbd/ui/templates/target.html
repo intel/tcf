@@ -516,6 +516,18 @@ $ tcf ls -vv {{ targetid}}</code> </pre></p>
             </td>
           </tr>
 
+          <tr>
+            <td>Allocation:</td>
+            <td>
+              {% if state.alloc and state.alloc != 'n/a' %}
+                <span><a href='/ttb-v2/ui/allocation/{{state.alloc}}'>{{state.alloc}}</a></span>
+              {% else %}
+                <span style='color: gray;'>no allocation</span>
+              {% endif %}
+            </td>
+          </tr>
+
+
         </table>
     </div>
 </div>
