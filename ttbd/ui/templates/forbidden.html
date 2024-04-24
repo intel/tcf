@@ -1,0 +1,19 @@
+{% extends 'base.html' %}
+{% block head %}
+{% endblock %}
+{% block title %} {{ Forbidden }} {% endblock %}
+{% block navbar %}{% endblock %}
+
+{% block content %}
+<h1>403 Forbidden</h1>
+<p>
+    It looks like you do not have permission to view the page you were trying
+    to access.
+</p>
+
+<a href='/ttb-v2/ui'>go home</a>
+
+<p class='info info-yellow'>
+    If you think this is a mistake, please contact an admin for assistance.
+</p>
+{% endblock %}
