@@ -340,6 +340,10 @@ if __name__ == "__main__":
         req_log = logging.getLogger('requests.packages.urllib3')
         req_log.setLevel(logging.DEBUG)
         req_log.propagate = True
+    else:
+        # we don't need all the warnings from urllib
+        import urllib3
+        urllib3.disable_warnings()
 
     if args.traces or args.debug:
         # I mean, this is ugly, but simple
