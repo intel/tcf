@@ -221,8 +221,8 @@ class discovery_agent_c:
             self.rts.update(server_rts)
             self.rts_flat.update(server_rts_flat)
             self.inventory_keys.update(server_inventory_keys)
-        logger.info(f"read {len(self.rts)} targets"
-                    f" from {len(tcfl.server_c.servers)} servers found")
+        logger.info("discovered %d targets from %d servers found",
+                    len(self.rts), len(tcfl.server_c.servers))
         self.executor = None
         self.rs = {}
 
