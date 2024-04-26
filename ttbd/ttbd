@@ -1524,6 +1524,10 @@ def cleanup_process_fn():
             if cleanup_elapsed > ttbl.config.cleanup_files_period:
                 cleanup_files()
                 cleanup_files_last = ts_now
+
+            # refresh server discovery; this function is cached, so it
+            # will only actually do the discovery when it's old.
+            ttbl.ui.servers_info_get()
         except Exception as e:
             loge("Exception in cleanup thread: %s\n"
                  % e + traceback.format_exc())

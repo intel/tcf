@@ -181,7 +181,7 @@ def servers_info_get():
                 "..", "cache", "ttbd.ui.servers_info_get"
             )
         ),
-        max_age_s = 20 * 60,		# refresh periodically
+        max_age_s = 10 * 60,		# refresh periodically
         max_entries = 20,
         exclude_exceptions = [ Exception ])
     def _servers_info_get():
