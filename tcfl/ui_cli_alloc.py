@@ -38,13 +38,12 @@ def _cmdline_alloc_ls(cli_args: argparse.Namespace):
     verbosity = cli_args.verbosity - cli_args.quietosity
     servers = tcfl.servers.by_targetspec(
         cli_args.target, verbosity = verbosity)
-
     if not tcfl.server_c.servers:
         log.error("E: no servers available, did you configure?")
         return
 
     allocations = tcfl.allocation.ls(
-        cli_args.username,
+        allocids = cli_args.allocids, username = cli_args.username,
         parallelization_factor = cli_args.parallelization_factor,
         traces = cli_args.traces)
 
@@ -507,9 +506,10 @@ def cmdline_setup_intermediate(arg_subparser):
         "alloc-ls",
         help = "List information about current allocations "
         "in all the servers or the servers where the named "
-        "targets are")
+        "targets are. Note as TARGETSPEC you can also add "
+        "allocation IDs")
     tcfl.ui_cli.args_verbosity_add(ap)
-    tcfl.ui_cli.args_targetspec_add(ap)
+    tcfl.ui_cli.args_targetspec_add(ap, argspec = [ "-t", "--target" ], nargs = 1)
     ap.add_argument(
         "-u", "--username", action = "store", default = None,
         help = "ID of user whose allocs are to be displayed"
@@ -518,6 +518,11 @@ def cmdline_setup_intermediate(arg_subparser):
         "-r", "--refresh", action = "store",
         type = float, nargs = "?", const = 1, default = 0,
         help = "Repeat every int seconds (by default, only once)")
+    ap.add_argument(
+        "allocids",
+        metavar = "ALLOCID", action = "store",
+        nargs = "*",
+        help = "Alloc IDs to list info for (if none, all are listed)")
     ap.set_defaults(func = _cmdline_alloc_ls)
 
 

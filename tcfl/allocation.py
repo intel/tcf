@@ -30,7 +30,7 @@ _subsystem_setup = False
 
 
 def server_allocs_get(_server_name: str, self: tcfl.server_c,
-                      username: str = None):
+                      username: str = None, allocids: list = None):
     """
     List all allocations in a server
 
@@ -77,30 +77,34 @@ def server_allocs_get(_server_name: str, self: tcfl.server_c,
     # - creator: who created it
     # - user: who is the allocation assigned to
 
-    if username:
-        # filter here, as we can translate the username 'self' to the
-        # user we are logged in as in the server
-        filtered_r = {}
-        if username == "self":
-            username = self.logged_in_username()
+    if not username and not allocids:
+        return r
 
-        def _alloc_filter_by_user(allocdata, username):
-            if username != None \
-               and username != allocdata.get('creator', None) \
-               and username != allocdata.get('user', None):
-                return False
+    # filter here, as we can translate the username 'self' to the
+    # user we are logged in as in the server
+    filtered_r = {}
+    if username == "self":
+        username = self.logged_in_username()
+
+    def _alloc_filter_by_user(allocdata, username):
+        if not username:
+            return False
+        if username == allocdata.get('creator', None):
             return True
+        if username == allocdata.get('user', None):
+            return True
+        return False
 
-        for allocid, allocdata in r.items():
-            if _alloc_filter_by_user(allocdata, username):
-                filtered_r[allocid] = allocdata
-            else:
-                self.log.info("alloc-ls: filtered out %s: %s",
-                              self.url, allocdata)
+    for allocid_itr, allocdata in r.items():
+        if _alloc_filter_by_user(allocdata, username):
+            filtered_r[allocid_itr] = allocdata
+        elif allocids and allocid_itr in allocids:
+            filtered_r[allocid_itr] = allocdata
+        else:
+            self.log.info("alloc-ls: filtered out %s: %s",
+                          self.url, allocdata)
 
-        return filtered_r
-
-    return r
+    return filtered_r
 
 
 
@@ -150,10 +154,13 @@ def rm_server_by_username(
 
 
 
-def ls(username: str, parallelization_factor: int = -4,
+def ls(allocids: list = None, username: str = None,
+       parallelization_factor: int = -4,
        traces: bool = True):
     """
     List all allocations in all known servers
+
+    :param list[str] allocids: (default all) list of Alloc IDs to list
 
     :param str: username: Name of the user whose allocations are to be
       removed. The special name *self* refers to the current logged in
@@ -176,7 +183,8 @@ def ls(username: str, parallelization_factor: int = -4,
     import tcfl.servers
 
     return tcfl.servers.run_fn_on_each_server(
-        tcfl.server_c.servers, server_allocs_get, username,
+        tcfl.server_c.servers, server_allocs_get,
+        allocids = allocids, username = username,
         parallelization_factor = parallelization_factor,
         traces = traces)
 
