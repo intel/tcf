@@ -20,6 +20,10 @@ learn more about them):
 
     $ tcf servers-discover [HOSTNAME]
 
+- Delete info about a server::
+
+    $ tcf servers-rm [HOSTNAME|URL|SERVER_AKA [...]]
+
 - Flush/delete list of available servers::
 
     $ tcf servers-flush
@@ -218,6 +222,43 @@ def _cmdline_servers_discover(cli_args: argparse.Namespace):
 
 
 
+def _cmdline_servers_rm(cli_args: argparse.Namespace):
+
+    log_sd = logging.getLogger("servers-rm")
+
+    import tcfl.servers
+
+    verbosity = tcfl.ui_cli.logger_verbosity_from_cli(log_sd, cli_args)
+    tcfl.servers.subsystem_setup(verbosity = verbosity)
+
+    for item in cli_args.items:
+        found = False
+        for server_url, server in tcfl.server_c.servers.items():
+            if item == server_url \
+               or item == server.aka \
+               or item == server.parsed_url.hostname:
+                found = True
+                print(f"{server_url}: deleting server")
+                try:
+                    server.logout()
+                except Exception as e:
+                    log_sd.warning("%s: error logging out; ignoring: %s",
+                                   server_url, e)
+                try:
+                    server.cache_wipe()
+                except Exception as e:
+                    log_sd.warning("%s: error wiping cache; ignoring: %s",
+                                   server_url, e)
+                try:
+                    server.state_wipe()
+                except Exception as e:
+                    log_sd.warning("%s: error wiping state; ignoring: %s",
+                                   server_url, e)
+        if not found:
+            log_sd.error("%s: can't delete, unknown", item)
+
+
+
 def _cmdline_servers_flush(_args):
     tcfl.server_c.flush()
 
@@ -267,6 +308,17 @@ def cmdline_setup(arg_subparser):
         help = "List of URLs or hostnames to seed discovery"
         f" [{' '.join(tcfl.server_c._seed_default.keys())}]")
     ap.set_defaults(func = _cmdline_servers_discover)
+
+
+    ap = arg_subparser.add_parser(
+        "servers-rm",
+        help = "Remove servers from knowledge")
+    tcfl.ui_cli.args_verbosity_add(ap)
+    ap.add_argument(
+        "items", metavar = "AKA|HOSTNAME|URL", nargs = "+",
+        action = "store", default = [],
+        help = "Hostnames, URLs or server AKAs to remove")
+    ap.set_defaults(func = _cmdline_servers_rm)
 
 
     ap = arg_subparser.add_parser(

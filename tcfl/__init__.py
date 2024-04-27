@@ -1216,6 +1216,7 @@ class server_c:
         """
         Delete this server's cache entry, database and lockfiles
         """
+        logger.info("%s: cache deleted in %s", self.url, self.cache_lockfile)
         with filelock.FileLock(self.cache_lockfile):
             r = self.fsdb.set(self.aka, None)
             commonl.rm_f(self.cache_lockfile)
@@ -2010,6 +2011,18 @@ class server_c:
         logger.debug("%s: state saved in %s", self.url, file_name)
 
 
+
+    def state_wipe(self):
+        """
+        Delete state information for this server as created with
+        :meth:`state_save`.
+        """
+        file_name = os.path.join(self.state_path,
+                                 f"cookies-{self.url_safe}.pickle")
+        commonl.rm_f(file_name)
+        logger.info("%s: state deleted in %s", self.url, file_name)
+
+
     def login(self, username, password):
         try:
             self.send_request('PUT', "login",
@@ -2028,6 +2041,7 @@ class server_c:
         else:
             # backwards compath
             self.send_request('PUT', "logout")
+        logger.info("%s: logged out", self.url)
 
 
 
