@@ -89,6 +89,8 @@ def by_targetspec(targetspec: list = None, verbosity: int = 0):
         for rt in tcfl.rts.values():
             server_url = rt['server']
             servers[server_url] = tcfl.server_c.servers[server_url]
+        # now wipe the servers that didn't match that
+        tcfl.server_c.servers = servers
         return servers
 
     # no targets, so all, just init the server discovery system
