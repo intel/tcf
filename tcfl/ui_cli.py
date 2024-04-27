@@ -47,9 +47,9 @@ def args_verbosity_add(ap: argparse.Namespace):
 
 
 def args_targetspec_add(
-        ap: argparse.Namespace, targetspec_n = False, nargs = None):
-    """
-    Add command line options for processing target specification
+        ap: argparse.Namespace, targetspec_n = False, nargs = None,
+        argspec: list = [ 'target' ]):
+    """Add command line options for processing target specification
     control (*TARGETSPECs*) to an argument parser
 
     :param argparse.Namespace ap: arg parse object
@@ -71,6 +71,16 @@ def args_targetspec_add(
       parallelization.
 
       Usually set to *1*.
+
+    :param bool argspec: (optional; default *['target']*) how to
+      specify target filtering options arguments.
+
+      Defaults to a *target* optional parameter. To make them be as
+      part of a -t or --target:
+
+      >>> argspec = [ "-t", "--target" ], nargs = 1
+
+      WARNING! Usually you want *nargs = 1* also when doing this
 
     """
     ap.add_argument(
@@ -108,15 +118,20 @@ def args_targetspec_add(
             f"targetspec_n: invalid; expected True, False or positive integer"
             f" got {type(targetspec_n)}")
 
+    if argspec != [ "target" ]:
+        kwargs_dest = { "dest": "target" }
+    else:
+        kwargs_dest = { }
     ap.add_argument(
-        "target",
-        metavar = "TARGETSPEC", action = "store",
+        *argspec,
+        metavar = "TARGETSPEC", action = "store", **kwargs_dest,
         nargs = nargs,
         help = "Target's name/s or a general target specification"
         " which might include values from the inventory, etc, in single"
         " quotes (eg: \"id:'STR'\" for all targets with STR in the name"
         " or \"ram.size_gib >= 2 and not type:'^qemu.*'\" for all"
         " machines with more than 2GiB of memory and not of QEMU type)")
+
 
 
 def logger_verbosity_from_cli(log, cli_args: argparse.Namespace) -> int:
