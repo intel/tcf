@@ -117,18 +117,20 @@ def _cmdline_alloc_ls(cli_args: argparse.Namespace):
         try:
             ts = os.get_terminal_size()
             display_w = max(ts.columns, 70)
+            logger.info("terminal is %d columns wide, display with %d",
+                        ts.columns, display_w)
             # First three columns are max around 30 characters
             #
             ## AllocID    State          Users
             ## ---------- -------------- -------...
             ## ipv3_ry7   active 500000  ...
             #
-            columns_available = display_w - 44
+            columns_available = display_w - 8 - 8
             maxcolwidths = [
                 8,
-                None,
-                int(0.30 * columns_available) - 2,
-                int(0.70 * columns_available) - 2,
+                8,	# some more random one are longer, they will wrap
+                int(0.30 * columns_available),
+                int(0.70 * columns_available),
             ]
         except OSError:
             maxcolwidths = None
@@ -152,13 +154,19 @@ def _cmdline_alloc_ls(cli_args: argparse.Namespace):
         try:
             ts = os.get_terminal_size()
             display_w = max(ts.columns, 70)
+            logger.info("terminal is %d columns wide, display with %d",
+                        ts.columns, display_w)
             # First three columns are max around 30 characters
             #
             ## AllocID    State          Users
             ## ---------- -------------- -------...
             ## ipv3_ry7   active 500000  ...
             #
-            columns_available = display_w - 44
+            # note we need to remove some from the columns_available
+            # calculation to adjust for extra space added for
+            # padding. This as done experimenting until there was no
+            # clipping
+            columns_available = display_w - 8 - 6 - 6 - 14
             maxcolwidths = [
                 8,				   # allocid
                 int(0.10 * columns_available) - 2, # server
@@ -166,8 +174,8 @@ def _cmdline_alloc_ls(cli_args: argparse.Namespace):
                 6,                                 # priority
                 14,                                # timestamp
                 int(0.15 * columns_available) - 2, # users
-                int(0.28 * columns_available) - 2, # groups
-                int(0.37 * columns_available) - 2, # reason
+                int(0.28 * columns_available) - 3, # groups
+                int(0.37 * columns_available) - 3, # reason
             ]
         except OSError:
             maxcolwidths = None
