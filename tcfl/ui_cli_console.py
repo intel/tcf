@@ -1011,7 +1011,6 @@ def _cmdline_console_disable(cli_args: argparse.Namespace):
 
     return tcfl.ui_cli.run_fn_on_each_targetspec(
         _console_disable, cli_args, cli_args.console,
-        only_one = True,
         iface = "console", extensions_only = [ "console" ])[0]
 
 
@@ -1023,7 +1022,6 @@ def _cmdline_console_enable(cli_args: argparse.Namespace):
 
     return tcfl.ui_cli.run_fn_on_each_targetspec(
         _console_enable, cli_args, cli_args.console,
-        only_one = True,
         iface = "console", extensions_only = [ "console" ])[0]
 
 
@@ -1081,7 +1079,6 @@ def _cmdline_console_setup(cli_args: argparse.Namespace):
     return tcfl.ui_cli.run_fn_on_each_targetspec(
         _console_setup, cli_args,
         cli_args.console, cli_args.reset, cli_args.parameters, verbosity,
-        only_one = True,
         iface = "console", extensions_only = [ "console" ])[0]
 
 
@@ -1091,7 +1088,7 @@ def _cmdline_setup(arg_subparser):
         "console-ls",
         help = "list consoles this target exposes")
     tcfl.ui_cli.args_verbosity_add(ap)
-    tcfl.ui_cli.args_targetspec_add(ap, targetspec_n = 1)
+    tcfl.ui_cli.args_targetspec_add(ap, targetspec_n = True, nargs = 1)
     ap.set_defaults(func = _cmdline_console_ls)
 
 
@@ -1256,7 +1253,7 @@ def _cmdline_setup_advanced(arg_subparser):
         "console-disable",
         help = "Disable a console")
     tcfl.ui_cli.args_verbosity_add(ap)
-    tcfl.ui_cli.args_targetspec_add(ap, targetspec_n = 1)
+    tcfl.ui_cli.args_targetspec_add(ap, targetspec_n = True, nargs = 1)
     ap.add_argument(
         "-c", "--console", metavar = "CONSOLE",
         action = "store", default = None,
@@ -1267,7 +1264,7 @@ def _cmdline_setup_advanced(arg_subparser):
         "console-enable",
         help = "Enable a console")
     tcfl.ui_cli.args_verbosity_add(ap)
-    tcfl.ui_cli.args_targetspec_add(ap, targetspec_n = 1)
+    tcfl.ui_cli.args_targetspec_add(ap, targetspec_n = True, nargs = 1)
     ap.add_argument(
         "-c", "--console", metavar = "CONSOLE",
         action = "store", default = None,
@@ -1278,7 +1275,7 @@ def _cmdline_setup_advanced(arg_subparser):
         "console-setup",
         help = "Setup a console")
     tcfl.ui_cli.args_verbosity_add(ap)
-    tcfl.ui_cli.args_targetspec_add(ap, targetspec_n = 1)
+    tcfl.ui_cli.args_targetspec_add(ap, targetspec_n = True, nargs = 1)
     ap.add_argument(
         "-c", "--console", metavar = "CONSOLE",
         action = "store", default = None,
