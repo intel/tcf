@@ -399,7 +399,16 @@ class method_pip_c(method_abc):
                 logging.info("pip not using --user due to venv")
             else:
                 cmdline.append("--user")
-
+        # Check which options are available in python pip install --
+        # note this is not supposed to fail--we only look at the output
+        p = subprocess.run(cmdline + [ "--help" ],
+                           capture_output = True, text = True, check = False)
+        if '--break-system-packages' in p.stdout:
+            # add --break-system-packages to newer Pyhton installs,
+            # because even with packages that are not available as
+            # system packages we get this and is the only way I've
+            # found we can install
+            cmdline.append("--break-system-packages")
         _indexes = []
         _index = method_details.get('index', None)
         if _index != None:
