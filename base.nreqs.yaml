@@ -17,6 +17,10 @@ colorama:
   reason: for initializing ANSI terminals in Windows
   require_platform: win32
 
+dateutil:
+  dnf: python3-dateutil
+  apt: python3-dateutil
+
 dosfstools:
   skip_platform: win32
 
@@ -33,6 +37,10 @@ gvnc-tools:
   debian: gvncviewer
   pip:
     skip: true
+
+keyring:
+  apt: python3-keyring
+  dnf: python3-keyring
 
 make:
   skip_platform: win32
@@ -72,8 +80,8 @@ python-Levenshtein:
   dnf: python3-Levenshtein
   apt: python3-levenshtein
   skip_platform: win32
-  
-PyYAML: python3-yaml 
+
+PyYAML: python3-yaml
 
 requests: python3-requests
 
@@ -85,7 +93,7 @@ rsync:
     Scripting uses it to efficiently provision SUTs
 
 tabulate: python3-tabulate
-  
+
 setuptools:
   distro: python3-setuptools
 
@@ -94,7 +102,7 @@ time:
   reason: |
     Some scripting commands prefix with time to measure
     execution time
-  
+
 termcolor:
   distro:
     name: python3-termcolor
