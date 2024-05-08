@@ -29,7 +29,6 @@ import requests
 import commonl
 import tcfl.config
 import tcfl.tc
-import tcfl.ttb_client
 
 def mkprefix(tag = None, cls = None):
     """
@@ -558,7 +557,7 @@ class test_ttbd(object):
         else:
             self.url = "http://localhost:%d" % self.port
             ssl_context = "--no-ssl"
-        self.url_spec = "fullid:'^%s'" % self.aka
+        self.url_spec = f"server == '{self.url}'"
         if tmpdir:
             self.tmpdir = tmpdir
         else:
