@@ -830,19 +830,25 @@ def _user_role(userid, action, role):
         return flask.jsonify(r)
 
 
+
 @app.route(API_PREFIX + 'targets/', methods = ['GET'])
+@app.route(API_PREFIX + 'targets/<string:target_id>', methods = ['GET'])
 @flask_login.login_required
-def _targets_gets():
+def _targets_gets(target_id: str = None):
     # no audit: no side effects and very frequent
     args = flask.request.get_json(silent = True)	# passed as JSON body?
     if args == None:
         args = flask.request.form	# as form?
     projections = ttbl.tt_interface.arg_get(
         args, 'projections', list, True, list())
-
     result = dict()
     calling_user = flask_login.current_user._get_current_object()
-    for target in ttbl.test_target.known_targets():
+    if target_id != None:
+        targets = [ ttbl.test_target.get(target_id) ]
+    else:
+        targets = ttbl.test_target.known_targets()
+    d = None	# keep this out of for for scope, see after for
+    for target in targets:
         if not target.check_user_allowed(calling_user):
             continue
         d = target.to_dict(projections)
@@ -851,6 +857,16 @@ def _targets_gets():
             # set of data
             d['id'] = target.id
             result[target.id] = d
+    if target_id and len(result) == 1:
+        # we asked for info about a SINGLE target and we found it, so
+        # we return only the info for that single target
+        #
+        ## { FIELD: VALUE, ... }
+        #
+        # vs the thing we'd return if we asked for all targets
+        #
+        ## { TARGETID1: { FIELD: VALUE, ... }, TARGETID2: ... }
+        result = d
     # Compress if gzip is accepted encoding
     if flask.request.accept_encodings['gzip']:
         content = gzip.compress(json.dumps(result).encode('utf-8'))
@@ -861,31 +877,6 @@ def _targets_gets():
     else:
         return flask.jsonify(result)
 
-
-@app.route(API_PREFIX + 'targets/<string:target_id>', methods = ['GET'])
-@flask_login.login_required
-def _target_get(target_id):
-    # no audit: no side effects and very frequent
-    args = flask.request.get_json(silent = True)	# passed as JSON body?
-    if args == None:
-        args = flask.request.form	# as form?
-    projections = ttbl.tt_interface.arg_get(
-        args, 'projections', list, True, list())
-
-    calling_user = flask_login.current_user._get_current_object()
-    target = ttbl.test_target.get_for_user(target_id, calling_user)
-    if target == None:
-        flask.abort(404, "%s: unknown target" % target_id)
-    d = target.to_dict(projections)
-    # Compress if gzip is accepted encoding
-    if flask.request.accept_encodings['gzip']:
-        content = gzip.compress(json.dumps(d).encode('utf-8'))
-        response = flask.make_response(content)
-        response.headers['Content-length'] = len(content)
-        response.headers['Content-Encoding'] = 'gzip'
-        return response
-    else:
-        return flask.jsonify(d)
 
 
 @app.route('/ttb', methods = ['GET'])
