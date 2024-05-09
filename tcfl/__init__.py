@@ -2159,6 +2159,10 @@ class server_c:
             if target_id:
                 r = self.send_request("GET", "targets/" + target_id,
                                       data = data, raw = True, timeout = 10)
+                # when we are asking for a single target, we get
+                #
+                ## { FIELD: VALUE, ... }
+                #
                 # Keep the order -- even if json spec doesn't contemplate it, we
                 # use it so the client can tell (if they want) the order in which
                 # for example, power rail components are defined in interfaces.power
@@ -2167,6 +2171,10 @@ class server_c:
             else:
                 r = self.send_request("GET", "targets/",
                                       data = data, raw = True, timeout = 10)
+                # When asking for multiple targets, we get
+                #
+                ## { TARGETID1: { FIELD: VALUE, ... }, TARGETID2: ... }
+                #
                 # Keep the order -- even if json spec doesn't contemplate it, we
                 # use it so the client can tell (if they want) the order in which
                 # for example, power rail components are defined in interfaces.power
