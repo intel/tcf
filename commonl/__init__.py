@@ -2406,8 +2406,10 @@ def dict_to_flat(d, projections = None, sort = True, empty_dict = False,
     are keys in nested dictionaries.
 
     :param dict d: dictionary to convert
+
     :param list(str) projections: (optional) list of :mod:`fnmatch`
       patterns of flay keys to bring in (default: all)
+
     :param bool sort: (optional, default *True*) sort according to KEY
       name or leave the natural order (needed to keep the order of the
       dictionaries) -- requires the underlying dict to be a
@@ -2439,7 +2441,6 @@ def dict_to_flat(d, projections = None, sort = True, empty_dict = False,
     """
     assert isinstance(d, collections.abc.Mapping)
     fl = []
-
     def _add(field_flat, val):
         if sort:
             bisect.insort(fl, ( field_flat, val ))
@@ -2472,11 +2473,13 @@ def dict_to_flat(d, projections = None, sort = True, empty_dict = False,
                 # we do not want that.
                 _add(field_flat, dict())
             elif depth_limit > 0:	# dict to dig in
+                len_before = len(fl)
                 for key, value in val.items():
                     __update_recursive(value, key, field_flat + "." + str(key),
                                        projections, depth_limit - 1,
                                        prefix = prefix + "    ",
                                        sort = sort, empty_dict = empty_dict)
+                len_after = len(fl)
                 # finally, add the field some.field.that.is.a.dict =
                 # THEDICT it self; this allows doing things like
                 # "'somestring' in some.field.that.is.a.dict"; we only
@@ -2506,7 +2509,18 @@ def dict_to_flat(d, projections = None, sort = True, empty_dict = False,
                 # a.i.y: 4
                 # a.i: { x: 2, y: 4 }
                 # a: { i: { x: 2, y: 4 } }
-                if '.' in field_flat and add_dict:
+                #
+                # Now, this check is messy -- we know we added fields
+                # using the len_after/before checks, meaning deeper
+                # than us there were things that checked the filters,
+                # so they had to be added; then we also need to check
+                # the field is required. -- note we do the checks from
+                # most simple to most complex.
+                if len_before < len_after \
+                   and add_dict \
+                   and '.' in field_flat \
+                   and val \
+                   and field_needed(field_flat, projections): \
                     _add(field_flat, val)
 
         elif field_needed(field_flat, projections):
