@@ -222,7 +222,7 @@ def is_tcf_testcase(path, from_path, tc_name, subcases_cmdline,
         del module
         return []
     logger.info("%s: found %d classes (%s)",
-                path, len(classes), ",".join(classes))
+                path, len(classes), ",".join([ str(i) for i in classes]))
 
     # We found stuff
     tcs = []
@@ -302,7 +302,9 @@ def _is_testcase_call(tc_driver, tc_name, file_name,
 
 
 
-def _tc_info_from_tc_c(testcase):
+def _tc_info_from_tc_c(testcase: tcfl.tc.tc_c):
+    assert isinstance(testcase, tcfl.tc.tc_c)
+    
     target_roles = dict()
     for target_want_name, tw in testcase._targets.items():
         target_role = tcfl.target_role_c(
@@ -396,6 +398,8 @@ def _create_from_file_name(tcis, file_name, from_path, subcases_cmdline,
 
             # this is so ugly, need to merge better with result_c's handling
             except subprocess.CalledProcessError as e:
+                # no trace here, since we append it to the
+                # formatted_traceback down there that can be seen
                 logger_driver.info("scanning exception: subprocess %s", e)
                 tcis[file_name].append(tcfl.tc_info_c(
                     tc_name, file_name,
@@ -422,7 +426,15 @@ def _create_from_file_name(tcis, file_name, from_path, subcases_cmdline,
                 ))
                 continue
             except Exception as e:
-                logger_driver.info("scanning exception: %s", e)
+                if isinstance(e, ( AttributeError, TypeError )):
+                    # usually a code error we want to see loud and clear
+                    logger_driver.error(
+                        "scanning exception: %s %s",
+                        type(e), e, exc_info = commonl.debug_traces)
+                else:
+                    logger_driver.info(
+                        "scanning exception: %s %s", type(e), e,
+                        exc_info = commonl.debug_traces)
                 tcis[file_name].append(tcfl.tc_info_c(
                     tc_name, file_name,
                     subcase_spec = subcases_cmdline,
@@ -549,7 +561,8 @@ class agent_c:
         orig_stderr = sys.stderr
         sys.stderr = sys.stdout = io.StringIO()
 
-        logger = log_sub.getChild(path)
+        pid = os.getpid()
+        logger = log_sub.getChild(f"{path}[{pid}]" )
         tcis = collections.defaultdict(list)
         logger.info("scanning for subcases %s", subcase_spec)
         try:
