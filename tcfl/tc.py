@@ -3953,6 +3953,29 @@ class tc_c(reporter_c, metaclass=_tc_mc):
     build_only = []
 
 
+    #: Testcase axes
+    #:
+    #: This is a dictionary of axis this testcase spins on (eg: which
+    #: permutations of Linux distros, memory sizes and disk types this
+    #: has to be run on); see :mod:`orchestrate`
+    #:
+    #: Some axis values can be obtained from the inventory (specifc
+    #: *None* to spin on what is available), others can be specified
+    #: here:
+    #:
+    #: >>> {
+    #: >>>      "linux_distro": [ "fedora", "debian" ],
+    #: >>>      "volume": [ 11.1, 32, -3 ],
+    #: >>> }
+    #:
+    #: A valid axis specification can be verified with
+    #: :func:`tcfl.axis_verify`; more axis can be added with the
+    #: :func:`tcfl.axis` decorator (when declaring a test class) or
+    #: with :func:`tcfl.axes_update` on an existing test class instance.
+    axes = {}
+
+    axes_origin = collections.defaultdict(set)
+    
     #: Allocation ID this testcase is using
     #:
     allocid = None
@@ -3987,6 +4010,11 @@ class tc_c(reporter_c, metaclass=_tc_mc):
             assert callable(hook_pre), \
                 "tcfl.tc.tc_c.hook_pre contains %s, defined as type '%s', " \
                 "which  is not callable" % type(hook_pre).__name__
+
+        # make a copy of the class definition, since it might be
+        # altered later during execution
+        self.axes = copy.copy(self.axes)
+        self.axes_origin = copy.copy(self.axes_origin)
 
         #: Lock to access :attr:`buffers` safely from multiple threads
         #: at the same time for the same testcase.

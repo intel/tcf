@@ -332,6 +332,8 @@ def _tc_info_from_tc_c(testcase):
         driver_name = str(testcase),
         tags = testcase._tags,
         result = tcfl.result_c(),
+        # original tcfl.tc.tc_c only supports spinning over the type axes
+        axes = { "type": None },
     )
     return tc_info
 
