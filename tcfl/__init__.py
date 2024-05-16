@@ -26,6 +26,7 @@ Debug support
 """
 import collections
 import concurrent.futures
+import copy
 import datetime
 import errno
 import inspect
@@ -2684,3 +2685,100 @@ logging.getLogger("filelock").setLevel(logging.CRITICAL)
 server_c.seed_add(
     "ttbd", port = 5000, ssl_verify = False,
     origin = f"defaults @{commonl.origin_get()}")
+
+def axes_verify(axes: dict):
+    """
+    Verify axes specification
+
+    :param dict axes: dictionary keyed by axis name (string)
+      containing a value of *None* (will be obtained from the
+      inventory) or a list of possible values of types:
+
+      - bool
+      - bytes
+      - dict
+      - float
+      - int
+      - str
+
+      For example:
+
+      >>> {
+      >>>      "linux_distro": [ "fedora", "debian" ],
+      >>>      "volume": [ 11.1, 32, -3 ],
+      >>> }
+
+    :raises AssertionError on badly defined axis.
+    """
+    if axes == None:
+        return
+    commonl.assert_dict_key_strings(axes, "axes")
+    for axis, values in axes.items():
+        if values != None:
+            commonl.assert_list_of_types(values, f"{axis} values", "value",
+                                         ( type(None), int, str, bool, float, bytes, dict ))
+        else:
+            # we'll fill this a list of the values in the
+            # inventory for this field
+            pass
+
+
+def axes(origin: str = None, **kwargs):
+    """
+    Add axes to a testcase class
+
+    This is used as a decorator to a testcase class to add axes that
+    need to be considered during execution.
+
+    >>> @tcfl.tc.axes(axisA = [ 'valA0', 'valA1', 'valA2' ],
+    >>>               axisB = [ 'valB0', 'valB1' ])
+    >>> class _test(tcfl.tc.tc_c):
+    >>>     pass
+
+    a more practical example
+
+    >>> @tcfl.tc.axes(distros = [ 'fedora:38', 'fedora:39', 'fedora:40' ],
+    >>>               python_versions = [ '3.8', '3.9', '3.10' ])
+    >>> class _test(tcfl.tc.tc_c):
+    >>>     pass
+
+    To add axes to an instance of a testcase, use
+    :meth:`tcfl.tc.tc_c.axes_update()`
+
+    :param str origin: (optional; defaults to current file and line
+      number) record a file origin from where axes were added.
+
+    :param axes: the rest of the parameters are in the form *AXISNAME
+      = LIST(VALUES)*, where *AXISNAME* will be the axis name and has to
+      be a valid Python identifier. *LIST(VALUES)* is a list of valid
+      axis values (which an be *bool*, *int*, *float* or *str*).
+
+      A common construct to get axis valus from the environment is:
+
+      >>> @tcfl.tc.axes(axisA = [ 'valA0', 'valA1', 'valA2' ],
+      >>>               axisB = os.environ.get(AXISB_VALUES, "valB0 valB1").split())
+      >>> class _test(tcfl.tc.tc_c):
+      >>>     pass
+    """
+    assert origin == None or isinstance(origin, str), \
+        "origin: expected None or a string describing origin" \
+        " (note *origin* cannot be used as an axis name)"
+    tcfl.axes_verify(kwargs)
+    if origin == None:
+        origin = commonl.origin_get(2)
+
+    def decorate_class(cls):
+        assert isinstance(cls, type)
+        #assert issubclass(cls, tcfl.tc_c)    # FIXME: until import hell fixed
+        assert "tc_c" in str(cls.__mro__)     # FIXME: until import hell fixed
+        # always copy, to ensure we don't modify common instances (eg:
+        # if class A inherits tcfl.tc_c and we decorate A, we don't
+        # want it to modify tcfl.tc_c.
+        cls.axes = copy.copy(cls.axes)
+        cls.axes_origin = copy.copy(cls.axes_origin)
+        cls.axes.update(kwargs)
+        for key in kwargs:	# for each key we add, add an origin
+            cls.axes_origin[key].add(origin)
+        return cls
+
+    return decorate_class
