@@ -270,6 +270,56 @@ def format_dict_as_str(d: dict, separator: str = ' ') -> str:
 
 
 
+def pickle_debug(root: str, o, logger = logging) -> list:
+    """
+    Debug helper for pinpointing pickle errors
+
+    This is used by debug code when we are trying to figure out a deep
+    dinctionary object that yields pickling errors; it will recursive
+    pickle an object and report which field caused the issue, as a
+    logged error message and as a list of strings naming those fields.
+
+    :param str root: name of the namespace for reporting (eg; name of
+      the variable *o*, so paths of a dictionary with fields a, b and
+      c would be *o.a*, *o.b*, *o.c*)
+
+    :param o: object to pickle
+
+    :param logger: logger object to use to report; if *None*, no
+      logging will be done
+
+    :returns list[str]: list of paths that fail to pickle
+
+    eg:
+
+    >>> pickled_paths = commonl.pickle_debug("somevariable", somevariable)
+
+    """
+    r = []
+    if isinstance(o, collections.abc.Mapping):
+        d = o
+    else:
+        d = getattr(o, "__dict__", {})
+    for k, v in d.items():
+        path = root + "." + str(k)
+        try:
+            # note we don't dig inside some classes, like Files --
+            # this allows us to test easily in
+            # ../tests/test_commonl_pickle_debug.py
+            if not isinstance(v, io.TextIOWrapper) \
+               and hasattr(v, "__dict__"):
+                r += pickle_debug(path, v)
+            else:
+                # we ignore the result, want to see if it fails
+                _ = pickle.dumps(v)
+        except Exception as e:
+            if 'cannot pickle' in str(e) and logger != None:
+                logger.error(f"{path}: pickling failure at {k}: {v} ({e})")
+            r.append(path)
+    return r
+
+
+
 class thread_periodical_runner_c(threading.Thread):
     """
     A simple class to run a function periodically
