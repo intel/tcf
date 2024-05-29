@@ -668,8 +668,11 @@ def submenu_header_expect(
         menu_name = menu_title
     else:
         assert isinstance(menu_title, str)
-    start_of_menu = re.compile(br"(----+|\xc4\xc4\xc4\xc4+)")
-    end_of_menu = re.compile(br"(----+|\xc4\xc4\xc4\xc4+)")
+    # note some versions of EDKII use --, others UTF-9 chars...not
+    # fun, deps on the encoding, so this regex means to try to pick'em
+    # all
+    start_of_menu = re.compile(r"(----+|──────+|\xc4\xc4\xc4\xc4+)".encode('utf-8'))
+    end_of_menu = re.compile(r"(----+|──────+|\xc4\xc4\xc4\xc4+)".encode('utf-8'))
     target.expect(start_of_menu,
                   name = menu_name + ":menu-box-start",
                   timeout = timeout)
@@ -1160,6 +1163,9 @@ def main_menu_expect(target):
     target.report_info("BIOS: confirming we are at toplevel menu")
     for entry in main_level_entries_get(target):
         target.expect(entry, name = "BIOS-toplevel/" + entry, timeout = 120)
+        target.report_info(f"BIOS: toplevel: found expected entry {entry}")
+
+
 
 def _paced_send(target, text):
     # FIXME: remove this, use pacing
