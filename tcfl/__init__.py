@@ -2135,7 +2135,12 @@ class server_c:
                 rt[target_id] = True
                 fullid = self.aka + "/" + target_id
                 rt[fullid] = True
+                # this might get shortened later in
+                # tcfl.targets.discovery_agent_c.update_complete(), so
+                # also include field 'fullid_always' that is always
+                # long
                 rt['fullid'] = fullid
+                rt['fullid_always'] = fullid
                 # these are needed to later one be able to go from an
                 # rt straight to the server
                 rt['server'] = self.url
