@@ -1137,7 +1137,8 @@ class server_c:
             name, aliases, addresses = socket_gethostbyname_ex_cached(hostname)
             log_sd.info(f"seed hostname '{hostname}' [{origin}] -> {name}, {aliases}, {addresses}")
         except OSError as e:
-            log_sd.warning(f"ignoring hostname '{hostname}' [{origin}]: {e}")
+            log_sd.warning(f"ignoring hostname '{hostname}' [{origin}]: {e}",
+                           exc_info = commonl.debug_traces)
             return
 
         servers_from_addresses = set()
