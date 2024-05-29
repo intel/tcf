@@ -5,7 +5,7 @@ generated-members = overriden_.*_50_.*
 # invalid-name: our variable names are ... special
 # bad-whitespace: we come from C, we like C style better
 # singleton-comparion: see bad-whitespace
-disable = invalid-name, bad-whitespace, singleton-comparison, locally-disabled, protected-access
+disable = invalid-name, singleton-comparison, locally-disabled, protected-access
 
 [BASIC]
 # We like our classes called WHATEVER_c so we can tell is a
