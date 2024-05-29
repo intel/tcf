@@ -552,9 +552,39 @@ class extension(tc.target_extension_c):
         return r
 
 
-    def get(self, capturer, stream = None, file_name = None, offset = None,
-            prefix = None, follow = False,
+    def get(self, capturer: str, stream: str = None,
+            file_name: str = None, offset: int = None,
+            prefix: str = None, follow: bool = False,
             **streams):
+        """
+
+        :param str capturer: name of the capturer to download for
+
+        :param str stream: (default *None*, meaning all) name of the
+          stream to download--the streams supported by each capturer
+          are reported in the inventory, eg:
+
+            $ tcf get TARGETNAME -p interfaces.capture.CAPTURER
+            ...
+                        "capture": {
+                            ...
+                            "stream": {
+                                "log": {
+                                    "mimetype": "text/plain"
+                                },
+                            "default": {
+                                "mimetype": "application/json"
+                            }
+                        }
+            ...
+
+          this capturer supports two streams *log* and *default*; by
+          convention all streams support these two.
+
+        :returns: dictionary keyed by stream with the filename
+          where the information is
+
+        """
         assert isinstance(capturer, str)
         assert stream == None or isinstance(stream, str)
         assert prefix == None or isinstance(prefix, str)
