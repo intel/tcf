@@ -56,7 +56,7 @@ import sys
 import commonl
 import tcfl.ui_cli
 
-logger = logging.getLogger("ui_cli_testcases")
+logger = logging.getLogger("ui_cli_targets")
 
 
 def _cmdline_targets_init(args):
@@ -328,6 +328,85 @@ def _cmdline_target_healthcheck(cli_args: argparse.Namespace):
 
 
 
+def _cmdline_help_fieldnames(cli_args: argparse.Namespace):
+    import tcfl.targets
+
+    # if callled from --help-fieldnames, we won't have cli_args with
+    # some options, so fake'em to get the most info
+    cli_args_target = getattr(cli_args, "target", [])
+    cli_args_all = getattr(cli_args, "all", True)
+
+    verbosity = tcfl.ui_cli.logger_verbosity_from_cli(logger, cli_args)
+    tcfl.targets.setup_by_spec(
+        cli_args_target,
+        # zero verbosity will get only minimal fields (names, etc)
+        # from the servers
+        verbosity = 1,
+        targets_all = cli_args_all)
+
+    # this is same as in tcfl.server_c.targets_get(); we re-do it so
+    # we only show the keys for the targets queried, since
+    # tcfl.inventory_keys are for all the keys found in servers
+    inventory_keys = collections.defaultdict(set)
+    for rtfullid in tcfl.rts_fullid_sorted:
+        rt = tcfl.rts_flat[rtfullid]
+        for key, value in rt.items():
+            tcfl.server_c._inventory_keys_update(inventory_keys, key, value)
+
+    if verbosity < 0:		# print just the fields
+        print("\n".join(sorted(inventory_keys)))
+
+    elif verbosity == 0:	# print fields and values in pretty form
+        for key in sorted(inventory_keys):
+            values = sorted(inventory_keys[key])
+            prefix = f"{key}:"
+            prefix_space = " " * len(prefix)
+            first_value = True
+            for value in values:
+                if first_value:
+                    print(prefix + f" [{type(value).__name__}] {value}")
+                    first_value = False
+                else:
+                    print(f"{prefix_space} [{type(value).__name__}] {value}")
+
+    elif verbosity == 1:	# print fields and raw values
+        for key in sorted(inventory_keys):
+            values = sorted(inventory_keys[key])
+            print(f"{key}: {values}")
+
+    elif verbosity == 2:	# line oriented
+        commonl.data_dump_recursive(inventory_keys)
+
+    elif verbosity == 3:	# Python pprint
+        import pprint
+        # convert to dict so it doesn't print it's a defaultdict
+        pprint.pprint(dict(inventory_keys), indent = True)
+
+    elif verbosity > 3:		# JSON
+        import json
+        def _serialize(o):
+            if isinstance(o, set):
+                return list(o)
+            return o
+        # convert to dict so it doesn't print it's a defaultdict
+        json.dump(dict(inventory_keys), sys.stdout,
+                  skipkeys = True, indent = 4, default = _serialize)
+
+
+class argparser_action_help_fieldnames(argparse.Action):
+    """
+    Helper to get the list of knonw fields
+
+    """
+    def __init__(self, *args, **kwargs):
+        argparse.Action.__init__(self, *args, **kwargs)
+
+    def __call__(self, _parser, namespace, _values, _option_string = None):
+        _cmdline_help_fieldnames(namespace)
+        sys.exit(0)
+
+
+
 def _cmdline_setup(arg_subparsers):
 
     import tcfl.ui_cli
@@ -354,6 +433,14 @@ def _cmdline_setup(arg_subparsers):
         " (SERVER/TARGETNAME) to TARGETNAME")
     ap.set_defaults(func = _cmdline_ls)
 
+
+    ap = arg_subparsers.add_parser(
+        "help-fieldnames",
+        help = "Display all fields in the inventory for the given targets"
+        " (all targets by default); verbosity controls how much info/format")
+    tcfl.ui_cli.args_verbosity_add(ap)
+    tcfl.ui_cli.args_targetspec_add(ap)
+    ap.set_defaults(func = _cmdline_help_fieldnames)
 
 
 def _cmdline_setup_advanced(arg_subparsers):

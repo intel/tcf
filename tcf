@@ -48,6 +48,7 @@ import tcfl.tc
 import tcfl.config
 import tcfl._install
 import tcfl.ui_cli
+import tcfl.ui_cli_targets	# needed earlier on
 
 commonl.logging_short_level_names()
 
@@ -132,6 +133,10 @@ if __name__ == "__main__":
         "--as-admin",
         action = "store_true", default = False,
         help = "run command gaining admin role first, then dropping it")
+    arg_parser.add_argument(	# same as tcfl.ui_cli.args_targetspec_add()
+        "--help-fieldnames",
+        action = tcfl.ui_cli_targets.argparser_action_help_fieldnames, nargs = 0,
+        help = "Display all fields in the inventory")
     arg_parser.add_argument(
         "-p", "--config-path",
         action = "append", dest = "config_path",

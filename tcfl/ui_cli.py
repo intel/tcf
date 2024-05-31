@@ -104,6 +104,10 @@ def args_targetspec_add(
             " -N: use as many threads as CPUs available times N"
             " [defaults to %(default)d]"
         )
+    ap.add_argument(
+        "--help-fieldnames",
+        action = tcfl.ui_cli_targets.argparser_action_help_fieldnames, nargs = 0,
+        help = "Display all fields in the inventory")
     if nargs != None:
         nargs = nargs
     elif isinstance(targetspec_n, bool):
@@ -145,14 +149,14 @@ def logger_verbosity_from_cli(log, cli_args: argparse.Namespace) -> int:
       with :func:`args_verbosity_add`
     :returns int: verbosity level
     """
-    verbosity = cli_args.verbosity - cli_args.quietosity
+    verbosity = getattr(cli_args, "verbosity", 0) - getattr(cli_args, "quietosity", 0)
     levels = [ logging.ERROR, logging.WARNING, logging.INFO, logging.DEBUG ]
     # now translate that to logging's module format
     # server-discovery -> tcfl.log_sd
     if verbosity >= len(levels):
         verbosity = len(levels) - 1
     log.setLevel(levels[verbosity])
-    return cli_args.verbosity - cli_args.quietosity
+    return verbosity
 
 
 def run_fn_on_each_targetspec(
