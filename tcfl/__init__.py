@@ -2188,9 +2188,13 @@ class server_c:
                 for target_id, rt in r.items():
                     _rt_handle(target_id, rt)
             # for this server, collect how many different keys and
-            # values we have
-            for key, value in server_rts_flat.items():
-                _inventory_keys_update(key, value)
+            # values we have; server_rts_flat is keyed by target name;
+            # each contains a dict of inventory key and value
+            # NOTE: tcfl.ui_cli_targets._cmdline_help_fieldnames() has to
+            # kinda do the same as this
+            for _rtid, rt in server_rts_flat.items():
+                for key, value in rt.items():
+                    self._inventory_keys_update(server_inventory_keys, key, value)
             return server_rts, server_rts_flat, server_inventory_keys
         except requests.exceptions.RequestException as e:
             log_sd.error("%s: can't use: %s", self.url, e)
