@@ -108,6 +108,10 @@ def args_targetspec_add(
         "--help-fieldnames",
         action = tcfl.ui_cli_targets.argparser_action_help_fieldnames, nargs = 0,
         help = "Display all fields in the inventory")
+    ap.add_argument(
+        "--help-targetspec",
+        action = tcfl.ui_cli_targets.argparser_action_help_targetspec, nargs = 0,
+        help = "Display information about the target query language")
     if nargs != None:
         nargs = nargs
     elif isinstance(targetspec_n, bool):
@@ -130,11 +134,9 @@ def args_targetspec_add(
         *argspec,
         metavar = "TARGETSPEC", action = "store", **kwargs_dest,
         nargs = nargs,
-        help = "Target's name/s or a general target specification"
-        " which might include values from the inventory, etc, in single"
-        " quotes (eg: \"id:'STR'\" for all targets with STR in the name"
-        " or \"ram.size_gib >= 2 and not type:'^qemu.*'\" for all"
-        " machines with more than 2GiB of memory and not of QEMU type)")
+        help = " Target name/s or a general target specification (the query"
+        " shall be specified in in double quotes; run `tcf"
+        " --help-targetspec` for more details and examples")
 
 
 

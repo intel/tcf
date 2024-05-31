@@ -137,6 +137,10 @@ if __name__ == "__main__":
         "--help-fieldnames",
         action = tcfl.ui_cli_targets.argparser_action_help_fieldnames, nargs = 0,
         help = "Display all fields in the inventory")
+    arg_parser.add_argument(	# same as tcfl.ui_cli.args_targetspec_add()
+        "--help-targetspec",
+        action = tcfl.ui_cli_targets.argparser_action_help_targetspec, nargs = 0,
+        help = "Display information about the target query language")
     arg_parser.add_argument(
         "-p", "--config-path",
         action = "append", dest = "config_path",
