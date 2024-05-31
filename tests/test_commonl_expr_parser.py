@@ -24,8 +24,11 @@ class _parser(tcfl.tc.tc_c):
         # key value list for table below; keep alphabetically sorted
         "bool_false": False,
         "bool_true": True,
+        "key_1_int": 1,
+        "key_1_str": '1',
         "str_false": "false",
         "str_true": "true",
+        "substring_field": "this contains a substring",
     }
 
     table = (
@@ -73,6 +76,15 @@ class _parser(tcfl.tc.tc_c):
         ( "str_true != 'true'", False ),
         ( "str_true == 'false'", False ),
         ( "str_true == 'true'", True ),
+
+
+        # IN operator
+        ( "'substring' in substring_field", True ),
+        ( "'notthissubstring' in substring_field", False ),
+        ( "key_1_int in [ '1', '2', '3' ]", False ),
+        ( "key_1_int in [ 1, 2, 3 ]", True ),
+        ( "key_1_str in [ '1', '2', '3' ]", True ),
+        ( "key_1_str in [ 1, 2, 3 ]", False ),
     )
 
 
