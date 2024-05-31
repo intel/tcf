@@ -407,6 +407,72 @@ class argparser_action_help_fieldnames(argparse.Action):
 
 
 
+def _cmdline_help_targetspec(_cli_args: argparse.Namespace):
+    print(
+"""
+TCF's targetspec is a boolean query language to select targets; it can be used
+with all the commands to do operations on multiple targets.
+
+Power off machines named *lab1/2/3*, owned by a user like *smith* that are on:
+
+  $ tcf power-off "id:'lab[123]' and interface.power.status == True and owner:'smith'"
+
+List all targets on server *someserver*
+
+  $ tcf ls "server:'someserver'"
+
+This is a summary of commonl/expr_parser.py (authoritative). Expressions:
+
+- FIELDNAME OPERATOR CONSTANT
+- CONSTANT in FIELDNAME, FIELDNAME in LIST
+- EXPRESSION and|or EXPRESSION, not EXPRESSION, ( EXPRESSION )
+- FIELDNAME (False if undefined, True if defined)
+
+OPERATORS by precedence: ==, !=, >, <, >=, <=, in, :, NOT, AND, OR
+FIELDNAMES and possible values can be found with: 'tcf help-fieldnames'
+CONSTANT is a number, float, 'string' or bool (False|True)
+
+- : is a regular expression operator; evaluates to True if the FIELDNAME
+  matches the Python regex in the CONSTANT
+  "owner:'jane'"	# owner field has *jane* in it
+
+- If FIELDNAME is not defined, it evaluates as false, so
+  "unexistingfieldname"       # matches none, because the field does not exist
+  "not unexistingfieldname"   # matches all, because the field does not exist
+
+- If FIELDNAME is defined, but as false it can be tested with:
+  "fieldname == False"
+
+Examples:
+
+- All targets that report their type as *qemu-uefi-arm*, *qemu-uefi-x86_64*:
+  "type in [ 'qemu-uefi-arm', 'qemu-uefi-x86_64' ]"
+
+- All targets whose type contains the QEMU substring and owned by *jane*:
+  "'qemu' in type and owner:'jane'"
+
+- Target's name is *central1*, RAM size more than 2 GiB and not allocated
+  "( id == 'central1' or ram.size_gib > 2 ) and not owner"
+
+** this doc is long; for paging: tcf --help-targetspec | less -S **
+""")
+
+
+class argparser_action_help_targetspec(argparse.Action):
+    """
+    Helper to get targetspec help from a command line switch
+    (--help-targetspec) vs just a command
+
+    """
+    def __init__(self, *args, **kwargs):
+        argparse.Action.__init__(self, *args, **kwargs)
+
+    def __call__(self, _parser, namespace, _values, _option_string = None):
+        _cmdline_help_targetspec(namespace)
+        sys.exit(0)
+
+
+
 def _cmdline_setup(arg_subparsers):
 
     import tcfl.ui_cli
@@ -441,6 +507,12 @@ def _cmdline_setup(arg_subparsers):
     tcfl.ui_cli.args_verbosity_add(ap)
     tcfl.ui_cli.args_targetspec_add(ap)
     ap.set_defaults(func = _cmdline_help_fieldnames)
+
+    ap = arg_subparsers.add_parser(
+        "help-targetspec",
+        help = "Display information about the target query language")
+    ap.set_defaults(func = _cmdline_help_targetspec)
+
 
 
 def _cmdline_setup_advanced(arg_subparsers):
