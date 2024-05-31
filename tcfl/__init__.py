@@ -2080,6 +2080,46 @@ class server_c:
                 f"server can't translate user 'self': {e}") from e
 
 
+    @staticmethod
+    def _inventory_keys_update(server_inventory_keys, key, value, log = logging):
+        if value == None:
+            # in practice, we don't record None values, since this
+            # means the value is not actually registered in the DB, so
+            # skip it; these come from pieces in the code that still
+            # haven't been moved to real-time DB and still rely on
+            # tags
+            return
+        # we collect all the different keys we know in the
+        # whole inventory (easier for the orchestrator) and
+        # collect them in a unified list, with all the values
+        # seen
+        #
+        # We only do this with the flat keys to avoid conflicts
+        try:
+            # FIXME: filter out _alloc.id, _alloc.queue.*
+            #   bsps.x86_64.lcpu-N? .cpu-N?
+            #   instrumentation.*.*?
+            #   interconnects.XYZ. mhmmm
+            #   *.instrument
+            #   path
+            if isinstance(value, dict):
+                # dictionaries are stored as a boolean,
+                # meaning the dictionary is present; subfields
+                # will be listed as field.subfield.subsubfield...
+                server_inventory_keys[key].add(True)
+            elif isinstance(value, ( list, set, tuple )):
+                # lists are just updated -- FIXME not sure if
+                # this is the best idea
+                server_inventory_keys[key].update(value)
+            else:
+                server_inventory_keys[key].add(value)
+        except Exception as e:
+            # shrug
+            log.warning("can't collect inventory key '%s'"
+                        " value (%s) '%s': %s",
+                        key, type(value), value, e)
+
+
 
     def targets_get(self, target_id = None, projections = None):
         commonl.assert_none_or_list_of_strings(projections, "projections",
@@ -2097,39 +2137,6 @@ class server_c:
             server_rts = dict()
             server_rts_flat = dict()
             server_inventory_keys = collections.defaultdict(set)
-
-            def _inventory_keys_update(key, value):
-                # we collect all the different keys we know in the
-                # whole inventory (easier for the orchestrator) and
-                # collect them in a unified list, with all the values
-                # seen
-                #
-                # We only do this with the flat keys to avoid conflicts
-                try:
-                    # FIXME: filter out _alloc.id, _alloc.queue.*
-                    #   bsps.x86_64.lcpu-N? .cpu-N?
-                    #   instrumentation.*.*?
-                    #   interconnects.XYZ. mhmmm
-                    #   *.instrument
-                    #   path
-                    if isinstance(value, dict):
-                        # dictionaries are stored as a boolean,
-                        # meaning the dictionary is present; subfields
-                        # will be listed as field.subfield.subsubfield...
-                        server_inventory_keys[key].add(True)
-                    elif isinstance(value, ( list, set, tuple )):
-                        # lists are just updated -- FIXME not sure if
-                        # this is the best idea
-                        server_inventory_keys[key].update(value)
-                    else:
-                        server_inventory_keys[key].add(value)
-                except Exception as e:
-                    # shrug
-                    self.log.warning("can't collect inventory key '%s'"
-                                     " value (%s) '%s': %s",
-                                     key, type(value), value, e)
-
-
 
             def _rt_handle(target_id, rt):
                 rt[target_id] = True
