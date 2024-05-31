@@ -220,7 +220,12 @@ class discovery_agent_c:
                 self._cache_rt_handle(fullid, rt)
             self.rts.update(server_rts)
             self.rts_flat.update(server_rts_flat)
-            self.inventory_keys.update(server_inventory_keys)
+            # server_inventory_keys is a dictionary keyed by flat
+            # inventory field name, value a set of seen values--we'll
+            # sort it, since it is stored as as dict and Python3
+            # defaults to sorted dicts
+            for key, values in sorted(server_inventory_keys.items()):
+                self.inventory_keys[key] |= values
         logger.info("discovered %d targets from %d servers found",
                     len(self.rts), len(tcfl.server_c.servers))
         self.executor = None
