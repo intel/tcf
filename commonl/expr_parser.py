@@ -327,9 +327,9 @@ def ast_expr(ast, env):
         val_left = _val_get(ast[1])
         val_right = _val_get(ast[2])
         if isinstance(val_right, ( dict, list, set, tuple )):
-            # FIELD in ANOTHERFILED
-            return symbol_left in val_right
-        # SUBSTRING in FIELD
+            # FIELD-A is listed in FIELD-B, which is an iterable
+            return val_left in val_right
+        # SUBSTRING: VALUE in FIELD, which is a scalar
         return val_left in val_right
     elif ast[0] == "exists":
         return True if ast_sym(ast[1], env) else False
