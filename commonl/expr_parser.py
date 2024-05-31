@@ -14,7 +14,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""
+"""\
 This module implements a simple expression language.
 
 The grammar for this language is as follows:
@@ -39,6 +39,7 @@ The grammar for this language is as follows:
                     | list_contents "," constant
 
     constant ::= number
+               | boolean
                | string
 
 When symbols are encountered, they are looked up in an environment
@@ -48,7 +49,15 @@ For the case where
 
     expression ::= symbol
 
-it evaluates to true if the symbol is defined to a non-empty string.
+it evaluates to true if the symbol is defined to a non-empty
+string. Note thus::
+
+  SOMESYMBOL
+
+Will evaluate as *False* if *SOMESYMBOL* is a *False* boolean; if you
+want to test for a symbol being defined and being boolean *False*, use::
+
+  SOMESYMBOL == False
 
 For all comparison operators, if the config symbol is undefined, it will
 be treated as a 0 (for > < >= <=) or an empty string "" (for == != in).
@@ -69,9 +78,11 @@ matches. For example, if CONFIG_SOC="quark_se" then
     filter = CONFIG_SOC : "quark.*"
 
 Would match it.
+
 """
 
 import copy
+import numbers
 import re
 import threading
 
@@ -88,6 +99,7 @@ reserved = {
 }
 
 tokens = [
+    "BOOL",
     "HEX",
     "STR",
     "INTEGER",
@@ -105,6 +117,19 @@ tokens = [
     "SYMBOL",
     "COLON",
 ] + list(reserved.values())
+
+def t_BOOL(t):
+    r"([Tt]rue|[Ff]alse)"
+    # Any token that says true or false is a boolean
+    #
+    # note we have matched against a text regex, so t.value is str
+    # already
+    value = t.value.lower()
+    if value == "true":
+        t.value = True
+    else:
+        t.value = False
+    return t
 
 def t_HEX(t):
     r"0x[0-9a-fA-F]+"
@@ -219,8 +244,11 @@ def p_list_intr_mult(p):
     p[0].append(p[3])
 
 def p_const(p):
-    """const : STR
-             | number"""
+    # note we try to evaluate BOOLs before STRs since they can be a
+    # "True/true/False/flase" so we don't confuse them w strings
+    """const : BOOL
+             | number
+             | STR"""
     p[0] = p[1]
 
 def p_number(p):
@@ -242,8 +270,12 @@ def ast_sym(ast, env):
         # Ugly, but I am not sure of what is a better way to do this.
         if isinstance(e, dict) or isinstance(e, set) or isinstance(e, list) :
             return env[ast]
-        else:
-            return str(env[ast])
+        if isinstance(e, bool):
+            return e
+        if isinstance(e, numbers.Number):
+            return e
+        return str(e)
+
     return ""
 
 def ast_sym_int(ast, env):
@@ -303,11 +335,17 @@ def ast_expr(ast, env):
         return True if ast_sym(ast[1], env) else False
     elif ast[0] == ":":
         value = ast_sym(ast[1], env)
-        if not isinstance(value, ( bool, int, float, str )):
+        if not isinstance(value, str):
             # not an scalar value, happens when we ask for a field
             # that is a nested dictionary, for example -- so let's
             # just encode it
             value = str(value)
+        # ast[2] is what we are looking for; : is always treating it
+        # as a regex, so we need to compile it; note re.compile()
+        # caches the compiled regex, so we don't need to worry about
+        # recompiling taking too long for repeated calls and this code
+        # is simpler--could argue we could precompile somewhere in the
+        # analysis phase, FIXME: exercise for the reader who has time
         return True if re.compile(ast[2]).search(value) else False
 
 _mutex = threading.Lock()
