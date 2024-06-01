@@ -1242,18 +1242,27 @@ class server_c:
                     datetime.datetime.utcnow().strftime("%Y%m%d%H%M%S"))
 
 
+
     def _record_success(self):
-        self._cache_set(
-            "last_success",
-            datetime.datetime.utcnow().strftime("%Y%m%d%H%M%S"))
+        with filelock.FileLock(self.cache_lockfile):
+            self._cache_set_unlocked(
+                "last_success",
+                datetime.datetime.utcnow().strftime("%Y%m%d%H%M%S"))
+            # since this has been succesful, reset the failure markers
+            self._cache_set_unlocked("failure_count", 0)
+            self._cache_set_unlocked("failure_last", None)
+
+
 
     def _record_failure(self):
         with filelock.FileLock(self.cache_lockfile):
-            current_count = int(self._cache_get_unlocked("failure_count", 0))
+            current_count = self._cache_get_unlocked("failure_count", 0)
+            if isinstance(current_count, str):	# COMPAT: previously was str
+                current_count = int(current_count)
             current_count += 1
-            self._cache_set_unlocked("failure_count", str(current_count))
-            utcnow = int(datetime.datetime.utcnow().strftime("%Y%m%d%H%M%S"))
-            self._cache_set_unlocked("last_failure", utcnow)
+            self._cache_set_unlocked("failure_count", current_count)
+            utcnow = float(datetime.datetime.utcnow().strftime("%Y%m%d%H%M%S.%f"))
+            self._cache_set_unlocked("failure_last", utcnow)
 
     def _destroy_if_too_bad(self):
         utcnow = int(datetime.datetime.utcnow().strftime("%Y%m%d%H%M%S"))
@@ -1300,9 +1309,10 @@ class server_c:
                              # away--otherwise when discovering many we
                              # could be here many times
                              timeout = 2)
-        except requests.RequestException as e:
+        except Exception as e:
+            self._record_failure()
             return self, None, \
-                f"{self.url}/ttb: got HTTP exception {e}"
+                f"{self.url}/ttb: got exception {e}"
 
         # this we set it as an UTC YYYYmmddHHMMSS -- we'll check it
         # later when doing discovery to avoid doing them too often
@@ -1312,6 +1322,7 @@ class server_c:
 
         if r.status_code != 200:
             if r.status_code != 404:
+                self._record_failure()
                 return self, None, \
                     f"{self.url}/ttb: got HTTP code {r.status_code}"
             # 404 - maybe an old server, since it lacks the /ttb endpoint,
@@ -1322,15 +1333,18 @@ class server_c:
         try:
             j = r.json()
         except json.decoder.JSONDecodeError as e:
+            self._record_failure()
             return self, None, \
                 f"{self.url}/ttb: bad JSON {e}"
         if not isinstance(j, dict):
+            self._record_failure()
             return self.url, None, \
                 f"{self.url}/ttb: expected a dictionary, got {type(j)}"
         # note it is legal for a server to report no herds if it
         # working alone.
         herds = r.json().get('herds', {})
         if not isinstance(herds, dict):
+            self._record_failure()
             return self, None, \
                 f"{self.url}/ttb: expected ['herds'] to be a dictionary," \
                 f" got {type(herds)}"
@@ -1447,7 +1461,6 @@ class server_c:
                     # it returns junk meaning TTBD not spoken there)
                     bad_servers[server.url] = server
                     server.reason = reason
-                    server._record_failure()
                     bad_server_count += 1
                     log_sd.info(f"#{count}/{loops_max}: skipping"
                                 f" {server.url}: bad server [{reason}]")
@@ -2196,6 +2209,7 @@ class server_c:
                     self._inventory_keys_update(server_inventory_keys, key, value)
             return server_rts, server_rts_flat, server_inventory_keys
         except requests.exceptions.RequestException as e:
+            self._record_failure()
             log_sd.error("%s: can't use: %s", self.url, e)
             return {}, {}, {}
 
