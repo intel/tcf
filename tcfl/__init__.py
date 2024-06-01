@@ -1079,18 +1079,16 @@ class server_c:
         self.fsdb = None
         self.log = logger.getChild(self.url_safe)
 
-    #: where to store state path (login info, etc); updated by
-    #: tcfl.config.subsystem_setup()
-    state_path = None
-
-    def setup(self):
-        """
-        Sets up any other internal data structure that are no strictly
-        needed until operating seconday parts of the API (eg: file paths)
-        """
+        # Sets up any other internal data structure that are no strictly
+        # needed until operating seconday parts of the API (eg: file paths)
         self.aka_make()
         self.log = logger.getChild(self.aka)
         self._cache_setup()
+
+
+    #: where to store state path (login info, etc); updated by
+    #: tcfl.config.subsystem_setup()
+    state_path = None
 
     #: only initialized once we start commiting to disk
     cache_dir = None
@@ -1449,7 +1447,6 @@ class server_c:
                     # it returns junk meaning TTBD not spoken there)
                     bad_servers[server.url] = server
                     server.reason = reason
-                    server.setup()
                     server._record_failure()
                     bad_server_count += 1
                     log_sd.info(f"#{count}/{loops_max}: skipping"
@@ -1466,7 +1463,6 @@ class server_c:
                     log_sd.info(f"#{count}/{loops_max}: adding {new_url}:"
                                 f" discovered from {server.url}")
                     cls.servers[new_url] = new_server
-                    new_server.setup()
                     new_servers[new_url] = new_server
 
         return new_servers, new_server_count, bad_server_count
@@ -1700,10 +1696,6 @@ class server_c:
                 "\n" % ":".join(config_path))
             return
 
-        # we'll need these properly setup in disk so we can record
-        # statistics
-        for aka, server in cls.servers.items():
-            server.setup()
 
         zero_strikes = 0
         cls.servers = dict(cls.servers)	# yup, make a copy of the dict
