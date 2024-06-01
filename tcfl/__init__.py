@@ -1298,8 +1298,44 @@ class server_c:
          - *None* on sucess, else string with error description
         """
 
-        log_sd.info(f"#{count}/{loops_max}: scanning {self.url}:"
-                    f" {self.origin}")
+        failure_count = self._cache_get_unlocked("failure_count", 0)
+        if isinstance(failure_count, str):	# COMPAT: previously was str
+            failure_count = int(failure_count)
+        utcnow = float(datetime.datetime.utcnow().strftime("%Y%m%d%H%M%S.%f"))
+        failure_last = self._cache_get_unlocked("failure_last", utcnow)
+        failure_delta = utcnow - failure_last
+
+        # Shall we scan this guy? This depends on it having failed recently
+        #
+        # We have two magnitudes
+        #
+        # - failure_count: increased every time we call
+        #   _record_failure(), reset to zero once we call
+        #   _record_success()
+        #
+        # - failure_delta: the time in seconds from the last failure to know
+        #
+        # We need to determine that if the last failure happened less
+        # than MAX seconds ago, it'll probably fail again.
+        #
+        # - make sense to increase MAX when we detect more failures,
+        #   so we weed out bad servers quickly
+        #
+        # - makes sense to decrease MAX to take into account glitches
+        #
+        # So MAX has to be proportional to the failure count, but also
+        # capped to 10 min, so each 10 min we retry at least once.
+        #
+        failure_delta_max = min(failure_count, 10) * 60
+
+        if failure_delta > 0 and failure_delta < failure_delta_max:
+            return self, None, \
+                f"{self.url}/ttb: not scanning, failed {failure_delta:.2f}s" \
+                f" ago ({failure_count=}), less than {failure_delta_max}s"
+        log_sd.info("#%d/%d: scanning %s: @%s: failure_delta %.2fs count %d",
+                    count, loops_max,
+                    self.url, self.origin, failure_delta, failure_count)
+
         # this is always available with no login
         try:
             # FIXME: use server.send_request, so it retries
@@ -1722,10 +1758,17 @@ class server_c:
         # long time, since they don't change this often
         for server_name, server in cls.servers.items():
             try:
-                last_discovery = int(server._cache_get("last_discovery"))
-                # this we set it as an UTC YYYYmmddHHMMSS
+                last_discovery = int(server._cache_get("last_discovery", 0))
                 utcnow = int(datetime.datetime.utcnow().strftime("%Y%m%d%H%M%S"))
+                failure_last = int(server._cache_get("failure_last", utcnow))
+                # this we set it as an UTC YYYYmmddHHMMSS
                 ellapsed = utcnow - last_discovery
+                if failure_last > last_discovery:
+                    delta = failure_last - last_discovery
+                    log_sd.warning(
+                        "%s: ignoring cache age; re-discovering:"
+                        " failure detected %.2fs after last discovery",
+                        server_name, delta)
                 if max_cache_age == 0:
                     log_sd.warning(
                         f"{server_name}: ignoring cache age; re-discovering")
