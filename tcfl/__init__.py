@@ -1504,8 +1504,9 @@ class server_c:
                 for new_url, new_server in new_hosts_on_this_server.items():
                     # do this here, single threaded
                     if new_url in cls.servers:
-                        log_sd.info(f"#{count}/{loops_max}:"
-                                    f" skipping {new_url}: already known")
+                        log_sd.info("#%d/%d: skipping %s discovered from %s:"
+                                    " already known",
+                                    count, loops_max, new_url, server.url)
                         continue
 
                     new_server_count += 1
