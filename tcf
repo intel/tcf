@@ -319,6 +319,9 @@ if __name__ == "__main__":
     import tcfl.ui_cli_testcases
     tcfl.ui_cli_testcases._cmdline_setup(arg_subparsers)
 
+    import commonl.ui_cli
+    commonl.ui_cli._cmdline_setup_advanced(arg_subparsers)
+
     argcomplete.autocomplete(arg_parser)
     global args
     args = arg_parser.parse_args()
