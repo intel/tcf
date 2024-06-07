@@ -1929,6 +1929,11 @@ def sheet_update(runid_raw):
                              "History (by target and testcase)",
                              create = False, tcs_include_target = True)
     _sheet_update_tcs_matrix(runid_raw, runid_pretty, doc,
+                             # This can get big!
+                             [ "BLCK", "ERRR", "FAIL", "PASS", "SKIP" ],
+                             "History w/ pass (by target and testcase)",
+                             create = False, tcs_include_target = True)
+    _sheet_update_tcs_matrix(runid_raw, runid_pretty, doc,
                              # IPG: disable PASS testcases because we
                              # are bursting the spreadsheet limits
                              #[ "PASS", "FAIL", "ERRR", "BLCK", "SKIP" ],
