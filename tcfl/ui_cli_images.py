@@ -166,7 +166,7 @@ def _images_flash(target, image_spec_per_target, uploaded_names, timeout):
         # don't necessarily know if it is an id or fullid -- so until
         # we fix that, try both
         target.fullid,
-        image_spec_per_target[target.id])[0]
+        image_spec_per_target[target.fullid])[0]
     image_spec = " ".join(f"{k}:{v}" for k, v in images.items())
     ts0 = time.time()
     # if we have uploaded the files, they might have a slightly
