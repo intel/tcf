@@ -940,7 +940,7 @@ def menu_escape_to_main(target, esc_first = True):
         % (max_levels, ",".join(main_level_entries)))
 
 
-def dialog_changes_not_saved_expect(target, action):
+def dialog_changes_not_saved_expect(target, action, timeout = 20):
     """
     Expect a changes have not saved dialog and do something about it
     (send *yes*, *No* or cancel)
@@ -965,7 +965,7 @@ def dialog_changes_not_saved_expect(target, action):
 
     submenu_header_expect(
         target, "Changes have not saved. Save Changes and exit",
-        canary_end_menu_redrawn = None)
+        canary_end_menu_redrawn = None, timeout = timeout)
     # if we send the action too soon, sometimes it gets hung...so
     # let's be patient
     time.sleep(0.5)
