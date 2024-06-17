@@ -627,8 +627,9 @@ def menu_dig_to(
             _menu_name =  " > ".join(menu_name)
             submenu_header_expect(
                 target, menu_title,
+                timeout = 160,	# some menu entries can take long to load
                 canary_end_menu_redrawn = canary_end_menu_redrawn,
-                menu_name = _menu_name)
+                menu_name = _menu_name, wait_for_no_output = False)
         if cnt == entries_len:
             # We got there, done!
             return rs
