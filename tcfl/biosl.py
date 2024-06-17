@@ -875,9 +875,7 @@ def menu_escape_to_main(target, esc_first = True):
 
     max_levels = 10	# FIXME: BIOS profile?
     if esc_first:
-        time.sleep(0.25)
         target.console_tx("\x1b")
-        time.sleep(0.25)
     #
     # We look for the Move Highlight marker that is printed at the end
     # of each menu; when we find that, then we look to see if what
@@ -897,41 +895,30 @@ def menu_escape_to_main(target, esc_first = True):
     for entry in main_level_entries:
         regexl.append(r"\[[0-9]+;[0-9]+H" + entry)
     main_menu_regex = re.compile(".*".join(regexl))
-    offset = target.console.size()
+
     for level in range(max_levels):
         # All menus print this after printing, so this is how we know
         # the menu has redrawn
         try:
+            target.console.wait_for_no_output(
+                target.console.default, silence_period = 0.6, poll_period = 0.2,
+                reason = "(possibly main) menu to render")
             # FIXME: move this to BIOS profile canary/end/menu/redrawn
-            target.expect("^v=Move Highlight")
-        except tcfl.tc.error_e:
+            target.expect(main_menu_regex,
+                          name = "main-menu-entries", timeout = 2)
             target.report_info(
-                "BIOS: escaping to main, pressing ESC after timeout %d/%d"
-                % (level, max_levels))
-            time.sleep(0.25)
-            target.console_tx("\x1b")
-            time.sleep(0.25)
-            # tickle it
-            target.console_tx("\x1b[A")			# press arrow up
-            time.sleep(0.25)
-            target.console_tx("\x1b[B")			# press arrow down
-            time.sleep(0.25)
-            continue
-        read = target.console.read(offset = offset)
-        # then let's see if all the main menu entries are there
-        m = main_menu_regex.search(read)
-        if m:
-            target.report_info("BIOS: escaped to main")
-            # FIXME: this is a sync hack--we are still not sure why, but if
-            # we don't do this, things dont' sync up properly
-            time.sleep(5)
+                "BIOS/escaping-to-main: found all main entries,"
+                " escaped to main")
             return
-        offset = target.console.size()
-        target.report_info("BIOS: escaping to main, pressing ESC %d/%d"
-                           % (level, max_levels))
-        time.sleep(0.25)
-        target.console_tx("\x1b")
-        time.sleep(0.25)
+        except tcfl.tc.fail_e:
+            # didn't find all the expected entries, not there yet,
+            # press ESC again
+            target.report_info(
+                "BIOS/escaping-to-main: pressing ESC after timeout"
+                " looking for main menu entries %d/%d"
+                % (level, max_levels))
+            target.console_tx("\x1b")
+            continue
 
     # nothing found, raise it
     raise tcfl.tc.error_e(
