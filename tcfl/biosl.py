@@ -500,7 +500,7 @@ def menu_dig_to(
         canary_end_menu_redrawn = "F10=Save Changes and Exit",
         highlight_string = normal_white_fg_black_bg,
         dig_last = True,
-        level = "top"):
+        level = "top", do_flush: bool = True):
     """Dig all the way down a list of nested menus
 
     Given a nested menu hierarchy, select the each entry from the
@@ -575,6 +575,10 @@ def menu_dig_to(
     assert isinstance(highlight_string, str)
     assert isinstance(dig_last, bool)
     assert isinstance(level, str)
+
+    if do_flush:
+        target.report_info(f"BIOS/menu_dig_to: flushing console {target.console.default}")
+        target.console.send_expect_sync(target.console.default)
 
     cnt = 0
     rs = collections.OrderedDict()
