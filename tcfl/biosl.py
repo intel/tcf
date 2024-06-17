@@ -640,7 +640,8 @@ def submenu_header_expect(
         # FIXME: move to BIOS profile
         canary_end_menu_redrawn = "^v=Move Highlight",
         menu_name = None,
-        timeout = None):
+        timeout = None,
+        wait_for_no_output: bool = True):
     """
     Wait for a submenu header to show up
 
@@ -687,24 +688,28 @@ def submenu_header_expect(
         menu_name = menu_title
     else:
         assert isinstance(menu_title, str)
+
+    # wait for the menu to finish drawing
+    if wait_for_no_output:
+        target.console.wait_for_no_output(
+            target.console.default, silence_period = 0.6, poll_period = 0.2,
+            reason = f"menu '{menu_title}' to render before detecting it")
     # note some versions of EDKII use --, others UTF-9 chars...not
     # fun, deps on the encoding, so this regex means to try to pick'em
     # all
-    start_of_menu = re.compile(r"(----+|──────+|\xc4\xc4\xc4\xc4+)".encode('utf-8'))
-    end_of_menu = re.compile(r"(----+|──────+|\xc4\xc4\xc4\xc4+)".encode('utf-8'))
-    target.expect(start_of_menu,
-                  name = menu_name + ":menu-box-start",
-                  timeout = timeout)
-    target.expect(menu_title,
-                  name = menu_name + ":menu-title",
-                  timeout = timeout)
-    # no need to use the args timeout on the box end, at this point
-    # the menu itself has been drawn, so the rest SHALL be fast.
-    target.expect(end_of_menu,
-                  name = menu_name + ":menu-box-end" )
+    # try to do as little calls to expect() as possible, as they
+    # delay the process a lot -- so we compose a single regex
+    # where we look for all the components of the menu.
+    pattern = \
+        r"(----+|──────+|\xc4\xc4\xc4\xc4+).*" \
+        f"{menu_title}" \
+        ".*(----+|──────+|\xc4\xc4\xc4\xc4+)"
     if canary_end_menu_redrawn:
-        target.expect(canary_end_menu_redrawn,
-                      name = menu_name + ":end-of-menu")
+        pattern += ".*" + canary_end_menu_redrawn
+
+    target.expect(re.compile(pattern),
+                  name = menu_name + ":menu-dialog",
+                  timeout = timeout)
     target.report_info("BIOS:%s: found menu header" % menu_name)
 
 
