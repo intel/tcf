@@ -46,7 +46,7 @@ class idrac_console_solssh_c(ttbl.console.ssh_pc):
 
     4. Select the right user, click *Edit*
 
-    5. Ensure *Login to iDRAC* and *Access Virtual Console* are select
+    5. Ensure *Login to iDRAC* and *Access Virtual Console* are selected
 
     6. Click *Save*
 
