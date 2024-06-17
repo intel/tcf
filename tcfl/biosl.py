@@ -371,26 +371,35 @@ def menu_scroll_to_entry(
     # first line that has the first entry selected; so the first time
     # we just go back and go fo
     first_scroll = True
-    for _ in range(max_scrolls):
-        time.sleep(0.25)
-        if first_scroll != True:
-            if _direction:
-                # FIXME: use get_key() -- how do we pass the terminal encoding?
-                target.console_tx("\x1b[A")			# press arrow up
-            else:
-                target.console_tx("\x1b[B")			# press arrow down
+
+    # wiggle the cursor so the loop will refresh whichever entry we
+    # might be highlighted on -- note this is the opposite of what we
+    # do in the loop
+    target.report_info(f"{name}: reverse scrolling")
+    if _direction:
+        # FIXME: use get_key() -- how do we pass the terminal encoding?
+        target.console_tx("\x1b[A")			# press arrow down
+    else:
+        target.console_tx("\x1b[B")			# press arrow up
+    # WAIT for the scroll to settle; otherwise we'll break havoc on
+    # the state machine since it'll half draw and confuse the expectation
+    target.console.wait_for_no_output(
+        target.console.default, silence_period = 0.6, poll_period = 0.2,
+        reason = f"display to settle before scrolling '{entry_string}'")
+    target.expect("")
+
+    for count in range(max_scrolls):
+        target.report_info(f"{name}: scrolling {count}/{max_scrolls}")
+        if _direction:
+            # FIXME: use get_key() -- how do we pass the terminal encoding?
+            target.console_tx("\x1b[B")			# press arrow up
         else:
-            if _direction:
-                # FIXME: use get_key() -- how do we pass the terminal encoding?
-                target.console_tx("\x1b[B")			# press arrow up
-            else:
-                target.console_tx("\x1b[A")			# press arrow down
-            first_scroll = False
+            target.console_tx("\x1b[A")			# press arrow down
         # alway give some time after scrolling because it takes time
-        # and things get out of sync otherwise; it's annoying, but
-        # there is no good way around it, even if we are expecting and
-        # waiting for the right thing
-        time.sleep(0.25)
+        # to redraw and things get out of sync otherwise
+        target.console.wait_for_no_output(
+            target.console.default, silence_period = 0.6, poll_period = 0.2,
+            reason = f"menu to render, scrolling for entry '{entry_string}'")
 
         skips = 4
         while skips > 0:
@@ -417,18 +426,24 @@ def menu_scroll_to_entry(
                     raise
                 target.report_info("%s: timed out, trying again %d"
                                    % (name, skips), dlevel = 1)
-                # sometimes these are caused by bad serial lines,
-                # with key characters missed, so we just try to
-                # scroll up and try again; we don't try to go up and
+                # sometimes these are caused by bad serial lines, with
+                # key characters missed, so we just try to reverse
+                # scroll and try again; we don't try to go up and
                 # down because it confuses the state machine.
                 skips += 0.5
-                time.sleep(0.25)
+                # wiggle the cursor so the loop will refresh whichever entry we
+                # might be highlighted on -- note this is the opposite of what we
+                # do in the loop
                 if _direction:
                     # FIXME: use get_key() -- how do we pass the terminal encoding?
-                    target.console_tx("\x1b[B")			# press arrow up
+                    target.console_tx("\x1b[A")		# press arrow down
                 else:
-                    target.console_tx("\x1b[A")			# press arrow down
-                time.sleep(0.25)
+                    target.console_tx("\x1b[B")		# press arrow up
+                # WAIT for the scroll to settle; otherwise we'll break havoc on
+                # the state machine since it'll half draw and confuse the expectation
+                target.console.wait_for_no_output(
+                    target.console.default, silence_period = 0.6, poll_period = 0.2,
+                    reason = "menu to render, wiggled looking for entry '{entry_string}'")
                 continue
             # the key always matches spaces all the way to the end, so it
             # needs to be stripped
