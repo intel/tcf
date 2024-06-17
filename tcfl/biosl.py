@@ -611,6 +611,9 @@ def menu_dig_to(
             target.report_info("BIOS: %s: selecting menu entry '%s'"
                                % (_menu_name, entry_next))
             entry_select(target)
+            target.console.wait_for_no_output(
+                target.console.default, silence_period = 0.6, poll_period = 0.2,
+            reason = f"menu to settle after selecting entry '{entry_next}'")
 
             # Wait for main menu title
             #
