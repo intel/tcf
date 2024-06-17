@@ -295,6 +295,9 @@ class expect_text_on_console_c(tc.expectation_c):
             ts_end = time.time()
             of.flush()
             os.fsync(ofd)
+            # record the previous offset and the new one; we use this
+            # in target.console.wait_for_no_ouput()
+            buffers_poll['read_offset0'] = read_offset
             buffers_poll['read_offset'] = new_offset
             target.report_info(
                 "%s/%s: read from console %s:%s @%d %dB (new offset @%d) "
@@ -1341,6 +1344,102 @@ class extension(tc.target_extension_c):
             else:
                 search_offset = 0
             poll_state.buffers[detect_context + 'search_offset'] = search_offset
+
+
+
+    def wait_for_no_output(self, console: str = None,
+                           timeout: float = 60,
+                           silence_period: float = 3,
+                           poll_period: float = 0.5,
+                           reason: str = ""):
+        """
+        Wait for a serial console to produce no more output
+
+        Note this works with the expectation system, so after waiting
+        the contents are already in the polling buffer.
+
+        :param str console: (optional; default console otherwise) name
+          of the console on which we'll wait
+
+        :param float timeout: (optional, default 1min) timeout (in
+          seconds) after which we'll give up waiting if there is still
+          output coming and an exception :exc:`tcfl.timeout_error_e` will
+          be raised.
+
+        :param float silence_period: (optional, default 3s) after how
+          many seconds of no output we consider it good and return.
+
+        :param str reason: (optional) reason for this wait for no output,
+          to print in progress/log messages as::
+
+            console[CONSOLE].wait_for[REASON]
+
+        """
+        # FIXME: this might make sense to implement in
+        # testcase.expect() in a more generic way, adding some sort of
+        # detector in the expectation class.
+        if console == None:
+            console = self.default
+        else:
+            assert isinstance(console, str), \
+                "console: expected string, got {type(console)}"
+        assert isinstance(reason, str), \
+            "reason: expected string, got {type(str)}"
+
+        target = self.target
+        # this setup is same as tcfl.tc.tc_c.expect() so the same
+        # buffrs are used and whatever is read here can be reused there.
+        exp = target.console.text("", console = console)
+        exp.poll_name = exp.poll_context()
+        with target.testcase.lock:	# see tcfl.tc.tc_c.expect()
+            if exp.poll_name not in target.testcase._poll_state:
+                target.testcase._poll_state[exp.poll_name] = \
+                    target.testcase._poll_state_c()
+            poll_state = target.testcase._poll_state[exp.poll_name]
+        ellapsed = 0
+        ts = time.time()
+        ts_end = ts + timeout
+        ts_last_data = ts
+        while True:
+            ts = time.time()
+            if ts > ts_end:
+                raise tcfl.timeout_error_e(
+                    f"waiting for {reason} in console {console} timed out,"
+                    f" output still coming after {timeout}s")
+            time.sleep(poll_period)
+            # see tcfl.tc.tc_c.expect() -- we access this under a lock because
+            # other threads might be using this
+            with poll_state.lock:
+                exp.poll(target.testcase,
+                         f"console[{console}].wait_for[{reason}]",
+                         poll_state.buffers)
+                read_offset0 = poll_state.buffers.get('read_offset0', None)
+                read_offset = poll_state.buffers.get('read_offset', None)
+            if read_offset0 == read_offset:
+                # no new output since the last time we read, is it still under the strikes?
+                silenced_for = ts - ts_last_data
+                if silenced_for > silence_period:
+                    target.report_info(
+                        f"console[{console}].wait_for[{reason}]: no new output"
+                        f" ({read_offset0}->{read_offset})"
+                        f" after {silenced_for:.2f}s (more than {silence_period:.2f}); done",
+                        level = 2)
+                    return
+                else:
+                    target.report_info(
+                        f"console[{console}].wait_for[{reason}]: no new output"
+                        f" ({read_offset0}->{read_offset})"
+                        f" after {silenced_for:.2f}s, still less than"
+                        f" {silence_period:.2f}s; waiting",
+                        level = 3)
+            else: # output came, reset strike count
+                ts_last_data = ts
+                target.report_info(
+                    f"console[{console}].wait_for[{reason}]: got output,"
+                    f" ({read_offset0}->{read_offset})"
+                    f" reset last data timestamp to {ts:.2f}",
+                    level = 4)
+
 
 
     def capture_complete(self, *consoles):
