@@ -138,6 +138,13 @@ References:
 
   - https://invisible-island.net/xterm/xterm-function-keys.html
 
+WARNING!!!
+^^^^^^^^^^
+
+Always use :meth:`tcfl.tc.target_c.console_tx` vs *target.console.write()*
+
+Otherwise the send/expect gets out of sync and things don't work as expected.
+
 """
 import collections
 import math
@@ -158,6 +165,12 @@ bold_white_fg_cyan_bg =    r"\x1b\[1m\x1b\[37m\x1b\[46m"	# highlighted
 normal_white_fg_blue_bg =  r"\x1b\[0m\x1b\[37m\x1b\[44m" # normal
 
 ansi_key_codes = {
+    "arrow_down": {
+        "\x1b[B": [ "rxvt", 'vt100', "xterm" ],
+    },
+    "arrow_up": {
+        "\x1b[A": [ "rxvt", 'vt100', "xterm" ],
+    },
     'F2': {
         "\x1b[12~": [ "rxvt", "xterm" ],
         "\x1bOQ": [ 'vt100' ],
@@ -211,6 +224,56 @@ def entry_select(target, wait = 0.5):
     time.sleep(wait)
     target.console_tx("\r")
     time.sleep(wait)
+
+def scroll_up(target, terminal: str = None):
+    # in vt100 and most others, \x1b[A
+    if terminal == None:
+        terminal = target.kws.get("bios.terminal_emulation", "vt100")
+    # USE CONSOLE_TX!!! see file header
+    target.console_tx(ansi_key_code("arrow_up", terminal))
+
+
+
+def scroll_down(target, terminal: str = None):
+    # in vt100 and most others, \x1b[B
+    if terminal == None:
+        terminal = target.kws.get("bios.terminal_emulation", "vt100")
+    # USE CONSOLE_TX!!! see file header
+    target.console_tx(ansi_key_code("arrow_down", terminal))
+
+
+
+def scroll_updown(target,
+                  # FIXME: bool | str -> newer Python only, so leave
+                  # without spec until we can deprecate support for
+                  # older Python versions
+                  direction,
+                  terminal: str = None):
+    """
+    Send a press arrow up or down to the target's default console
+
+    :param str|bool direction: what to press; this can be a string
+      (more descriptive) or a bool, for easy manipulation.
+
+      - bool:True or str:up: send an arrow/cursor up
+      - bool:False or str:down: send an arrow/cursor down
+
+    :param str terminal: (optional, default from target's property
+      *bios.terminal_emulation* which will be defaulted to *vt100*.
+
+    """
+    if isinstance(direction, str):
+        direction = direction.lower()
+    if direction == True or direction == "up":
+        scroll_up(target, terminal = terminal)
+    elif direction == False or direction in ( "down", "dn" ):
+        scroll_down(target, terminal = terminal)
+    else:
+        raise AssertionError(
+            "direction: unknown direction, expected (up|True, down|false),"
+            f" got {direction}")
+
+
 
 def menu_scroll_to_entry(
         target, entry_string, has_value = False,
@@ -376,25 +439,16 @@ def menu_scroll_to_entry(
     # might be highlighted on -- note this is the opposite of what we
     # do in the loop
     target.report_info(f"{name}: reverse scrolling")
-    if _direction:
-        # FIXME: use get_key() -- how do we pass the terminal encoding?
-        target.console_tx("\x1b[A")			# press arrow down
-    else:
-        target.console_tx("\x1b[B")			# press arrow up
+    scroll_updown(target, "up" if direction == "down" else "down")
     # WAIT for the scroll to settle; otherwise we'll break havoc on
     # the state machine since it'll half draw and confuse the expectation
     target.console.wait_for_no_output(
         target.console.default, silence_period = 0.6, poll_period = 0.2,
         reason = f"display to settle before scrolling '{entry_string}'")
-    target.expect("")
 
     for count in range(max_scrolls):
         target.report_info(f"{name}: scrolling {count}/{max_scrolls}")
-        if _direction:
-            # FIXME: use get_key() -- how do we pass the terminal encoding?
-            target.console_tx("\x1b[B")			# press arrow up
-        else:
-            target.console_tx("\x1b[A")			# press arrow down
+        scroll_updown(target, direction)
         # alway give some time after scrolling because it takes time
         # to redraw and things get out of sync otherwise
         target.console.wait_for_no_output(
@@ -434,11 +488,8 @@ def menu_scroll_to_entry(
                 # wiggle the cursor so the loop will refresh whichever entry we
                 # might be highlighted on -- note this is the opposite of what we
                 # do in the loop
-                if _direction:
-                    # FIXME: use get_key() -- how do we pass the terminal encoding?
-                    target.console_tx("\x1b[A")		# press arrow down
-                else:
-                    target.console_tx("\x1b[B")		# press arrow up
+                target.report_info(f"{name}: reverse scrolling bc /timeout")
+                scroll_updown(target, "up" if direction == "down" else "down")
                 # WAIT for the scroll to settle; otherwise we'll break havoc on
                 # the state machine since it'll half draw and confuse the expectation
                 target.console.wait_for_no_output(
