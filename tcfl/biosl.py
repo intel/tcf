@@ -538,7 +538,7 @@ def menu_dig_to(
       the default console)
 
     :param list(str) entries: list of the menu and submenu entries
-      that have to be selected. 
+      that have to be selected.
 
       An item can also be a tuple with two or thee entries::
 
@@ -547,7 +547,7 @@ def menu_dig_to(
       This is used when the menu tittle for a submenu will be
       different than the entry name; *MENUTITLE* can be *None* if we
       know it is going to be the same and we need to only specify
-      *HASVALUE*. 
+      *HASVALUE*.
 
       *HASVALUE* is a boolean that indicates the entry is a key/value
       entry (see :func:`menu_scroll_to_entry`).
@@ -598,6 +598,7 @@ def menu_dig_to(
             menu_title = entry_next
         cnt += 1	# important this is here for later
 
+        # Do not flush/sync here! let menu_scroll_to_entry() do it
         r = menu_scroll_to_entry(
             target, entry_next,
             has_value = has_value, direction = "down",
