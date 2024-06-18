@@ -776,6 +776,7 @@ def multiple_entry_select_one(
         # regex format, to put inside (?P<values>VALUES)
         wait = 0.5, timeout = 10,
         highlight_string = "\x1b\\[1m\x1b\\[37m\x1b\\[46m",
+        skip_first_scroll: bool = True,
         level = ""):
     """
     In a simple menu, wait for it to be drown and select a given entry
@@ -838,7 +839,6 @@ def multiple_entry_select_one(
     # so this assumes the whole box is redrawn every time we move the
     # cursor -- hence why we look for /---- ANSICRUFT+KEYSANSI+CRUFT
     # HIGHLIGHT KEY ANSICRUFT ----/
-    _direction = False
     entry_highlighted_regex = re.compile(
         b"/-+"
         + b".*"
@@ -851,13 +851,26 @@ def multiple_entry_select_one(
                        % (level, select_entry))
     last_seen_entry = None
     last_seen_entry_count = 0
+    direction = False   # down -- we'll toggle it later
+    # wiggle the cursor in the opposite direction to refresh the
+    # current entry
+    scroll_updown(target, not direction)
+    # WAIT for the scroll to settle; otherwise we'll break havoc on
+    # the state machine since it'll half draw and confuse the expectation
+    target.console.wait_for_no_output(
+        target.console.default, silence_period = 0.6, poll_period = 0.2,
+        reason = f"multiple/entry: display to settle before scrolling to '{select_entry}'")
+
     for toggle in range(0, max_scrolls):
-        time.sleep(0.25)
-        if _direction:
-            target.console_tx("\x1b[A")			# press arrow up
+        if skip_first_scroll:
+            skip_first_scroll = False
         else:
-            target.console_tx("\x1b[B")			# press arrow down
-        time.sleep(0.25)
+            scroll_updown(target, direction)
+            # WAIT for the scroll to settle; otherwise we'll break havoc on
+            # the state machine since it'll half draw and confuse the expectation
+            target.console.wait_for_no_output(
+                target.console.default, silence_period = 0.6, poll_period = 0.2,
+                reason = f"multiple/entry: display to settle before scrolling to '{select_entry}'")
 
         target.report_info("BIOS: %s: waiting for highlighted entry" % level)
         # wait for highlighted then give it a breather to send the rest
@@ -873,11 +886,18 @@ def multiple_entry_select_one(
                 "BIOS: %s: %s: didn't find a highlighted entry, retrying"
                 % (level, select_entry))
             # tickle it
-            time.sleep(0.25)
-            target.console_tx("\x1b[A")			# press arrow up
-            time.sleep(0.25)
-            target.console_tx("\x1b[B")			# press arrow down
-            time.sleep(0.25)
+            scroll_updown(target, not direction)
+            # WAIT for the scroll to settle; otherwise we'll break havoc on
+            # the state machine since it'll half draw and confuse the expectation
+            target.console.wait_for_no_output(
+                target.console.default, silence_period = 0.6, poll_period = 0.2,
+                reason = f"multiple/entry: display to settle before scrolling to '{select_entry}'")
+            scroll_updown(target, direction)
+            # WAIT for the scroll to settle; otherwise we'll break havoc on
+            # the state machine since it'll half draw and confuse the expectation
+            target.console.wait_for_no_output(
+                target.console.default, silence_period = 0.6, poll_period = 0.2,
+                reason = f"multiple/entry: display to settle before scrolling to '{select_entry}'")
         else:
             # nothing found, raise it
             raise tcfl.tc.error_e(
@@ -901,7 +921,10 @@ def multiple_entry_select_one(
             # the menu and have a limited count to make a judgement on
             # maybe this is a menu that does not wrap around, flip the
             # direction
-            _direction = not _direction
+            target.report_info("BIOS: %s: entry '%s' found %s times,"
+                               " reversing scroll direction"
+                               % (level, key, last_seen_entry_count))
+            direction = not direction
         target.report_info("BIOS: %s: entry '%s' found, scrolling"
                            % (level, key))
 
