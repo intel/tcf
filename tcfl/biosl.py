@@ -643,8 +643,8 @@ def menu_dig_to(
         if isinstance(entry_next, tuple):
             if len(entry_next) > 2:	# watch out, we'll override it next
                 has_value = entry_next[2]
-            entry_next = entry_next[0]
             menu_title = entry_next[1]
+            entry_next = entry_next[0]
         else:
             menu_title = entry_next
         cnt += 1	# important this is here for later
