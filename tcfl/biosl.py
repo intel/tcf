@@ -221,9 +221,9 @@ def entry_select(target, wait = 0.5):
     # do it here
     # in the future this will include more things, BIOS specific, to
     # select entries
-    time.sleep(wait)
-    target.console_tx("\r")
-    time.sleep(wait)
+    target.console_tx("\r")    # USE CONSOLE_TX!!! see file header
+
+
 
 def scroll_up(target, terminal: str = None):
     # in vt100 and most others, \x1b[A
