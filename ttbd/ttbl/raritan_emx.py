@@ -188,7 +188,10 @@ class pci(ttbl.power.impl_c, ttbl.capture.impl_c): # pylint: disable = abstract-
         url_no_password = url.scheme + "://"
         if url.username:
             url_no_password += url.username + "@"
-        url_no_password += f"{url.hostname}:{url.port}"
+        if self.outlet_number:
+            url_no_password += f"{url.hostname}:{self.outlet_number}"
+        else:
+            url_no_password += f"{url.hostname}:{url.port}"
 
         if not password:
             password = url.password
