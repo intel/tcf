@@ -679,7 +679,16 @@ def _login_ui():
             calling_user = flask_login.current_user._get_current_object(),
             request = flask.request
         ) as audit_record:
-            _ = _login(audit_record)
+            try:
+                _ = _login(audit_record)
+            except werkzeug.exceptions.HTTPException as e:
+                # _login func will abort with exception if the user is not
+                # allowed or not found
+                return flask.render_template(
+                    'login.html',
+                    bad_login = True, # print msg in template for bad login
+                    servers_info = ttbl.ui.servers_info_get()
+                )
 
         if previous_route:
             return flask.redirect(previous_route)

@@ -83,6 +83,12 @@ form {
     border-color: #c9ba9b;
 }
 
+.info-red {
+    border-color: #6d0202;
+    background-color: #ffb9b9;
+    color: #360000;
+}
+
 .info-grey {
     padding: 0.5em 1em;
     color: #333;

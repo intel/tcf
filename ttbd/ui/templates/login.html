@@ -14,6 +14,12 @@
   -->
 <div class='main'>
   <div class='column-main tile'>
+    {% if bad_login == True %}
+    <p class='info info-red'>
+        You typed an incorrect email, password, or you do not have access.
+        Please double check your login information.
+    </p>
+    {% endif %}
     <form action="login" method="post">
       <table border="0">
         <tbody>
