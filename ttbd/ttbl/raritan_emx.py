@@ -177,8 +177,8 @@ class pci(ttbl.power.impl_c, ttbl.capture.impl_c): # pylint: disable = abstract-
         if outlet_number:
             assert isinstance(outlet_number, int), \
                 f"outlet_number: expected int; got {type(outlet_number)}"
-            assert outlet_number > 1, \
-                f"outlet_number: expected > 1 int; got {outlet_number}"
+            assert outlet_number >= 1, \
+                f"outlet_number: expected >=1 1 int; got {outlet_number}"
         self.outlet_number = outlet_number
         self.https_verify = https_verify
 
