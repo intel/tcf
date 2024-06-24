@@ -393,11 +393,39 @@ def menu_scroll_to_entry(
     # FIXME: This won't work when we have multi line values in key/values
     # :/ latch on the first line of the entry and be happy with
     # it... but we'll loose the value on multiline values
-    if has_value:
-        # takes care of (2) in the function doc
-        selected_regex = re.compile(
-            highlight_string.encode('utf-8')
-            + rb"\x1b\[(?P<row>[0-9]+);(?P<column_value>[0-9]+)H"
+    #
+    # This fugly regex supports entries with value and entries with
+    # values; it's complicated, but it is what allows to support an
+    # scenario such as (from the QEMU EFI shell):
+    #
+    ##
+    ##  Standard PC (i440FX + PIIX, 1996)
+    ##  pc-i440fx-7.0                                       2.00 GHz
+    ##  edk2-20230524-3.fc37                                10240 MB RAM
+    ##
+    ##
+    ##
+    ##    Select Language            <Standard English>         This is the option
+    ##                                                          one adjusts to change
+    ##  ► Device Manager                                        the language for the
+    ##  ► Boot Manager                                          current system
+    ##  ► Boot Maintenance Manager
+    ##
+    ##    Continue
+    ##    Reset
+    ##
+    #
+    # The entries with value are rendered in a really weird way (value
+    # first, key later). Really messy.
+    #
+    # Since we can't have repeated keys, we have
+    # <NAME>_{value|novalue}_<MORENAME> and then we decode them as
+    # needed later on.
+    selected_regex = re.compile(
+        highlight_string.encode('utf-8') + b"("
+        + (
+            # this takes care of (2) in the function doc
+            rb"\x1b\[(?P<row_value>[0-9]+);(?P<column_value>[0-9]+)H"
             # value is anything that is not an ANSI escape char
             + rb"(?P<value>[^\x1b]+)"
             # the rest for us is fluf until the entry name(key) comes
@@ -406,22 +434,24 @@ def menu_scroll_to_entry(
             # note we force with (?P=row) that they are all in the
             # same column; this will cause problem for multiline
             # entries...
-            + rb"\x1b\[(?P=row);[0-9]+H\s+"
-            + rb"\x1b\[(?P=row);[0-9]+H\s+"
-            + rb"\x1b\[(?P=row);(?P<column_key>[0-9]+)H"
+            + rb"\x1b\[(?P=row_value);[0-9]+H\s+"
+            + rb"\x1b\[(?P=row_value);[0-9]+H\s+"	# yup, this is doubled
+            + rb"\x1b\[(?P=row_value);(?P<column_value_key>[0-9]+)H"
             # Some entries do start with a space, but it is not *all* spaces
-            + rb"(?P<key>[^\x1b]*[^ \x1b][^\x1b]*)")
-    else:
-        # takes care of (1) in the function doc
-        selected_regex = re.compile(
+            + rb"(?P<key_value>[^\x1b]*[^ \x1b][^\x1b]*)"
+        )
+        + b"|"
+        + (
+            # takes care of (1) in the function doc
             # This won't work when we have multi line values in key/values
             # :/
-            highlight_string.encode('utf-8')
-            + rb"\x1b\[(?P<row>[0-9]+);(?P<column_key>[0-9]+)H"
+            rb"\x1b\[(?P<row_novalue>[0-9]+);(?P<column_novalue_key>[0-9]+)H"
             # Some entries do start with a space, but it is not *all*
             # spaces; they might finish with a string of spaces, but
             # definitely in a escape sequence
-            + rb"(?P<key>[^\x1b]*[^ \x1b][^\x1b]*) *\x1b")
+            + rb"(?P<key_novalue>[^\x1b]*[^ \x1b][^\x1b]*) *\x1b"
+        )
+        + b")")
 
     if isinstance(entry_string, str):
         # convert to bytes
@@ -498,8 +528,15 @@ def menu_scroll_to_entry(
                 continue
             # the key always matches spaces all the way to the end, so it
             # needs to be stripped
-            key = r[name]['groupdict']['key'].strip()
-            key_at_column = int(r[name]['groupdict']['column_key'])
+            key_value = r[name]['groupdict']['key_value']
+            key_novalue = r[name]['groupdict']['key_novalue']
+            if key_novalue == None:
+                key = key_value.strip()
+                key_at_column = int(r[name]['groupdict']['column_value_key'])
+            else:
+                key = key_novalue.strip()
+                key_at_column = int(r[name]['groupdict']['column_novalue_key'])
+
             # entries are always on column four (FIXME: BIOS profile)
             if key_at_column == column_key:
                 break
