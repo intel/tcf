@@ -2287,7 +2287,7 @@ def password_lookup(entry):
             if '%(' in value:
                 value = value % m.groupdict()
             return value
-        raise RuntimeError(f"can't find a password for entry '{entry}'")
+    raise RuntimeError(f"can't find a password for entry '{entry}'")
 
 
 
