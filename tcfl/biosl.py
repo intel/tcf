@@ -1198,8 +1198,6 @@ def bios_boot_expect(target):
     bios_boot_time = target.kws.get('bios.boot_time', 180)
 
     ts0 = time.time()
-    target.report_info("BIOS: waiting for main menu after power on"
-                       f" (up to {bios_boot_time}s)")
     boot_prompt = target.kws.get("bios.boot_prompt",
                                  target.kws.get("bios_boot_prompt", None))
     if boot_prompt == None:
@@ -1210,6 +1208,12 @@ def bios_boot_expect(target):
             r" (eg: 'Press\s+\[F6\]\s+to show boot menu options')"
             % target.id,
             dict(target = target))
+    if not boot_prompt:
+        target.report_info("BIOS: not waiting for boot prompt"
+                           " (declared empty in bios.boot_prompt)")
+        return
+    target.report_info("BIOS: waiting for main menu after power on"
+                       f" (up to {bios_boot_time}s)")
     report_backlog = target.kws.get(
         "bios.boot_prompt_report_backlog", 500)
     target.expect(re.compile(boot_prompt.encode('utf-8')),

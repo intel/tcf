@@ -1124,8 +1124,14 @@ def target_qemu_pos_add(target_name,
         ),
         "bios.terminal_emulation": "vt100",
         "bios.boot_time": 20,
-        # Well, QEMU spews this on the setial port when it boots, so good enough
-        "bios.boot_prompt": "\\x1b\\[2J\\x1b\\[01;01H\\x1b\\[=3h\\x1b\\[2J\\x1b\\[01;01H\\x1b\\[0m\\x1b\\[35m\\x1b\\[40m\\x1b\\[0m\\x1b\\[37m\\x1b\\[40m",
+        # Well, QEMU doesn't necessarily spew anything on the serial
+        # port when the BIOS boots, so we just assume it's nothing;
+        # the tcfl.biosl.bios_boot_expect() code knows about this and
+        # when waiting for it to boot does nothing, since it is pretty
+        # much inmendiate and things like
+        # tcfl.biosl.boot_to_main_menu() it might send F2 when needing
+        # to go into the BIOS menu.
+        "bios.boot_prompt": "",
         "bios.boot_prompt_report_backlog": 500,
         "bios.boot_key_main_menu": "F2",
         # note this matches the name in bios.main_level_entries.2
