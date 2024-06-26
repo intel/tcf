@@ -1932,6 +1932,8 @@ if __name__ == "__main__":
     # JSON/Python don't necessary require ordering dictionaries, but
     # for our protocol, we do, since it simplifies the data structures
     app.config["JSON_SORT_KEYS"] = False
+    # Flask > v1.3, per https://stackoverflow.com/a/60780210
+    app.json.sort_keys = False
     app.secret_key = base64.b64encode(sk)
 
     # Initialize the SSL CRT/key from ttbl.config if present
