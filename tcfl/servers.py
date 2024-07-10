@@ -32,11 +32,11 @@ _subsystem_setup = False
 
 
 
-def _discover_bare(ssl_ignore = True):
+def _discover_bare(*args, ssl_ignore = True, **kwargs):
     # this takes stuff in added by config files to tcfl.config.urls to
     # seed, stuff we saved on disk from previous runs or defaults to
     # hostname "ttbd" that is resovled
-    tcfl.server_c.discover(ssl_ignore = ssl_ignore)
+    tcfl.server_c.discover(*args, ssl_ignore = ssl_ignore, **kwargs)
 
     if not tcfl.server_c.servers:
         logger.warning(
@@ -193,14 +193,30 @@ def run_fn_on_each_server(servers: dict, fn: callable, *args,
 
 
 
-def subsystem_setup(*args, **kwargs):
-    """
-    Initialize the server management system in a synchronous way
+def subsystem_setup(*args, tcfl_server_c_discover_kwargs = None, **kwargs):
+    """Initialize the server management system in a synchronous way
 
     Same arguments as :func:`tcfl.config.subsystem_setup`
 
     Note this will initialize all the modules it requires
     (:mod:`tcfl.config`) if not already initialized.
+
+    Note you can pass arguments to control how the discovery process
+    happens; these are the arguments to :meth:`tcfl.server_c.discover`
+    and can be passed in the dict *tcfl_server_c_discover_kwargs*; for
+    example, to discover just a single known server:
+
+    >>> tcfl.servers.subsystem_setup(
+    >>>     tcfl_server_c_discover_kwargs = dict(
+    >>>         seed_url = ["https://SERVERNAME:5000" ],
+    >>>         ignore_cache = True,
+    >>>         loops_max = 0
+    >>>     )
+    >>> )
+
+    This is useful if you know you only need to talk to one well-known
+    server and to avoid the overhead of extra discovery.
+
     """
     #
     # This is currently a wee of a hack as we move stuff from
@@ -225,6 +241,9 @@ def subsystem_setup(*args, **kwargs):
         _kwargs = kwargs
     tcfl.config.subsystem_setup(*args, **_kwargs)
     logger.info("setting up server subsystem")
-    _discover_bare(ssl_ignore = kwargs.get('ignore_ssl'))
+    if tcfl_server_c_discover_kwargs == None:
+        tcfl_server_c_discover_kwargs = {}
+    _discover_bare(ssl_ignore = kwargs.get('ignore_ssl'),
+                   **tcfl_server_c_discover_kwargs)
 
     _subsystem_setup = True

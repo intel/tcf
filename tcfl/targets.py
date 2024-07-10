@@ -114,8 +114,12 @@ class discovery_agent_c:
 
     """
 
-    def __init__(self, projections = None):
+    def __init__(self, projections = None, targetid: str = None):
 
+        if targetid != None:
+            assert isinstance(targetid, str), \
+                f"targetid: expected str, got {type(targetid)}"
+        self.targetid = targetid
 
         #: Remote target inventory (cached)
         self.rts = dict()
@@ -186,7 +190,9 @@ class discovery_agent_c:
             return
         self.executor = concurrent.futures.ThreadPoolExecutor(len(tcfl.server_c.servers))
         self.rs = self.executor.map(
-            lambda server: server.targets_get(projections = self.projections),
+            lambda server: server.targets_get(
+                target_id = self.targetid,
+                projections = self.projections),
             tcfl.server_c.servers.values())
         logger.info("server inventory update started")
 
@@ -733,9 +739,9 @@ _subsystem_setup = False
 
 
 def subsystem_setup(*args, projections = None, shorten_names: bool = True,
+                    tcfl_servers_subsystem_setup_kwargs: dict = None,
                     **kwargs):
-    """
-    Initialize the target discovery subsystem in a synchronous way
+    """Initialize the target discovery subsystem in a synchronous way
 
     Check the module documentation for an asynchronous one.
 
@@ -754,13 +760,51 @@ def subsystem_setup(*args, projections = None, shorten_names: bool = True,
     initialized).
 
     :param bool shorten_names: see :meth:`update_complete`
+
+    :param dict tcfl_servers_subsystem_setup_kwargs: (optional,
+      default *None*) arguments for
+      :func:`tcfl.servers.subsystem_setup`; see below for common usage
+      of this.
+
+    To discover a single target that is known ahead of time:
+
+    >>> tcfl.targets.subsystem_setup(targetid = "TARGETNAME")
+
+    in general for this case you want to also discover only a single server
+    where the target is located, which can be achieved by passing
+    arguments for the different subsystems:
+
+    >>> tcfl.targets.subsystem_setup(
+    >>>     targetid = "TARGETNAME",
+    >>>     tcfl_servers_subsystem_setup_kwargs = dict(
+    >>>         tcfl_server_c_discover_kwargs = dict(
+    >>>             seed_url = ["https://SERVERNAME:5000" ],
+    >>>             ignore_cache = True,
+    >>>             loops_max = 0
+    >>>         )
+    >>>     )
+    >>> )
+
+    or just doing separate calls:
+
+    >>> tcfl.servers.subsystem_setup(
+    >>>     tcfl_server_c_discover_kwargs = dict(
+    >>>         seed_url = ["https://SERVERNAME:5000" ],
+    >>>         ignore_cache = True,
+    >>>         loops_max = 0
+    >>>     )
+    >>> )
+    >>> tcfl.targets.subsystem_setup(targetid = "TARGETNAME")
+
     """
     # ensure discovery subsystem is setup
     global _subsystem_setup
     if _subsystem_setup:
         return
 
-    tcfl.servers.subsystem_setup()
+    if tcfl_servers_subsystem_setup_kwargs == None:
+        tcfl_servers_subsystem_setup_kwargs = {}
+    tcfl.servers.subsystem_setup(**tcfl_servers_subsystem_setup_kwargs)
 
     # FIXME: move server discovery here, since it is a requirement
     # tcfl.server.discover()

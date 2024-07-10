@@ -1601,7 +1601,23 @@ class server_c:
           organization, so clients don't have to do any further server
           configuration.
 
+        If you want to forcibly configure a single server, call with:
 
+        >>> tcfl.server_c.discover(
+        >>>     seed_url = ["https://SERVERNAME:5000" ],
+        >>>     ignore_cache = True,
+        >>>     loops_max = 0
+        >>> )
+
+        However, normally you want to use the subsystem setup code
+
+        >>> tcfl.servers.subsystem_setup(
+        >>>     tcfl_server_c_discover_kwargs = dict(
+        >>>         seed_url = ["https://SERVERNAME:5000" ],
+        >>>         ignore_cache = True,
+        >>>         loops_max = 0
+        >>>     )
+        >>> )
         """
 
         # FIXME: get default from tcfl.config -- this is always USER specific
@@ -1799,6 +1815,7 @@ class server_c:
                 f"info is warm")
             return
 
+        count = 0
         for count in range(1, loops_max + 1):
             # start searching the seed servers, but then only search
             # the new servers found in the previous run
