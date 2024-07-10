@@ -1845,6 +1845,9 @@ if __name__ == "__main__":
     ttbl.test_target.state_path = os.path.join(args.var_state_path, "targets")
     ttbl.test_target.files_path = args.files_path
     ttbl.user_control.User.state_dir = os.path.join(args.var_state_path, "users")
+    # Admin can configure a secondary user state dir, if not we default to the
+    # primary one.
+    ttbl.user_control.User.state_dir_secondary = os.path.join(args.var_state_path, "users")
 
 
     os.umask(0o007)		# daemon gives no permissions to others
