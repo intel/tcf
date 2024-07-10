@@ -73,6 +73,8 @@ class User(object):
 
     # Where we save user data so users don't have to re-login
     state_dir = None
+    # Optional secondary path to store user state dir info
+    state_dir_secondary = None
 
     def __init__(self, userid, fail_if_new = False, roles = None):
         path = self.create_filename(userid, self.state_dir)
@@ -80,8 +82,23 @@ class User(object):
         if not os.path.isdir(path) and fail_if_new == False:
             commonl.rm_f(path)	# cleanup, just in case
             commonl.makedirs_p(path)
+
+        # if requested by admin by setting the variable
+        # `ttbl.user_control.User.state_dir_secondary` in the config files
+        # we will create a secondary fsdb instance. If nothing was defined we
+        # will use the same as the primary
+        if self.state_dir != self.state_dir_secondary:
+            path_s = self.create_filename(userid, self.state_dir_secondary)
+            if not os.path.isdir(path_s) and fail_if_new == False:
+                commonl.rm_f(path_s)	# cleanup, just in case
+                commonl.makedirs_p(path_s)
         try:
             self.fsdb = commonl.fsdb_symlink_c(path)
+            if self.state_dir != self.state_dir_secondary:
+                self.fsdb_secondary = commonl.fsdb_symlink_c(path_s)
+            else:
+                self.fsdb_secondary = self.fsdb
+
         except ( AssertionError, commonl.fsdb_c.exception ) as e:
             if fail_if_new:
                 raise self.user_not_existant_e("%s: no such user" % userid)
