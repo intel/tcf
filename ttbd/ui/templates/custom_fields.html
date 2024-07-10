@@ -1,0 +1,199 @@
+{% extends 'base.html' %}
+
+{% block title %} targets {% endblock %}
+{% block head %}
+<link rel="stylesheet" href="{{url_for('static', filename = 'css/buttons.css')}}"/>
+
+<script src="{{url_for('static', filename = 'js/targets.js')}}"></script>
+
+<link rel="stylesheet" href="{{url_for('static', filename = 'css/external/jquery.dataTables.css')}}"/>
+<script src="{{url_for('static', filename = 'js/external/jquery-3.6.4.slim.min.js')}}" integrity="sha256-a2yjHM4jnF9f54xUQakjZGaqYs/V1CYvWpoqZzC2/Bw=" crossorigin="anonymous"></script>
+<script src="{{url_for('static', filename = 'js/external/jquery.dataTables.js')}}"></script>
+{% endblock %}
+
+{% block navbar %}{% endblock %}
+
+{% block content %}
+
+<div class='toolbar-targets'>
+      <div class = "tooltip">
+        <button class='primary' onclick='$(".message").empty(); js_save_custom_fields("ui_preferred_fields_for_targets_table")'>
+            Save Changes
+        </button>
+        <span class = "tooltiptext">
+           Customize targets table
+          <p>
+            You can select the checkbox for multiple fields (displayed in the
+            table bellow) and save them to modify the main targets table view.
+          </p>
+        </span>
+      </div>
+      <div class = "tooltip">
+        <button class='secundary' onclick='js_uncheck_all_checkboxes("ui_preferred_fields_for_targets_table"); $(".message").empty();'>Clean Selection</button>
+          <span class = "tooltiptext">
+            Clear the selection on the tables. Uncheck all checkboxes.
+            <p>
+            If you save without any checkbox the columns displayed will be the default ones.
+            </p>
+        </span>
+      </div>
+
+      <div class = "tooltip" style='margin-left: auto'>
+        <button class='warning' onclick="location.href='/ttb-v2/ui/';">Go to Targets Table</button>
+          <span class = "tooltiptext">
+            Go to the target table with the columns you just specified.
+          <p style='color: red;'>
+            <b>Be sure to save your changes</b> Unsaved changes will be lost
+          </p>
+        </span>
+      </div>
+</div>
+<div class='message'>
+    {% if not preferred_fields in [None, '']%}
+        <div class='info info-yellow'>
+            The current preferred fields are: <b>{{preferred_fields}}</b>
+        </div>
+    {% else %}
+        <div class='info info-yellow'>
+        You have no preferred values, by default we are showing:
+        <b>type,ipv4_addr,mac_addr,owner</b>
+        <br>
+        Feel free to change them using the table below.
+        </div>
+    {% endif %}
+</div>
+<h3>Aggregated Fields
+
+    <div class="tooltip" style='font-size: 1.2rem; font-weight: normal;'>
+      <label style='color: blue;'>(?)</label>
+      <span class="tooltiptext">
+        <p>
+            You can create patterns to aggregate fields here. For example, say you
+            want to get the specific value <i>name</i> out of multiple entires in
+            the inventory, you can add a pattern like: <i>entry.*.name</i>.
+        </p>
+
+      <table class='pattern-explanation-table'>
+        <thead>
+            <tr>
+              <th><p>Pattern</p></th>
+              <th><p>Meaning</p></th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><p><code><span>*</span></code></p></td>
+                <td><p>Matches zero or more characters.</p></td>
+            </tr>
+            <tr>
+                <td><p><code><span>?</span></code></p></td>
+                <td><p>Matches one character.</p></td>
+            </tr>
+            <tr>
+                <td><p><code><span>[seq]</span></code></p></td>
+                <td><p>Matches exactly one character that is a member of the string <em>seq</em></p></td>
+            </tr>
+            <tr>
+                <td><p><code><span>[!seq]</span></code></p></td>
+                <td><p>Negate the match of exactly one character that is a member of the string <em>seq</em></p></td>
+            </tr>
+        </tbody>
+      </table>
+      <p>Other common examples:</p>
+      <ul>
+          <li>
+            <b>interconnects.*.ipv4_addr</b>: list all the IPs inside interconnects per target
+          </li>
+          <li>
+            <b>interconnects.*.mac_addr</b>:  list all the Mac Address inside interconnects per target
+          </li>
+      </ul>
+      <p>
+        <small>more info: <a href='https://www.gnu.org/software/findutils/manual/html_node/find_html/Shell-Pattern-Matching.html'>https://www.gnu.org/software/findutils/manual/html_node/find_html/Shell-Pattern-Matching.html</a> </small>
+      </p>
+      </span>
+    </div>
+</h3>
+
+<div>
+    <label for="regex_input">Add Pattern</label>
+    <input type="input" id="regex_input" value="" placeholder='some.*.property'/>
+    <button class='primary' onclick='add_row_to_field_table(table, "regex_input")'>add</button>
+</div>
+<table id='t-targets-fields-regex' class='display'>
+<thead>
+  <tr>
+    <th>&nbsp;</th>
+    <th>Field</th>
+    <th>Description</th>
+  </tr>
+</thead>
+<tbody>
+   {% for field in preferred_fields %}
+    <tr>
+      <td>
+        <div>
+          <input type="checkbox" id="{{field}}" name="field" value="{{field}}" class='ui_preferred_fields_for_targets_table' checked/>
+        </div>
+      </td>
+      <td>
+        <div>
+          <label for="{{field}}">{{field}}</label>
+        </div>
+      </td>
+      <td>-</td>
+    </tr>
+   {% endfor %}
+</tbody>
+</table>
+
+
+<hr>
+<h3>All Fields</h3>
+<table id='t-targets-fields' class='display'>
+<thead>
+  <tr>
+    <th>&nbsp;</th>
+    <th>Field</th>
+    <th>Description</th>
+  </tr>
+</thead>
+<tbody>
+   {% for field in all_fields %}
+    <tr>
+      <td>
+        <div>
+          <input type="checkbox" id="{{field}}" name="field" value="{{field}}" class='ui_preferred_fields_for_targets_table'/>
+        </div>
+      </td>
+      <td>
+        <div>
+          <label for="{{field}}">{{field}}</label>
+        </div>
+      </td>
+      <td>-</td>
+    </tr>
+   {% endfor %}
+</tbody>
+</table>
+
+<script>
+// datatables part, basically pass the id of the table to the function, and it
+// does the rest
+var table = ""; // can we use a broader scope?
+$(document).ready( function () {
+    $('#t-targets-fields').DataTable({
+        scrollY: '70vh',
+        scrollCollapse: true,
+        paging: false,
+    });
+
+    table = $('#t-targets-fields-regex').DataTable({
+        scrollY: '70vh',
+        scrollCollapse: true,
+        paging: false,
+        info: false,
+    });
+} );
+</script>
+{% endblock %}

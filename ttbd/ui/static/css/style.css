@@ -89,6 +89,12 @@ form {
     color: #360000;
 }
 
+.info-green {
+    color: #155126;
+    background-color: #A9FDAC;
+    border-color: #44CF6C;
+}
+
 .info-grey {
     padding: 0.5em 1em;
     color: #333;
@@ -276,4 +282,27 @@ hr {
 .toolbar-targets {
     display: flex;
     margin-top: 1.5em;
+}
+
+.pattern-explanation-table {
+   box-shadow: 0 1px 2px 0 rgba(0,0,0,.2);
+   border: 1px solid black;
+   border-collapse: collapse;
+   th,
+   td {
+        border: 1px solid black;
+        padding: 0em 0.5em;
+   }
+   thead {
+        background-color: gainsboro;
+   }
+   tbody {
+        background-color: white;
+   }
+   margin: 0 auto;
+}
+
+.table-cell-inventory-keys {
+    color: darkblue;
+    margin-top: 0;
 }
