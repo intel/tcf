@@ -564,6 +564,77 @@ def _target(targetid):
         servers_info = servers_info_get(),
     )
 
+@bp.route('/targets/customize', methods = ['GET', 'POST'])
+@flask_login.login_required
+def _target_customize():
+    '''
+    This view will manage the customization of the targets table. If you do a
+    GET it will render a table with the possible fields to choose as columns.
+
+    If you do a POST it will record those fields in the user state directory
+    secondary database
+    '''
+    if flask.request.method == 'GET':
+        calling_user = flask_login.current_user._get_current_object()
+        # query the user secondary db to see if he/she has preferred fields for the
+        # targets table, meaning specific columns he/she want to see
+        preferred_fields = \
+            calling_user.fsdb_secondary.get('ui_preferred_fields_for_targets_table')
+        preferred_fields = preferred_fields.split(',')
+
+        # `all_fields` is a set that contains all the keys in inventory every
+        # target has found. Not all targets have the same.
+        all_fields = set()
+        for targetid, target in ttbl.config.targets.items():
+            if not target.check_user_allowed(calling_user):
+                continue
+            target = ttbl.config.targets.get(targetid, None)
+
+            # we get all the keys from the target inventory flatten.
+            # flatten_keys_w_values = [('a.b.c', 5), ('x.y', True), ('q', 'smth')]
+            flatten_keys_w_values = commonl.dict_to_flat(target.tags, add_dict = False)
+            flatten_keys_w_values += target.fsdb.get_as_slist()
+            # we do not care about the value just the keys, it is a list of
+            # tuples, so we can just do this.
+            flatten_keys = [ full_value[0] for full_value in flatten_keys_w_values ]
+            all_fields.update(flatten_keys)
+
+        # remove `id` from the set since it will always display, also remove
+        # any empty string
+        all_fields = all_fields - {'id', ''}
+
+        return flask.render_template(
+            'custom_fields.html',
+            servers_info = servers_info_get(),
+            all_fields = all_fields,
+            preferred_fields = preferred_fields,
+        )
+
+    if flask.request.method == 'POST':
+        # the json expected has the following format
+        # {"ui_preferred_fields_for_targets_table":
+        #   "some,comma,separated,fields"
+        #}
+        try:
+            posted_content = flask.request.get_json()
+            # fields_to_store is a string with the fields separated by commas
+            # something like 'id,type,ip,mac'
+            # IMPORTANT assuming we do not have any fields in the inventory
+            # with `,` in the name.
+            fields_to_store = \
+                posted_content.get('ui_preferred_fields_for_targets_table', '')
+        except Exception as e: # make exception more specific
+            return f'bad request {e}', 400 # FIXME improve response
+
+        # we will be using calling_user.fsdb_secondary to interact with the db
+        # fsdb_secondary. Go to `commonl/__init__.py:class:fsdb_symlink_c` for
+        # more info
+        calling_user = flask_login.current_user._get_current_object()
+        calling_user.fsdb_secondary.set(
+            key = 'ui_preferred_fields_for_targets_table',
+            value = fields_to_store,
+        )
+        return flask.jsonify({ '_message': "the entry has been updated" })
 
 
 @bp.route('/allocation/<allocid>', methods = ['GET'])

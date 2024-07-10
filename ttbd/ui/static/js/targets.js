@@ -76,3 +76,107 @@ function js_acquire_selected_targets(checkboxes_class) {
     }
     acquire(targets);
 }
+
+
+/*
+* make an http request to store the custom fields of a user into their
+* secondary DB
+*
+* @param {custom_fields} str -> comma,separated,values,to,store
+*
+* return {void} -> on success it creates a green div with a success message on
+* the elements with class `.message`
+*
+*/
+async function save_custom_fields(custom_fields_list) {
+
+    let custom_fields_list_joined = custom_fields_list.join(',');
+
+    let r = await fetch('/ttb-v2/ui/targets/customize', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json'
+      },
+      body: JSON.stringify({
+        "ui_preferred_fields_for_targets_table": custom_fields_list_joined,
+      })
+    });
+
+    let b = await r.text();
+
+    if (r.status == 401) {
+        alert(
+            'oops, seems that you are not logged in. please log in to' +
+            ' acquire machines (top right corner)'
+        );
+        return
+    }
+
+    if (r.status != 200) {
+        alert(b);
+        return
+    }
+
+    $(".message").append("<div class='info info-green'>Successfully saved the following fields: <b>" + custom_fields_list_joined +  "</b></div>")
+
+}
+
+/*
+* store in secondary db selected (by checkbox) fields.
+*
+* for selecting the fields the table must have an input tag with the following
+* requirements.
+* - value shall be the field
+* - type shall be set to checkbox
+* - they must share the same class
+*
+*
+* @param {checkboxes_class} str -> class all the checkboxes representing the
+* checkboxes
+*
+* return {void}
+*/
+function js_save_custom_fields(checkboxes_class) {
+
+    let checkboxes = document.getElementsByClassName(checkboxes_class);
+    let custom_fields = new Array();
+
+    for (let i = 0; i < checkboxes.length; i++) {
+        if (checkboxes[i].checked) {
+            custom_fields.push(checkboxes[i].value);
+        }
+    }
+    save_custom_fields(custom_fields);
+}
+
+/*
+* Given a class, uncheck all the checkboxes found
+*
+* @param {checkboxes_class} str -> class all the checkboxes representing the
+* checkboxes
+*
+* return {void}
+*/
+function js_uncheck_all_checkboxes(checkboxes_class) {
+    let checkboxes = document.getElementsByClassName(checkboxes_class);
+    for (let i = 0; i < checkboxes.length; i++) {
+        checkboxes[i].checked = false;
+    }
+}
+
+/*
+* Given a table object (from DataTables) and an input tag with a pattern as its
+* value. Create a new row in that table with the pattern and a checkbox for it
+* to be selected
+*/
+function add_row_to_field_table(table, pattern_input_id) {
+    let pattern_input = document.getElementById(pattern_input_id);
+    let pattern = pattern_input.value;
+    table.row
+        .add([
+            "<input type='checkbox' id='" + pattern + "' name='" + pattern + "' value='" + pattern + "' class='ui_preferred_fields_for_targets_table' checked/>",
+            pattern,
+            'Custom Pattern'
+        ])
+        .draw();
+}
