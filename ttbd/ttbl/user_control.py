@@ -75,7 +75,7 @@ class User(object):
     state_dir = None
 
     def __init__(self, userid, fail_if_new = False, roles = None):
-        path = self.create_filename(userid)
+        path = self.create_filename(userid, self.state_dir)
         self.userid = userid
         if not os.path.isdir(path) and fail_if_new == False:
             commonl.rm_f(path)	# cleanup, just in case
@@ -201,12 +201,12 @@ class User(object):
         return User(userid)
 
     @staticmethod
-    def create_filename(userid):
+    def create_filename(userid, state_dir):
         """
         Makes a safe filename based on the user ID
         """
         filename = "_user_" + commonl.mkid(userid)
-        return os.path.join(User.state_dir, filename)
+        return os.path.join(state_dir, filename)
 
     @staticmethod
     def search_user(userid):
