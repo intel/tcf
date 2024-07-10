@@ -1305,7 +1305,7 @@ class test_target(object):
         l += self.fsdb.get_as_slist(*projections)
         r = commonl.flat_slist_to_dict(l)
 
-	# mandatory fields, override them all
+        # mandatory fields, override them all
         if commonl.field_needed('owner', projections):
             owner = self.owner_get()
             if owner:
