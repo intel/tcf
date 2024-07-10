@@ -436,6 +436,29 @@ function toggle(id) {
     inv.style.display = "none";
 }
 
+/**
+ * toggle visibilty of class elements
+ *
+ * modify html elements by class, switching the display tag to either, show the
+ * element or hide it.
+ *
+ * @param {id} var      id of element you want to toggle.
+ *
+ * @return {void}
+ */
+function toggle_class(class_name) {
+    let elements = document.getElementsByClassName(class_name);
+
+    for (let i = 0; i < elements.length; i++) {
+        if (elements[i].style.display === "none") {
+            elements[i].style.display = "block";
+            continue;
+        }
+        elements[i].style.display = "none";
+    }
+}
+
+
 
 /**
  * make inventory dialog appear
@@ -854,4 +877,14 @@ function flash_images_onchange_select(image_type) {
     } else {
         file_input_contiainer.style.display = 'none';
     }
+}
+
+function open_dialog_element_by_id(dialog_id){
+    let dialog_element = document.getElementById(dialog_id);
+    dialog_element.showModal();
+}
+
+function close_dialog_element_by_id(dialog_id){
+    let dialog_element = document.getElementById(dialog_id);
+    dialog_element.close();
 }
