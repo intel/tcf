@@ -306,3 +306,12 @@ hr {
     color: darkblue;
     margin-top: 0;
 }
+
+.dialog-inventory-details {
+    min-width: 50em;
+    border: 0;
+    box-shadow: 0 4px 8px 0 rgba(0,0,0,.2);
+    border-bottom-left-radius: 0.5em;
+    border-bottom-right-radius: 0.5em;
+    padding: 1em 2em;
+}

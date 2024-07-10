@@ -42,54 +42,83 @@ no permissions, use the <i>report issue</i> link above</p>
           </p>
         </span>
       </div>
+      <div class = "tooltip" style='margin-left: auto'>
+        <button class='secundary' onclick="toggle_class('table-cell-inventory-keys')">Toggle Keys</button>
+        <span class = "tooltiptext">
+           Toggle the visibility of the keys in the table, if you see no change, there are not keys in the table.
+        </span>
+      </div>
+      <div class = "tooltip" >
+        <button class='primary' onclick="location.href='/ttb-v2/ui/targets/customize';">Customize Table</button>
+        <span class = "tooltiptext">
+           Customize Table
+          <p>
+            Redirect to a another page where you will be able to customize the
+            columns on this table.
+            </p>
+        </span>
+      </div>
 </div>
 <hr>
 <table id='t-targets' class='display'>
 <thead>
   <tr>
-    <th>&nbsp;</td>
-    <th>target id</td>
-    <th>type</td>
-    <th>ipv4 address</td>
-    <th>mac address</td>
-    <th>owner</td>
+    <th>&nbsp;</th>
+    <th>target id</th>
+    {% for field in preferred_fields %}
+        <th>{{field}}</th>
+    {% endfor %}
   </tr>
 </thead>
 <tbody>
 
-  {% for k, v in targets.items() %}
+  {% for targetid, columns in targets.items() %}
   <tr>
-    <td> <input class='checkbox-acquire-target' value='{{k}}' type='checkbox'> </td>
-    <td> <a href='/ttb-v2/ui/target/{{k}}'>{{ k }}</td>
-    <td>{{ v.type }}</td>
-
-    <td>
-      {% if v.ip_short is defined %}  {# too long, shorten and tooltip #}
-        <div class = "tooltip">
-          {{v.ip_short}}
-          <span class = "tooltiptext">{{v.ip}}</span>
-        </div>
-      {% else %}	{# entry is short, no need to tooltip it #}
-        {{v.ip}}
-      {% endif %}
-    </td>
-
-    <td>
-      {% if v.mac_short is defined %}  {# too long, shorten and tooltip #}
-        <div class = "tooltip">
-          {{v.mac_short}}
-          <span class = "tooltiptext">{{v.mac}}</span>
-        </div>
-      {% else %}	{# entry is short, no need to tooltip it #}
-        {{v.mac}}
-      {% endif %}
-    </td>
-
-    {% if v.owner == 'available'%}
-        <td style='color: green;'>{{ v.owner }}</td>
-    {% else %}
-        <td style='color: red;'>{{ v.owner }}</td>
-    {% endif %}
+    <td> <input class='checkbox-acquire-target' value='{{targetid}}' type='checkbox'> </td>
+    <td> <a href='/ttb-v2/ui/target/{{targetid}}'>{{ targetid }}</td>
+    {% for field in preferred_fields %}
+        {% if columns[field] is mapping %}
+            {% if columns[field]['first_entries'] != None %}
+                <td>
+               {% for key, entry in columns[field]['first_entries']  %}
+                    <small class='table-cell-inventory-keys'>{{key}}:</small>
+                    <br>
+                    {{entry}}
+                    <br>
+               {% endfor %}
+                    <br>
+                    <dialog class='dialog-inventory-details' id='{{targetid}}-{{columns[field]}}'>
+                      <button autofocus onclick='close_dialog_element_by_id("{{targetid}}-{{columns[field]}}")'>Close</button>
+                        <br>
+                        <h2>{{targetid}}</h2>
+                        <h3>{{field}}</h3>
+                        <hr>
+                       {% for key, entry in columns[field]['all_entries'] %}
+                            <small class='table-cell-inventory-keys'>{{key}}:</small>
+                            <br>
+                            {{entry}}
+                            <br>
+                            <hr>
+                       {% endfor %}
+                    </dialog>
+                    <button class='show_more_info_inside_table' onclick='open_dialog_element_by_id("{{targetid}}-{{columns[field]}}")'>more...</button>
+                </td>
+            {% else %}
+            <td>
+               {% for key, entry in columns[field]['all_entries'] %}
+                    {% if columns[field]['all_entries']|length != 1 %}
+                        <small class='table-cell-inventory-keys'>{{key}}:</small>
+                        <br>
+                    {% endif %}
+                    {{entry}}
+                    <br>
+               {% endfor %}
+            </td>
+            {% endif %}
+        {% else %}
+            <td>-</td>
+        {% endif %}
+    {% endfor %}
   </tr>
   {% endfor %}
 </tbody>

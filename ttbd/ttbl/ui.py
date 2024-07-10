@@ -63,6 +63,7 @@ with this.
 """
 
 import collections
+import fnmatch
 import glob
 import logging
 import json
@@ -278,43 +279,94 @@ def _targets():
     '''
     targets = {}
     calling_user = flask_login.current_user._get_current_object()
+
+    try:
+        # query the user secondary db to see if he/she has preferred fields for the
+        # targets table, meaning specific columns he/she want to see
+        preferred_fields = \
+            calling_user.fsdb_secondary.get('ui_preferred_fields_for_targets_table')
+    except AttributeError:
+        preferred_fields = 'type,interconnects.*.ipv4_addr,interconnects.*.mac_addr,owner'
+    if preferred_fields in [None, ''] :
+        # user has not created custom fields, lets add some default ones.
+        preferred_fields = 'type,interconnects.*.ipv4_addr,interconnects.*.mac_addr,owner'
+        calling_user.fsdb_secondary.set(
+            key = 'ui_preferred_fields_for_targets_table',
+            value = preferred_fields,
+        )
+
+    preferred_fields = preferred_fields.split(',')
     for targetid, target in ttbl.config.targets.items():
         if not target.check_user_allowed(calling_user):
             continue
-
         target = ttbl.config.targets.get(targetid, None)
-        inventory = target.to_dict(list())
 
-        # TODO this will work once the healthcheck discovers this info
-        # disks = d.get('disks', {}).get('total_gib', 'undefined?')
-        # ram = d.get('ram', {}).get('size_gib', 'undefined?')
-        owner = inventory.get('owner', 'available')
+        # inventory_to_display is a list of tuples that looks something like:
+        # [('some_key', 'some_value'), ('other.key.name', 'value'),...  ]
+        inventory_to_display = commonl.dict_to_flat(
+            target.tags, preferred_fields, sort = False, empty_dict = True)
+        inventory_to_display += target.fsdb.get_as_slist(*preferred_fields)
 
-        target_type =  inventory.get('type', 'n/a')
-        if target_type == 'ethernet':
-            continue
+        # We now have in `inventory_to_display` all the info we will show in
+        # the different columns, the thing is, we do not know on which column
+        # to put each item. So we are going to use `fnmatch` to group them.  We
+        # will exec the regex on the entires and group together all those that
+        # match. Under a that looks like this
+        # targets = {
+        #   'target-1': {
+        #       'some_custom_field_*_that_groups_keys': {
+        #           'all_entires': [
+        #               ('some_custom_field_1_that_groups_keys', 'value'),
+        #               ('some_custom_field_2_that_groups_keys', 'other'),
+        #               ('some_custom_field_3_that_groups_keys', 'thing'),
+        #           ],
+        #       },
+        #       'other_field_*': {
+        #           'all_entires': [
+        #               ('other_field_a', 'jose'),
+        #               ('other_field_c', 'pedro'),
+        #           ],
+        #       },
+        #   },
+        #   'target-2': {
+        #   ...
+        # }
+        targets[targetid] = {}
+        for key, entry in inventory_to_display:
+            for preferred_field in preferred_fields:
+                regex = fnmatch.translate(preferred_field)
+                r = re.compile(regex)
+                m = r.match(key)
+                if m:
+                    if preferred_field not in targets[targetid]:
+                        targets[targetid][preferred_field] = {
+                            'all_entries': [(key, entry)],
+                        }
+                        continue
+                    targets[targetid][preferred_field]['all_entries'] += [(key, entry)]
 
-        # For network fields, collect them and if there is more than
-        # one network, prefix the network name
-        # FIXME: only if ipv4_addr in fields
-        ipv4_addr = _interconnect_values_render(inventory, "ipv4_addr")
-        mac_addr = _interconnect_values_render(inventory, "mac_addr")
-
-        targets[targetid] = {
-            'id': targetid,
-            'type': target_type,
-            'ip': ipv4_addr,
-            'mac': mac_addr,
-            'owner': owner,
-        }
-        # single IPs are at least 16 chars
-        short_field_maybe_add(targets[targetid], 'ip', 16)
-        # single MACs are at least 18 chars
-        short_field_maybe_add(targets[targetid], 'mac', 18)
+        for fields_group_name, fields in targets[targetid].items():
+            # if one fields_group_name has a lot of elements, the table cell
+            # will look messy with a bunch on the html.
+            # We want to just render the first entries and add a button to show
+            # all the info if needed.
+            #
+            # jinja can not break out of a loop, so if a group of fields is
+            # large enough (> `max_entries_to_render` entries).
+            #
+            # we add a new key to the dict, first_entires, we render those in
+            # the table html, and add everything else to a pop up
+            max_entries_to_render = 3
+            if len(fields['all_entries']) > max_entries_to_render:
+                targets[targetid][fields_group_name]['first_entries'] = \
+                                fields['all_entries'][:max_entries_to_render]
+                continue
+            targets[targetid][fields_group_name]['first_entries'] = None
 
     return flask.render_template(
         'targets.html',
         targets = targets,
+        preferred_fields = preferred_fields,
         servers_info = servers_info_get()
     )
 
