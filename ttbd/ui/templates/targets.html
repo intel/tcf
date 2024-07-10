@@ -132,6 +132,16 @@ $(document).ready( function () {
         scrollY: '70vh',
         scrollCollapse: true,
         paging: false,
+        columnDefs: [{
+            "targets": '_all',
+            "createdCell": function (td, cellData, rowData, row, col) {
+                $(td).css('padding', '0.2em')
+                $('br').css('display', 'block')
+                $('br').css('margin', '1px 0')
+                $(td).css('vertical-align', 'top')
+            }
+
+        }]
     });
 
 } );
