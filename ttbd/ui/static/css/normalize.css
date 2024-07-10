@@ -30,7 +30,7 @@ body {
     background-color: var(--body-bg-color);
     font-family: 'Helvetica', 'Arial';
     margin-top: 0;
-    max-width: 1080px;
+    max-width: 1280px;
     margin: 0 auto;
 }
 
@@ -42,6 +42,6 @@ body * + * {
 }
 
 .container {
-    max-width: 1080px;
+    max-width: 1280px;
     margin: 0 auto;
 }
