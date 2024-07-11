@@ -90,8 +90,11 @@ class User(object):
         if self.state_dir != self.state_dir_secondary:
             path_s = self.create_filename(userid, self.state_dir_secondary)
             if not os.path.isdir(path_s) and fail_if_new == False:
-                commonl.rm_f(path_s)	# cleanup, just in case
-                commonl.makedirs_p(path_s)
+                raise RuntimeError(
+                    f'{path_s} exists but it is not a directory, please'
+                     'consider erase it so ttbl/user_control can create it'
+                     'properly'
+                )
         try:
             self.fsdb = commonl.fsdb_symlink_c(path)
             if self.state_dir != self.state_dir_secondary:
