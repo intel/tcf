@@ -42,12 +42,12 @@ button:active {
     transition-duration: 0.1s;
 }
 
-.secundary {
+.secondary {
     background-color: skyblue;
     color: white;
 }
 
-.secundary:hover {
+.secondary:hover {
     background-color: royalblue;
     text-decoration: underline;
     color: white;
