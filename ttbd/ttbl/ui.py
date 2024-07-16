@@ -63,6 +63,7 @@ with this.
 """
 
 import collections
+import copy
 import fnmatch
 import glob
 import logging
@@ -835,7 +836,10 @@ def _get_images_paths(target: ttbl.test_target, inventory: dict, kws: dict):
         >>>     ...more
         >>> ]
     '''
-    images = dict(inventory.get('interfaces', {}).get('images', {}))
+    # don't just use dict, since that will use references for the
+    # levels under images and then we are modifying the tags, so the
+    # file_list stuff will bleed to the inventory
+    images = copy.deepcopy(inventory.get('interfaces', {}).get('images', {}))
     # `images_by_path` tell us the valid images types that are in each path
     # found in the server
     images_by_path = collections.defaultdict(dict)
