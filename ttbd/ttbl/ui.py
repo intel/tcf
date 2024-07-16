@@ -187,7 +187,23 @@ def servers_info_get():
         max_entries = 20,
         exclude_exceptions = [ Exception ])
     def _servers_info_get():
-        import tcfl.servers
+        import sys
+        try:
+            import tcfl.servers
+        except ModuleNotFoundError as e:
+            if 'tcfl' not in str(e):
+                raise
+            # Might be running from source __file__ => ensure we have
+            # the source path included so we can import tcfl.servers
+            # /home/USER/tcf.git/ttbd/ttbl/ui.py =>
+            # /home/USER/tcf.git, which has tcfl
+            topleveldir = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+            if topleveldir in sys.path:
+                raise		# dir is already there, something else
+            # add path and retry -- let the raise rip if there is
+            # another issue
+            sys.path.append(topleveldir)
+            import tcfl.servers
         import urllib.parse
         tcfl.servers.subsystem_setup()
         tcfl.servers._discover_bare()	# rediscover if oldish
