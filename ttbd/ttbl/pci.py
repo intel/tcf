@@ -62,14 +62,18 @@ def synth_fields_maker_pexusb3s44v(syspath: str, expensive: bool) -> dict:
     parent_syspath = os.path.dirname(device_syspath)
     vendor = ttbl._sysfs_read(parent_syspath + "/vendor")
     device = ttbl._sysfs_read(parent_syspath + "/device")
-    if vendor != "0x12d8" or device != "0x8608":
+    if vendor != "0x12d8":
+        return d
+    if  device != "0x8608" and device != "0x2608":
         return d
     parent_name = os.path.basename(parent_syspath)
 
     grandparent_syspath = os.path.dirname(parent_syspath)
     vendor = ttbl._sysfs_read(grandparent_syspath + "/vendor")
     device = ttbl._sysfs_read(grandparent_syspath + "/device")
-    if vendor != "0x12d8" or device != "0x8608":
+    if vendor != "0x12d8":
+        return d
+    if device != "0x8608" and device != "0x2608":
         return d
     grandparent_name = os.path.basename(grandparent_syspath)
 
