@@ -148,7 +148,7 @@ async function js_buttons(targetid, action, component) {
     window.location.reload()
 }
 
-function common_error_check(r) {
+function common_error_check(r, error_message) {
 
     if (r.status == 401) {
         alert(
@@ -160,7 +160,7 @@ function common_error_check(r) {
 
     if (!r.ok) {
         alert(
-            'something went wrong: ' + response_text
+            'something went wrong: ' + error_message
         );
         $('#loading').empty();
         $('#loading').append(
@@ -175,7 +175,7 @@ function common_error_check(r) {
 
 
 /*
-* Remove a guest from an allocation
+* Add a guest to an allocation
 *
 * @param {allocid} str -> allocation from which to remove the guest
 * @param {selector_id} str -> select tag html id which selected the user
@@ -209,7 +209,8 @@ async function js_alloc_guest_add(allocid, username) {
         method: 'PATCH',
     });
 
-    if (common_error_check(r)) {
+    let error_message = await r.text();
+    if (common_error_check(r, error_message)) {
         return
     }
 }
@@ -218,7 +219,8 @@ async function js_alloc_guest_add(allocid, username) {
 * Remove a guest from an allocation
 *
 * @param {allocid} str -> allocation from which to remove the guest
-* @param {selector_id} str -> select tag html id which selected the user
+* @param {selector_id} str -> select tag html id which selected
+*                             the user; if null, remove current user
 *
 * return {void}
 */
@@ -226,24 +228,28 @@ async function js_alloc_guest_remove(allocid, selector_id) {
 
     $('.diagnostics').empty();
 
-    // the selector_id element in the HTML document has picked up something
-    let selected_item = document.getElementById(selector_id);
-    if (selected_item == null) {
-        // this means do nothing
-        return
+    let user_name = "self"   // by default delete current user
+    if (selector_id != null) {
+        // the selector_id element in the HTML document has picked up something
+        let selected_item = document.getElementById(selector_id);
+        if (selected_item == null) {
+            // this means do nothing
+            return
+        }
+	user_name = selected_item.value;
+        if (user_name.value == 'None') {
+            // this means do nothing
+            return
+        }
     }
-    let user_name = selected_item.value;
 
-    if (user_name.value == 'None') {
-        // this means do nothing
-        return
-    }
 
     let r = await fetch('/ttb-v2/allocation/' + allocid + '/' + user_name, {
         method: 'DELETE',
     });
 
-    if (common_error_check(r)) {
+    let error_message = await r.text();
+    if (common_error_check(r, error_message)) {
         return
     }
 
@@ -334,8 +340,6 @@ async function js_images_flash(targetid, select_id, image_type, suffix) {
         body: data,
     });
 
-    let response_text = await r.text();
-
     if (r.status == 401) {
         alert(
             'oops, seems that you are not logged in. Please log in to' +
@@ -345,6 +349,7 @@ async function js_images_flash(targetid, select_id, image_type, suffix) {
     }
 
     if (!r.ok) {
+	let response_text = await r.text();
         alert(
             'something went wrong: ' + response_text
         );
