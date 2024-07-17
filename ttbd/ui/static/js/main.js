@@ -204,6 +204,20 @@ async function js_alloc_guest_add_from_input_field(allocid, input_field_id) {
     window.location.reload()
 }
 
+async function js_alloc_guest_add_sync(allocid, userid) {
+
+    $('.diagnostics').empty();
+
+    await js_alloc_guest_add(allocid, userid)
+
+    $('#loading').empty();
+    $('#loading').append(
+        '<b><label style="color: green;">SUCCESS</label></b>'
+    );
+
+    window.location.reload()
+}
+
 async function js_alloc_guest_add(allocid, username) {
     let r = await fetch('/ttb-v2/allocation/' + allocid + '/' + username, {
         method: 'PATCH',
