@@ -1306,6 +1306,8 @@ def _delete_guest(allocid, guestname):
                request = flask.request) as ao:
         try:
             user = flask_login.current_user._get_current_object()
+            if guestname == "self":
+                guestname = user.get_id()
             result = ttbl.allocation.guest_remove(allocid, user, guestname)
         except Exception as e:
             flask_logi_abort(400, "%s" % e, exc_info = True)
