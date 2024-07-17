@@ -78,7 +78,7 @@
 
     {% elif state.user_is_guest %}
       <div class = "tooltip">
-        <button class='warning' onclick='js_alloc_remove("{{state.alloc}}")'>remove myself as a guest</button>
+        <button class='warning' onclick='js_alloc_guest_remove("{{state.alloc}}", null)'>remove myself as a guest</button>
         <span class = "tooltiptext">
           You ({{ state.user }}) are a <b>guest</b> in this
           target's allocation.
@@ -90,7 +90,7 @@
           </p>
           <p>
             On the command line, you can use:
-            <pre><code class="language-bash">$ tcf release {{ targetid }} </code></pre>
+            <pre><code class="language-bash">$ tcf guest-rm {{ state.alloc }} {{ state.user }}</code></pre>
           </p>
         </span>
       </div>

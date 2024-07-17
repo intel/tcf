@@ -55,7 +55,7 @@ ttbd's /ttb-v2/ui/allocation.
           <div class='subsection'>
             <div class="tooltip">
 
-                <button class='secondary' onclick='js_alloc_remove("{{allocid}}")'>
+                <button class='secondary' onclick='js_alloc_guest_remove("{{allocid}}", null)'>
                     remove myself as guest
                 </button>
 
@@ -70,7 +70,7 @@ ttbd's /ttb-v2/ui/allocation.
                     </p>
                     <p>
                         On the command line, you can use:
-                        <pre><code class="language-bash">$ tcf guest-rm {{ state.user }}
+                        <pre><code class="language-bash">$ tcf guest-rm {{ allocid }} {{ state.user }}
                         </code></pre>
                     </p>
                 </span>
