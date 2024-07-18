@@ -589,6 +589,7 @@ class interface(ttbl.tt_interface):
         estimated_duration = 0
         check_period = 4
         all_images = [ ]
+        filenames = set()
         for impl, images in list(parallel.items()):
             context = dict()
             context['ts0'] = time.time()
@@ -598,6 +599,7 @@ class interface(ttbl.tt_interface):
             check_period = min(impl.check_period, check_period)
             all_images += images.keys()
             for image_name, filename in images.items():
+                filenames.add(filename)
                 # Ensure the files are accessile
                 #
                 # For files that are in automount directories, and for
@@ -627,6 +629,21 @@ class interface(ttbl.tt_interface):
         done_impls = set()
         while ts - ts0 < estimated_duration:
             target.timestamp()	# timestamp so we don't idle...
+
+            # sometimes files are in dynamically mounted
+            # directories -- avoid they being mounted in very long
+            # flash process -- some tools are just not good at
+            # telling the system they are active
+            for filename in filenames:
+                try:
+                    os.stat(filename)
+                    target.log.info(
+                        "flashing: stating file %s", filename)
+                except Exception as e:
+                    target.log.warning(
+                        "flashing: (ignoring) exception stating file %s: %s",
+                        filename, exception)
+
             time.sleep(check_period)
             for impl, images in parallel.items():
                 if impl in done_impls:	# already completed? skip
