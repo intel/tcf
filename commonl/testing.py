@@ -668,7 +668,6 @@ host = '127.0.0.1'
                     ssl_verify = self.use_ssl,
                     origin = "unit test run")
                 tcfl.server_c.servers[self.server.url] = self.server
-                self.server.setup()
                 # let's see if we get the basic ttb endpoint working
                 #
                 # meaning the server is up and running
