@@ -299,6 +299,8 @@ def _guest_add(_server_name: str, server: tcfl.server_c,
                guests: list):
 
     for guest in guests:
+        if guest == "self":
+            guest = server.logged_in_username()
         try:
             r = server.send_request("PATCH", "allocation/%s/%s"
                                     % (allocid, guest))
@@ -331,6 +333,8 @@ def _cmdline_guest_add(cli_args: argparse.Namespace):
     else:
         servers = tcfl.server_c.servers
 
+    if not cli_args.guests:	# if no args, add current user
+        cli_args.guests = [ "self" ]
     retval, r = tcfl.ui_cli.run_fn_on_each_server(
         servers,
         _guest_add, cli_args, allocid, cli_args.guests)
@@ -374,6 +378,8 @@ def _guest_rm(_server_name: str, server: tcfl.server_c,
                      server.url, " ".join(guests))
 
     for guest in guests:
+        if guest == "self":
+            guest = server.logged_in_username()
         try:
             r = server.send_request("DELETE", f"allocation/{allocid}/{guest}")
             logger.info("%s: removed guest %s from allocation %s",
@@ -586,10 +592,11 @@ def cmdline_setup_intermediate(arg_subparser):
         action = "store", default = None,
         help = "Allocation IDs to which to add guest to")
     ap.add_argument(
-        "guests", metavar = "USERNAME", nargs = "+",
+        "guests", metavar = "USERNAME", nargs = "*",
         action = "store", default = None,
         help = "Name of guest to add; note this is the names"
-        " the users logged in with")
+        " the users logged in with; use *self* for yourself."
+        " If none specifies, adds the calling user")
     ap.set_defaults(func = _cmdline_guest_add)
 
 
@@ -611,7 +618,7 @@ def cmdline_setup_intermediate(arg_subparser):
         action = "store", default = None,
         help = "Names of guests to remove; note this is the names"
         " the users logged in with. If none given, all guests"
-        " will be removed.")
+        " will be removed. Use *self* to remove current user.")
     ap.set_defaults(func = _cmdline_guest_rm)
 
 
