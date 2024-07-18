@@ -17,6 +17,7 @@ learn more about them):
 """
 
 import argparse
+import collections
 import logging
 import os
 import sys
@@ -294,50 +295,79 @@ def _aka_allocid_extract(allocid: str):
 
 
 
-def _guest_add(_server_name: str, server: tcfl.server_c,
-               _cli_args: argparse.Namespace, allocid: str,
+def _guest_add(server_name: str, server: tcfl.server_c,
+               _cli_args: argparse.Namespace, allocids_by_server: dict,
                guests: list):
 
-    for guest in guests:
-        if guest == "self":
-            guest = server.logged_in_username()
-        try:
-            r = server.send_request("PATCH", "allocation/%s/%s"
-                                    % (allocid, guest))
-            logger.info("%s: added guest %s to allocation %s",
-                        server.url, guest, allocid)
-            return r
-        except Exception as e:
-            if "invalid allocation" not in str(e):
-                raise
-            # convert this condition so we don't trigger error
-            # handling in run_fn_on_each_server--we have basically
-            # tried every server for the allocid and if it says I
-            # can't find it, it's fine
-            return None
+    r = {}
+    for allocid in allocids_by_server[server_name]:
+        for guest in guests:
+            if guest == "self":
+                guest = server.logged_in_username()
+            try:
+                r[allocid + guest] = server.send_request(
+                    "PATCH", "allocation/%s/%s" % (allocid, guest))
+                logger.info("%s: added guest %s to allocation %s",
+                            server.url, guest, allocid)
+            except Exception as e:
+                if "invalid allocation" not in str(e):
+                    raise
+                # convert this condition so we don't trigger error
+                # handling in run_fn_on_each_server--we have basically
+                # tried every server for the allocid and if it says I
+                # can't find it, it's fine
+                r[allocid + guest] = None
+    return r
 
 
 def _cmdline_guest_add(cli_args: argparse.Namespace):
     import tcfl.servers
 
+    cli_args.verbosity += 1	# we want to default to have warnings
     verbosity = tcfl.ui_cli.logger_verbosity_from_cli(logger, cli_args)
     tcfl.servers.subsystem_setup()
+    # are we addressing by allocid or by targets
+    if cli_args.target:
+        tcfl.targets.setup_by_spec(
+            [ cli_args.allocid ],	# we callit allocid but here is a targetspec
+            verbosity = verbosity,
+            project = { "_alloc.id" }, targets_all = True)
+        # only brings up servers that have those targets
+    else:
+        tcfl.servers.subsystem_setup()
 
     if not tcfl.server_c.servers:
         logger.error("E: no servers available? did you discover?")
         return 1
 
-    server, allocid = _aka_allocid_extract(cli_args.allocid)
-    if server:
-        servers = { server.url: server }
-    else:
-        servers = tcfl.server_c.servers
-
     if not cli_args.guests:	# if no args, add current user
         cli_args.guests = [ "self" ]
+
+    allocids_by_server = collections.defaultdict(set)
+    if cli_args.target:
+        # when we have targets we know what server and allocid, so we
+        # don't need to fire requests to all servers
+
+        for target_id, rt_flat in tcfl.rts_flat.items():
+            allocid = rt_flat.get('_alloc.id', None)
+            if allocid == None:
+                logger.warning("%s: ignoring, not acquried", target_id)
+
+            allocids_by_server[rt_flat['server']].add(allocid)
+
+    else:
+
+        server, allocid = _aka_allocid_extract(cli_args.allocid)
+        if server:
+            allocids_by_server = { server.url: { allocid } }
+        else:
+            # fire it to all servers
+            for server in tcfl.server_c.servers:
+                allocids_by_server[server] = { allocid }
+
     retval, r = tcfl.ui_cli.run_fn_on_each_server(
-        servers,
-        _guest_add, cli_args, allocid, cli_args.guests)
+        allocids_by_server,
+        _guest_add, cli_args, allocids_by_server, cli_args.guests)
 
     # r is not a dict { SERVERURL : ( GUESTLIST, EXCEPTION, TRACEBACK
     # ) } however, the allocation IDs are unique to a server, so in
@@ -346,18 +376,17 @@ def _cmdline_guest_add(cli_args: argparse.Namespace):
     # them all
     guests = []
     invalid_allocations = 0
+    total_allocations = 0
     for serverurl, ( data, ex, _ex_traceback ) in list(r.items()):
         if ex:			# reported by tcfl.ui_cli.run_fn_on_each_server
             del r[serverurl]
-        if data == None:	# from _guest_add()
-            invalid_allocations += 1
-        elif isinstance(data, dict):
-            pass		# we are good
-        else:
-            logger.error(f"%s: unknown response type: %s, expected list[str]",
-                           serverurl, type(guestlist))
+        # data is { ALLOCID: retval, ALLOCID: retval... } from _guest_add()
+        for allocid, alloc_data in data.items():
+            total_allocations += 1
+            if alloc_data == None:
+                invalid_allocations += 1
 
-    if invalid_allocations == len(r):
+    if total_allocations == invalid_allocations:
         # all failed with invalid allocation, so it's an invalid alloc
         logger.error(f"{cli_args.allocid}: invalid allocation")
         return 1
@@ -365,55 +394,81 @@ def _cmdline_guest_add(cli_args: argparse.Namespace):
 
 
 
-def _guest_rm(_server_name: str, server: tcfl.server_c,
-               _cli_args: argparse.Namespace, allocid: str,
+def _guest_rm(server_name: str, server: tcfl.server_c,
+               _cli_args: argparse.Namespace, allocids_by_server: dict,
                guests: list):
-    if not guests:
-        logging.info("%s: no guests given, removing all; listing first",
-                     server.url)
-        # no guests given, remove'em all -- so list them first
-        r = server.send_request("GET", f"allocation/{allocid}")
-        guests = r.get('guests', [])
-        logging.info("%s: no guests given, found guests: %s",
-                     server.url, " ".join(guests))
+    r = {}
+    for allocid in allocids_by_server[server_name]:
+        if not guests:
+            logging.info("%s: no guests given, removing all; listing first",
+                         server.url)
+            # no guests given, remove'em all -- so list them first
+            rls = server.send_request("GET", f"allocation/{allocid}")
+            guests = rls.get('guests', [])
+            logging.info("%s: no guests given, found guests: %s",
+                         server.url, " ".join(guests))
 
-    for guest in guests:
-        if guest == "self":
-            guest = server.logged_in_username()
-        try:
-            r = server.send_request("DELETE", f"allocation/{allocid}/{guest}")
-            logger.info("%s: removed guest %s from allocation %s",
-                        server.url, guest, allocid)
-        except Exception as e:
-            if "invalid allocation" not in str(e):
-                raise
-            # convert this condition so we don't trigger error
-            # handling in run_fn_on_each_server--we have basically
-            # tried every server for the allocid and if it says I
-            # can't find it, it's fine
-            return None
-    return guests
+        for guest in guests:
+            if guest == "self":
+                guest = server.logged_in_username()
+            try:
+                r[allocid + guest] = server.send_request("DELETE", f"allocation/{allocid}/{guest}")
+                logger.info("%s: removed guest %s from allocation %s",
+                            server.url, guest, allocid)
+            except Exception as e:
+                if "invalid allocation" not in str(e):
+                    raise
+                # convert this condition so we don't trigger error
+                # handling in run_fn_on_each_server--we have basically
+                # tried every server for the allocid and if it says I
+                # can't find it, it's fine
+                r[allocid + guest] = None
+    return r
 
 
 def _cmdline_guest_rm(cli_args: argparse.Namespace):
     import tcfl.servers
 
+    cli_args.verbosity += 1	# we want to default to have warnings
     verbosity = tcfl.ui_cli.logger_verbosity_from_cli(logger, cli_args)
-    tcfl.servers.subsystem_setup()
 
+    # are we addressing by allocid or by targets
+    if cli_args.target:
+        tcfl.targets.setup_by_spec(
+            [ cli_args.allocid ],	# we callit allocid but here is a targetspec
+            verbosity = verbosity,
+            project = { "_alloc.id" }, targets_all = True)
+        # only brings up servers that have those targets
+    else:
+        tcfl.servers.subsystem_setup()
     if not tcfl.server_c.servers:
         logger.error("E: no servers available? did you discover?")
         return 1
 
-    server, allocid = _aka_allocid_extract(cli_args.allocid)
-    if server:
-        servers = { server.url: server }
+    allocids_by_server = collections.defaultdict(set)
+    if cli_args.target:
+        # when we have targets we know what server and allocid, so we
+        # don't need to fire requests to all servers
+
+        for target_id, rt_flat in tcfl.rts_flat.items():
+            allocid = rt_flat.get('_alloc.id', None)
+            if allocid == None:
+                logger.warning("%s: ignoring, not acquried", target_id)
+
+            allocids_by_server[rt_flat['server']].add(allocid)
+
     else:
-        servers = tcfl.server_c.servers
+        server, allocid = _aka_allocid_extract(cli_args.allocid)
+        if server:
+            allocids_by_server = { server.url: { allocid } }
+        else:
+            # fire it to all servers
+            for server in tcfl.server_c.servers:
+                allocids_by_server[server] = { allocid }
 
     retval, r = tcfl.ui_cli.run_fn_on_each_server(
-        servers,
-        _guest_rm, cli_args, allocid, cli_args.guests)
+        allocids_by_server,
+        _guest_rm, cli_args, allocids_by_server, cli_args.guests)
 
     # r is not a dict { SERVERURL : ( GUESTLIST, EXCEPTION, TRACEBACK
     # ) } however, the allocation IDs are unique to a server, so in
@@ -421,19 +476,18 @@ def _cmdline_guest_rm(cli_args: argparse.Namespace):
     # expand this in the future to dif server, same allocid, we scan
     # them all
     guests = []
+    total_allocations = 0
     invalid_allocations = 0
     for serverurl, ( data, ex, _ex_traceback ) in list(r.items()):
         if ex:			# reported by tcfl.ui_cli.run_fn_on_each_server
             del r[serverurl]
-        if data == None:	# from _guest_rm()
-            invalid_allocations += 1
-        elif isinstance(data, list):
-            pass		# we are good
-        else:
-            logger.error(f"%s: unknown response type: %s, expected list[str]",
-                           serverurl, type(guestlist))
+        # data is { ALLOCID: retval, ALLOCID: retval... } from _guest_rm()
+        for allocid, allocid_data in data.items():
+            total_allocations += 1
+            if allocid_data == None:
+                invalid_allocations += 1
 
-    if invalid_allocations == len(r):
+    if total_allocations == invalid_allocations:
         # all failed with invalid allocation, so it's an invalid alloc
         logger.error(f"{cli_args.allocid}: invalid allocation")
         return 1
@@ -441,17 +495,20 @@ def _cmdline_guest_rm(cli_args: argparse.Namespace):
 
 
 
-def _guests_list(_server_name: str, server: tcfl.server_c,
-                 _cli_args: argparse.Namespace, allocid: str):
-    try:
-        r = server.send_request("GET", "allocation/%s" % allocid)
-    except Exception as e:
-        if "invalid allocation" not in str(e):
-            raise
-        # convert this condition so we don't trigger error handling in
-        # run_fn_on_each_server
-        return None
-    return r.get('guests', [])
+def _guests_list(server_name: str, server: tcfl.server_c,
+                 _cli_args: argparse.Namespace, allocids_by_server: dict):
+    guest_list_by_allocid = {}
+    for allocid in allocids_by_server[server_name]:
+        try:
+            r = server.send_request("GET", "allocation/%s" % allocid)
+            guest_list_by_allocid[allocid] = r.get('guests', [])
+        except Exception as e:
+            if "invalid allocation" not in str(e):
+                raise
+            # convert this condition so we don't trigger error handling in
+            # run_fn_on_each_server
+            guest_list_by_allocid[allocid] = None
+    return guest_list_by_allocid
 
 
 def _cmdline_guest_ls(cli_args: argparse.Namespace):
@@ -460,52 +517,77 @@ def _cmdline_guest_ls(cli_args: argparse.Namespace):
     verbosity = tcfl.ui_cli.logger_verbosity_from_cli(logger, cli_args)
     tcfl.servers.subsystem_setup()
 
+    # are we addressing by allocid or by targets
+    if cli_args.target:
+        tcfl.targets.setup_by_spec(
+            [ cli_args.allocid ],	# we callit allocid but here is a targetspec
+            verbosity = verbosity,
+            project = { "_alloc.id" }, targets_all = True)
+        # only brings up servers that have those targets
+    else:
+        tcfl.servers.subsystem_setup()
+
     if not tcfl.server_c.servers:
         logger.error("E: no servers available? did you discover?")
         return 1
 
-    server, allocid = _aka_allocid_extract(cli_args.allocid)
-    if server:
-        servers = { server.url: server }
-    else:
-        servers = tcfl.server_c.servers
+    allocids_by_server = collections.defaultdict(set)
+    if cli_args.target:
+        # when we have targets we know what server and allocid, so we
+        # don't need to fire requests to all servers
+
+        for target_id, rt_flat in tcfl.rts_flat.items():
+            allocid = rt_flat.get('_alloc.id', None)
+            if allocid == None:
+                logger.warning("%s: ignoring, not acquried", target_id)
+
+            allocids_by_server[rt_flat['server']].add(allocid)
+
+    else:	# [SERVERAKA/]ALLOCID
+        server, allocid = _aka_allocid_extract(cli_args.allocid)
+        if server:
+            allocids_by_server = { server.url: { allocid } }
+        else:
+            # fire it to all servers
+            for server in tcfl.server_c.servers:
+                allocids_by_server[server] = { allocid }
 
     retval, r = tcfl.ui_cli.run_fn_on_each_server(
-        servers,
-        _guests_list, cli_args, allocid)
+        allocids_by_server,
+        _guests_list, cli_args, allocids_by_server)
 
     # r is not a dict { SERVERURL : ( GUESTLIST, EXCEPTION, TRACEBACK
     # ) } however, the allocation IDs are unique to a server, so in
     # theory we should get an entry for only one server--in case we
     # expand this in the future to dif server, same allocid, we scan
     # them all
-    guests = []
     invalid_allocations = 0
-    for serverurl, ( guestlist, ex, _ex_traceback ) in list(r.items()):
+    guests = {}
+    for serverurl, ( guest_list_by_allocid, ex, _ex_traceback ) in r.items():
         if ex:			# reported by tcfl.ui_cli.run_fn_on_each_server
             del r[serverurl]
-        if guestlist == None:	# from _guest_list()
+        if not guest_list_by_allocid:	# from _guest_list()
             invalid_allocations += 1
-        elif isinstance(guestlist, list):
-            guests += guestlist
-        else:
-            logger.error(f"%s: unknown response type: %s, expected list[str]",
-                           serverurl, type(guestlist))
+        for allocid, guest_list in guest_list_by_allocid.items():
+            if verbosity < 2:
+                print(allocid + ": " + " ".join(sorted(guest_list)))
+            elif verbosity == 2:
+                guests[allocid] = sorted(guest_list)
+            elif verbosity >= 3:
+                guests[allocid] = sorted(guest_list)
+
+    if verbosity == 2:
+        import pprint
+        pprint.pprint(guests, indent = True)
+    if verbosity >= 3:
+        import json
+        json.dump(guests, sys.stdout, indent = True)
+        print()
 
     if invalid_allocations == len(r):
         # all failed with invalid allocation, so it's an invalid alloc
         logger.error(f"{cli_args.allocid}: invalid allocation")
         return 1
-    guests.sort()
-
-    if verbosity < 2:
-        print("\n".join(guests))
-    elif verbosity == 2:
-        import pprint
-        pprint.pprint(guests, indent = True)
-    elif verbosity >= 3:
-        import json
-        json.dump(guests, sys.stdout, indent = True)
 
     return retval
 
@@ -588,15 +670,19 @@ def cmdline_setup_intermediate(arg_subparser):
         action = "store", type = int, default = -4,
         help = "(advanced) parallelization factor")
     ap.add_argument(
-        "allocid", metavar = "[SERVERAKA/]ALLOCATIONID",
+        "--target", "-t",
+        action = "store_true", default = False,
+        help = "filter by targetspec, not ALLOCID")
+    ap.add_argument(
+        "allocid", metavar = "[SERVERAKA/]ALLOCATIONID|TARGETSPEC",
         action = "store", default = None,
-        help = "Allocation IDs to which to add guest to")
+        help = "Allocation IDs to which to add guest to; if -t, TARGETSPEC")
     ap.add_argument(
         "guests", metavar = "USERNAME", nargs = "*",
         action = "store", default = None,
         help = "Name of guest to add; note this is the names"
         " the users logged in with; use *self* for yourself."
-        " If none specifies, adds the calling user")
+        " If none specifies, adds the calling user.")
     ap.set_defaults(func = _cmdline_guest_add)
 
 
@@ -610,9 +696,13 @@ def cmdline_setup_intermediate(arg_subparser):
         action = "store", type = int, default = -4,
         help = "(advanced) parallelization factor")
     ap.add_argument(
-        "allocid", metavar = "[SERVERAKA/]ALLOCATIONID",
+        "--target", "-t",
+        action = "store_true", default = False,
+        help = "filter by targetspec, not ALLOCID")
+    ap.add_argument(
+        "allocid", metavar = "[SERVERAKA/]ALLOCATIONID|TARGETSPEC",
         action = "store", default = None,
-        help = "Allocation IDs to which to add guest to")
+        help = "Allocation IDs to which to remove guest from; if -t, TARGETSPEC")
     ap.add_argument(
         "guests", metavar = "USERNAME", nargs = "*",
         action = "store", default = None,
@@ -632,9 +722,13 @@ def cmdline_setup_intermediate(arg_subparser):
         action = "store", type = int, default = -4,
         help = "(advanced) parallelization factor")
     ap.add_argument(
-        "allocid", metavar = "[SERVER/]ALLOCATIONID",
+        "--target", "-t",
+        action = "store_true", default = False,
+        help = "filter by targetspec, not ALLOCID")
+    ap.add_argument(
+        "allocid", metavar = "[SERVERAKA/]ALLOCATIONID|TARGETSPEC",
         action = "store", default = None,
-        help = "Allocation IDs to which to add guest to")
+        help = "Allocation IDs to list to add guest to; if -t, TARGETSPEC")
     ap.set_defaults(func = _cmdline_guest_ls)
 
 
