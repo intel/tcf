@@ -137,7 +137,7 @@ class interface(ttbl.tt_interface):
     survive_reboots = False
 
 
-    def __init__(self, key_size = 2048):
+    def __init__(self, key_size = 4096):
         ttbl.tt_interface.__init__(self)
         self.key_size = key_size
 
