@@ -466,6 +466,11 @@ def _cmdline_guest_rm(cli_args: argparse.Namespace):
             for server in tcfl.server_c.servers:
                 allocids_by_server[server] = { allocid }
 
+    if cli_args.all:	# if --all, remove all users, set it to empty
+        cli_args.guests = [ ]
+    elif not cli_args.guests:	# if no args, remove current user
+        cli_args.guests = [ "self" ]
+
     retval, r = tcfl.ui_cli.run_fn_on_each_server(
         allocids_by_server,
         _guest_rm, cli_args, allocids_by_server, cli_args.guests)
@@ -696,6 +701,10 @@ def cmdline_setup_intermediate(arg_subparser):
         action = "store", type = int, default = -4,
         help = "(advanced) parallelization factor")
     ap.add_argument(
+        "--all", "-a",
+        action = "store_true", default = False,
+        help = "remove all guests")
+    ap.add_argument(
         "--target", "-t",
         action = "store_true", default = False,
         help = "filter by targetspec, not ALLOCID")
@@ -707,8 +716,8 @@ def cmdline_setup_intermediate(arg_subparser):
         "guests", metavar = "USERNAME", nargs = "*",
         action = "store", default = None,
         help = "Names of guests to remove; note this is the names"
-        " the users logged in with. If none given, all guests"
-        " will be removed. Use *self* to remove current user.")
+        " the users logged in with. If none given or *self* specified"
+        " will remove current user.")
     ap.set_defaults(func = _cmdline_guest_rm)
 
 
