@@ -11,7 +11,7 @@ button {
     border: 1px solid rgba(27, 31, 35, 0.15);
     border-radius: 0.4em;
     box-shadow: rgba(27, 31, 35, 0.04) 0 1px 0, rgba(255, 255, 255, 0.25) 0 1px 0 inset;
-    padding: 0.5em 0.5em;
+    padding: 0.15em 0.55em;
     margin: 0 0.5em;
     font-weight: 500;
     cursor: pointer;
