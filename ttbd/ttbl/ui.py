@@ -514,6 +514,45 @@ def _target_button_get(target: ttbl.test_target, inventory: dict, kws: dict):
     return buttons_component_description
 
 
+
+def _target_tunnel_collect(target, inventory, state):
+    state['server_ips'] = commonl.local_ip_addrs_cached()
+    state['target_ips'] = {}
+    boot_ic_name = inventory.get('pos', {}).get(
+        'boot_interconnect',
+        inventory.get('pos_boot_interconnect', None))
+    if boot_ic_name:
+        boot_ic = inventory['interconnects'][boot_ic_name]
+        boot_ip_addr = boot_ic.get('ipv4_addr', boot_ic.get('ipv6_addr', None))
+        if boot_ip_addr:
+            state['target_ips'][boot_ip_addr] = boot_ic_name
+        state['tunnel_boot_ip_addr'] = boot_ip_addr
+    else:
+        state['tunnel_boot_ip_addr'] = None
+    for ic, ic_data in inventory.get('interconnects', {}).items():
+        for k, v in ic_data.items():
+            if k not in ('ipv4_addr', 'ipv6_addr'):
+                continue
+            if v in state['target_ips']:
+                continue
+            state['target_ips'][v] = ic
+    if hasattr(target, 'tunnel'):
+        tunnels = []
+        for tunnel_id in target.fsdb.keys('interfaces.tunnel.*.protocol'):
+            local_port = tunnel_id[len('interfaces.tunnel.'):-len('.protocol')]
+            protocol = target.fsdb.get('interfaces.tunnel.%s.protocol' % local_port)
+            ip_addr = target.fsdb.get('interfaces.tunnel.%s.ip_addr' % local_port)
+            ip_addr = ip_addr.replace('_', '.')
+            port = target.fsdb.get('interfaces.tunnel.%s.port' % local_port)
+            tunnels.append((protocol, ip_addr, port, local_port))
+        return tunnels
+    else:
+        tunnels = None
+        return tunnels
+
+
+
+
 @bp.route('/target/<targetid>', methods = ['GET'])
 @flask_login.login_required
 def _target(targetid):
@@ -620,6 +659,7 @@ def _target(targetid):
     #   ...more
     consoles = dict(inventory.get('interfaces', {}).get('console', {}))
 
+    tunnels = _target_tunnel_collect(target, inventory, state)
     return flask.render_template(
         'target.html',
         targetid = targetid,
@@ -631,6 +671,7 @@ def _target(targetid):
         paths_for_all_images_types = paths_for_all_images_types,
         buttonls = buttons_component_description,
         servers_info = servers_info_get(),
+        tunnels = tunnels,
     )
 
 @bp.route('/targets/customize', methods = ['GET', 'POST'])

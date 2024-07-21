@@ -278,6 +278,45 @@ async function js_alloc_guest_remove(allocid, selector_id) {
 
 
 /*
+* Remove a tunnel
+*
+* @param {targetid} str -> target id to which you want to flash
+* @param {port} int -> port in the target that terminates the tunnel
+* @param {protocol} str -> tunnel's protocol
+* @param {ip_addr} str -> target's IP address
+*
+* return {void}
+*/
+async function js_tunnel_remove(targetid, port, protocol, ip_addr) {
+
+    $('.diagnostics').empty();
+    let data = new URLSearchParams();
+    data.append('port', port);
+    data.append('protocol', protocol);
+    data.append('ip_addr', ip_addr);
+
+    let r = await fetch('/ttb-v2/targets/' + targetid + '/tunnel/tunnel', {
+        method: 'DELETE',
+	body: data,
+    });
+
+    let error_message = await r.text();
+    if (common_error_check(r, error_message)) {
+        return;
+    }
+
+    $('#loading').empty();
+    $('#loading').append(
+        '<b><label style="color: green;">SUCCESS</label></b>'
+    );
+
+    window.location.reload();
+}
+
+
+
+
+/*
 * make a flashing call given a version and an image type
 *
 * note: if the `version` gotten from the select is `upload` we will call the
