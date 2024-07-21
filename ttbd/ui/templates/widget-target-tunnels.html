@@ -65,6 +65,96 @@
       </tr>
       {% endfor %}
 
+      <!-- Add row -->
+      <tr>
+        <td>
+          <div>
+            <select name="proto" required id = "input_field_id_tunnel_add_protocol">
+              <option value='tcp4' selected>TCP</option>
+              <option value='udp4'>UDP</option>
+              <option value='sctp4'>SCTP</option>
+              <option value='tcp6'>TCP IPv6</option>
+              <option value='udp6'>UCP IPv6</option>
+              <option value='sctp6'>SCTP IPv6</option>
+            </select>
+          </div>
+        </td>
+
+        <td style='color: gray;'>
+          <div class = "tooltip">
+            <input type = "int" size = 5 id = "input_field_id_tunnel_add_port"
+                   name = "port_number"
+                   list = "input_field_id_tunnel_add_port_examples"
+                   placeholder = "PORT"
+                   required>
+            <datalist id = "input_field_id_tunnel_add_port_examples">
+              <option value="22">SSH (22)</option>
+              <option value="23">Telnet (23)</option>
+              <option value="80">HTTP (80)</option>
+              <option value="443">HTTPS (443)</option>
+              <option value="5900">VNC:0 (5900)</option>
+              <option value="5901">VNC:1 (5901)</option>
+            </datalist>
+            <span class = "tooltiptext">
+              Port where to connect to in the target.
+              <p>
+                For example, to be able to connect to a target's
+                SSH port, you would specify TCP (or TCP IPv6) and
+                port number 22.
+              </p>
+            </span>
+          </div>
+        </td>
+
+        <td style='color: gray;'>
+          <div class = "tooltip">
+            <!-- FIXME: convert this to a drop down of known IP
+            addresses from interconnects.*.ipv*_addr, leaving
+            space for others since we might not know them ahead of
+            time -->
+
+            <input type = "text" size = 17 id = "input_field_id_tunnel_add_ip_addr"
+                   list = "input_field_id_tunnel_add_ip_addrs"
+                   placeholder = "select/enter IP address"
+                   required>
+            <datalist id = "input_field_id_tunnel_add_ip_addrs">
+              {% for ip_addr, ic_name  in state.target_ips.items() %}
+              <option value="{{ ip_addr }}">{{ ip_addr }} on <a href='/ttb-v2/ui/target/{{ic_name}}'>{{ ic_name }}</a></option>
+              {% endfor %}
+            </datalist>
+            <span class = "tooltiptext">
+              IP addresses for the target in the hidden network.
+              <p>
+                The server needs to have access to this IP
+                address. If there is a list of IP addresses
+                configured in the inventory, they will be
+                available to select. This usually happens in
+                static IP address configurations or in fixed DHCP
+                MAC-to-IP mappings.
+              </p>
+              <p>
+                Otherwise, you need to enter the IP address after
+                finding it from the target.
+              </p>
+            </span>
+          </div>
+        </td>
+
+        <td style='color: gray;'>
+          <div class = "tooltip">
+            <button class = 'primary' onclick = 'js_tunnel_add_from_input_field("{{targetid}}", "input_field_id_tunnel_add")'>+</button>
+            <span class = "tooltiptext">
+              Add a new tunnel to this target
+              <p>
+                On the command line, you can use:
+                <pre><code class="language-bash">$ tcf tunnel-add {{ targetid }} PORT [PROTOCOL [IPADDR]]</code></pre>
+              </p>
+            </span>
+          </div>
+        </td>
+
+      </tr>
+
     </table>
   {% endif %}
 </div>		<!-- network tunnels -->
