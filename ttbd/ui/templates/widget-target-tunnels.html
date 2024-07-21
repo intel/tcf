@@ -1,0 +1,71 @@
+<!-- this is start of file ui/widget-target-tunnels.html -->
+
+<div class='status'>
+  {% if tunnels is none %}
+    <h4 class='info info-grey'>network tunnels: not supported</h4>
+  {% else %}
+    <h4 class='info info-grey'>
+      <div class = "tooltip">
+        network tunnels
+        <span class = "tooltiptext">
+          Tunnel from the server into private networks to which
+          both the server and targets are connected.
+        </span>
+      </div>
+    </h4>
+    <table class='display'>
+      <thead>
+        <th align="left">Protocol</th>
+        <th align="left">From</th>
+        <th align="left">To</th>
+        <th align="left">Action</th>
+      </thead>
+
+      <!-- tunnels is [ ( protocol, ip_addr, port, local_port )] -->
+      {% for protocol, ip_addr, port, local_port in tunnels %}
+      <tr>
+        <td>{{ protocol }} </td>
+        <td>
+          <div class = "tooltip">
+            {{ local_port }}…
+            <span class = "tooltiptext">
+              This port is accessible via the following server addresses:
+              <p>
+                <table>
+                  {% for server_ip_addr in state.server_ips %}
+                  <tr>
+                    <td>
+                      {{ server_ip_addr }}:{{ local_port }}
+                    </td>
+                  </tr>
+                  {% endfor %}
+                </table>
+              </p>
+              <p
+                >for example, you can now SSH into a tunneled SSH
+                port with:
+                <pre><code class = "language-bash">$ ssh -p {{ local_port }} USERNAME@SERVERIP</code></pre>
+              </p>
+            </span>
+          </div>
+        </td>
+        <td>{{ ip_addr }}:{{ port }}</td>
+        <td>
+          <div class = "tooltip">
+            <button class = 'warning' onclick='js_tunnel_remove("{{targetid}}", "{{port}}", "{{protocol}}", "{{ip_addr}}");'>-</button>
+            <span class = "tooltiptext">
+              Remove this tunnel
+              <p>
+                On the command line, you can use:
+                <pre><code class="language-bash">$ tcf tunnel-rm {{ targetid }} {{ port }} {{ protocol }} {{ ip_addr }}</code></pre>
+              </p>
+            </span>
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+
+    </table>
+  {% endif %}
+</div>		<!-- network tunnels -->
+<!-- this is end of file ui/widget-target-tunnels.html -->
