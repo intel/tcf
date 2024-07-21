@@ -275,6 +275,71 @@ async function js_alloc_guest_remove(allocid, selector_id) {
     window.location.reload()
 }
 
+/*
+* Add a tunnel from form data
+*
+* @param {targetid} str -> target id to which you want to flash
+*
+* return {void}
+*/
+async function js_tunnel_add_from_input_field(targetid, input_field_id) {
+
+    $('.diagnostics').empty();
+    $('#loading').append(
+        '<label>adding tunnel: </label><progress id="progress-bar" aria-label="Content loading…"></progress></div>' +
+        '<br>'
+    );
+    let data = new URLSearchParams();
+
+    let protocol = document.getElementById(input_field_id + "_protocol");
+    if (protocol == null) {
+	$('#loading').empty();
+	$('#loading').append(
+            '<b><label style="color: red;">ERROR in protocol spec</label></b>'
+	);
+        return
+    }
+    data.append('protocol', protocol.value);
+
+    let port = document.getElementById(input_field_id + "_port");
+    if (port == null) {
+	$('#loading').empty();
+	$('#loading').append(
+            '<b><label style="color: red;">ERROR in port spec</label></b>'
+	);
+        return
+    }
+    data.append('port', port.value);
+
+    let ip_addr = document.getElementById(input_field_id + "_ip_addr");
+    if (ip_addr == null) {
+	$('#loading').empty();
+	$('#loading').append(
+            '<b><label style="color: red;">ERROR in ip_addr spec</label></b>'
+	);
+        return
+    }
+    if (ip_addr.value)
+	data.append('ip_addr', ip_addr.value);
+
+    let r = await fetch('/ttb-v2/targets/' + targetid + '/tunnel/tunnel', {
+        method: 'PUT',
+	body: data,
+    });
+
+    let error_message = await r.text();
+    if (common_error_check(r, error_message)) {
+        return;
+    }
+
+    $('#loading').empty();
+    $('#loading').append(
+        '<b><label style="color: green;">SUCCESS</label></b>'
+    );
+
+    window.location.reload();
+}
+
 
 
 /*
