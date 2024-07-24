@@ -1101,6 +1101,17 @@ def lru_cache_disk(path, max_age_s, max_entries, key_maker = None,
                 key = key_maker(*args, **kwargs)
             t = fn.cache.get_unlocked(key, None, max_age = max_age_s)
             value, ex = t
+            # if there is an exception, raise it -- this means a
+            # previous call found an exception that had to be cached,
+            # so raise it again to avoid calling the function
+            # again. If we don't want to cache, call with
+            # *exclude_exceptions* or set:
+            #
+            # >>> setattr(exception, "cacheable") = False
+            #
+            # before raising
+            if ex != None:
+                raise ex
             if value == None:
                 # miss! get the return value and set the cache
                 try:
@@ -1123,8 +1134,6 @@ def lru_cache_disk(path, max_age_s, max_entries, key_maker = None,
                         fn.cache.set_unlocked(key, None, e)
                     raise
 
-            if ex != None:
-                raise ex
             return value
 
         return wrapper
