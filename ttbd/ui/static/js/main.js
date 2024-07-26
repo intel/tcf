@@ -380,6 +380,88 @@ async function js_tunnel_remove(targetid, port, protocol, ip_addr) {
 
 
 
+/*
+* Add a cert from form data
+*
+* @param {targetid} str -> target id
+*
+* @param {input_field_id} str -> where to get the cert name from
+*
+* return {void}
+*/
+async function js_certs_add_from_input_field(targetid, input_field_id) {
+
+    $('.diagnostics').empty();
+    $('#loading').append(
+        '<label>adding certificate: </label><progress id="progress-bar" aria-label="Content loading…"></progress></div>' +
+        '<br>'
+    );
+    let data = new URLSearchParams();
+
+    let name_el = document.getElementById(input_field_id);
+    if (name_el == null) {
+	$('#loading').empty();
+	$('#loading').append(
+            '<b><label style="color: red;">ERROR: name not specified</label></b>'
+	);
+        return
+    }
+
+    data.append('name', name_el.value);
+    let r = await fetch('/ttb-v2/targets/' + targetid + '/certs/certificate', {
+        method: 'PUT',
+	body: data,
+    });
+
+    let error_message = await r.text();
+    if (common_error_check(r, error_message)) {
+        return;
+    }
+
+    $('#loading').empty();
+    $('#loading').append(
+        '<b><label style="color: green;">SUCCESS</label></b>'
+    );
+
+    window.location.reload();
+}
+
+
+
+/*
+* Remove a certificate from an allocation
+*
+* @param {targetid} str -> target id
+*
+* @param {name} str -> cert to remove
+*
+* return {void}
+*/
+async function js_cert_remove(targetid, name) {
+
+    $('.diagnostics').empty();
+
+    let data = new URLSearchParams();
+    data.append('name', name);
+    let r = await fetch('/ttb-v2/targets/' + targetid + '/certs/certificate', {
+        method: 'DELETE',
+	body: data,
+    });
+
+    let error_message = await r.text();
+    if (common_error_check(r, error_message)) {
+        return
+    }
+
+    $('#loading').empty();
+    $('#loading').append(
+        '<b><label style="color: green;">SUCCESS</label></b>'
+    );
+
+    window.location.reload()
+}
+
+
 
 /*
 * make a flashing call given a version and an image type
