@@ -86,20 +86,25 @@ no permissions, use the <i>report issue</i> link above</p>
                     {{entry}}
                     <br>
                {% endfor %}
-                    <br>
                     <dialog class='dialog-inventory-details' id='{{targetid}}-{{columns[field]}}'>
-                      <button autofocus onclick='close_dialog_element_by_id("{{targetid}}-{{columns[field]}}")'>Close</button>
-                        <br>
-                        <h2>{{targetid}}</h2>
-                        <h3>{{field}}</h3>
-                        <hr>
-                       {% for key, entry in columns[field]['all_entries'] %}
-                            <small class='table-cell-inventory-keys'>{{key}}:</small>
-                            <br>
-                            {{entry}}
-                            <br>
-                            <hr>
-                       {% endfor %}
+                      {# details for fields with multiple cells #}
+                      <h2>
+                        <button autofocus onclick='close_dialog_element_by_id("{{targetid}}-{{columns[field]}}")'>╳</button>{{targetid}}: all values for fields <i>{{field}}</i></h2>
+                      <table class='display'>
+                        <thead>
+                          <th>Field</th>
+                          <th>Value</th>
+                        </thead>
+                        <tbody>
+                          {% for key, entry in columns[field]['all_entries'] %}
+                          <tr>
+                            {# use fixed font for field names, so visually they allign #}
+                            <td class='table-cell-inventory-keys'><code>{{ key }}</code></td>
+                            <td>{{ entry }}</td>
+                          </tr>
+                        </tbody>
+                        {% endfor %}
+                      </table>
                     </dialog>
                     <button class='show_more_info_inside_table' onclick='open_dialog_element_by_id("{{targetid}}-{{columns[field]}}")'>more...</button>
                 </td>
