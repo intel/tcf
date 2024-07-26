@@ -552,6 +552,12 @@ def _target_tunnel_collect(target, inventory, state):
 
 
 
+def _target_certs_collect(target, calling_user: str, state: dict):
+    if hasattr(target, 'certs'):
+        r = target.certs.get_certificate(target, calling_user, None, None, None)
+        state['certs'] = sorted(r.get("client_certificates", []))
+
+
 
 @bp.route('/target/<targetid>', methods = ['GET'])
 @flask_login.login_required
@@ -660,6 +666,8 @@ def _target(targetid):
     consoles = dict(inventory.get('interfaces', {}).get('console', {}))
 
     tunnels = _target_tunnel_collect(target, inventory, state)
+    _target_certs_collect(target, calling_user.get_id(), state)
+
     return flask.render_template(
         'target.html',
         targetid = targetid,
