@@ -1080,7 +1080,7 @@ def lru_cache_disk(path, max_age_s, max_entries, key_maker = None,
                 f"{exception_t}: expected a type, got a {type(exception_t)}"
 
     def _lru_cache_disk(fn):
-        makedirs_p(path, reason = "cache for lru_cache_disk")
+        makedirs_p(path, reason = f"cache for lru_cache_disk {fn}")
         # need to use files so we can contain pickle stuff
         fn.cache = fs_cache_c(path, base_type = fsdb_file_c)
         @functools.wraps(fn)
