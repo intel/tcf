@@ -57,7 +57,7 @@ import tcfl.tc
 tcfl.tc_global = tcfl.tc.tc_global
 tcfl.tc_c = tcfl.tc.tc_c
 
-log = logging.getLogger("discovery")
+log = logging.getLogger("tc-discovery")
 log_sub = log.getChild("(subprocess)")
 log_tcf_sub = logging.getLogger("tcf discovery (subprocess)")
 
@@ -699,10 +699,11 @@ class agent_c:
                         "current directory, %s", os.getcwd())
             paths = [ os.path.curdir ]
 
-        tcfl.tc_global.report_info("scanning for test cases", dlevel = 2)
-
         self.result = tcfl.result_c()
         _manifest_expand(paths, self.result, manifests)
+
+        tcfl.tc_global.report_info(f"scanning for test cases in {paths}", dlevel = 2)
+        log.warning("scanning for test cases in %s", paths)
 
         # For each path to a file/directory we have found, peel off
         # subcase specifications and give it to drivers to see what we
