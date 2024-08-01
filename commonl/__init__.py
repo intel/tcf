@@ -952,8 +952,30 @@ class fs_cache_c():
             if field == "lockfile":
                 continue
 
-            timestamp, _value, _ex = \
-                self.get_unlocked(field, include_timestamp = True)
+            try:
+                timestamp, _value, _ex = \
+                    self.get_unlocked(field, include_timestamp = True)
+            except TypeError:
+                # this usually means we got a new file
+                # (SOMETHING-PID-TID) [from fsdb_c.set()], which we
+                # need to ignore--in theory it should not happen -- we
+                # clean it up if it is really old. This is the code
+                # handling old entries. New creation
+                # files have a more distinct name to make them easier
+                # to clean/ignore at the fsdb_c.keys() level
+                location = os.path.join(self.fsdb.location, field)
+                st_info = os.stat(location)
+                mtime_age = time.time() - st_info.st_mtime
+                if mtime_age > 0 and mtime_age > 30:
+                    # there is no way one of these files can be more
+                    # than a 30s old, so this means it's a leftover,
+                    # let's clean it up. We use logging.error because
+                    # fsdb_c.get_unlocked() errors, so we always see
+                    # both messages
+                    logging.error("WARNING: DB %s field %s: removing dead"
+                                  " creation field", self.cache_dir, field)
+                    self.fsdb._raw_unlink(location)
+                continue
             if timestamp == None:	# old format, wipe
                 self.fsdb.set(field, None, nested_flat_keyspace = False)
             else:
@@ -3974,6 +3996,23 @@ class fsdb_symlink_c(fsdb_c):
         for _rootname, _dirnames, filenames_raw in os.walk(self.location):
             filenames = []
             for filename_raw in filenames_raw:
+                if filename_raw.endswith("##field_creation##"):
+                    location = os.path.join(self.location, filename_raw)
+                    try:	# is this a leftover creation file?
+                        st_info = os.stat(location)
+                        mtime_age = time.time() - st_info.st_mtime
+                        if mtime_age > 0 and mtime_age > 30:
+                            # there is no way one of these files can be more
+                            # than a 30s old, so this means it's a leftover,
+                            # let's clean it up. We use logging.error because
+                            # fsdb_c.get_unlocked() errors, so we always see
+                            # both messages
+                            logging.error("WARNING: DB %s field %s: removing dead"
+                                          " creation field", self.location, filename_raw)
+                            self._raw_unlink(location)
+                            continue
+                    except FileNotFoundError:
+                        continue
                 # need to filter with the unquoted name...
                 filename = urllib.parse.unquote(filename_raw)
                 if pattern == None or fnmatch.fnmatch(filename, pattern):
@@ -4089,7 +4128,10 @@ class fsdb_symlink_c(fsdb_c):
         # but never half.
         if nested_flat_keyspace:
             self._keys_cleanup(key, all_keys_index = _keys_index)
-        location_new = location + "-" + str(os.getpid()) + "-" + str(threading.get_ident())
+        # we use ## because we always URL encode fieldnames, so there
+        # is no way we'll see a raw # in the field name -- this makes
+        # it easy to catch and won't conflict
+        location_new = f"{location}-{os.getpid()}-{threading.get_ident()}##field_creation##"
         rm_f(location_new)
         self._raw_write(location_new, value)
         self._raw_rename(location_new, location)
