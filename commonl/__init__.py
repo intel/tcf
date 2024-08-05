@@ -319,6 +319,45 @@ def pickle_debug(root: str, o, logger = logging) -> list:
     return r
 
 
+def local_ip_addrs():
+    '''
+    Report the local IP addresses (except local and multicast)
+
+    :returns list[str]: list of IP address, sorted alphabetically
+    '''
+    import pyroute2	# lazy import, only when needed
+    import ipaddress
+    ips = set()
+    for _iface_name, data in pyroute2.IPDB().items():
+        for ip_addr, _netmask in data.get('ipaddr', []):
+            ip = ipaddress.ip_address(ip_addr)
+            if ip.is_loopback or ip.is_multicast:
+                continue	# can't be used to connect externally
+            ips.add(ip_addr)
+    return sorted(ips)
+
+_local_ip_addrs_ts = None
+_local_ip_addrs_r = None
+
+def local_ip_addrs_cached(timeout_s: int = 10 * 60):
+    """
+    Cached version of :func:`local_ip_addrs`, since local IPs do
+    not change that oftern
+
+    :param int timeout_s: (optional; default 10m) maximum time the
+      value is cached before it being refreshed
+    """
+    global _local_ip_addrs_ts
+    global _local_ip_addrs_r
+    ts = time.time()
+    # for a singleton
+    if _local_ip_addrs_ts == None or _local_ip_addrs_ts + timeout_s < ts:
+        # no need for a memoization decorator, this is simple enough
+        _local_ip_addrs_r = local_ip_addrs()
+        _local_ip_addrs_ts = ts
+    return _local_ip_addrs_r
+
+
 
 class thread_periodical_runner_c(threading.Thread):
     """
