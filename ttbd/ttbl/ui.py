@@ -514,6 +514,14 @@ def _target_button_get(target: ttbl.test_target, inventory: dict, kws: dict):
     return buttons_component_description
 
 
+
+def _target_certs_collect(target, calling_user: str, state: dict):
+    if hasattr(target, 'certs'):
+        r = target.certs.get_certificate(target, calling_user, None, None, None)
+        state['certs'] = sorted(r.get("client_certificates", []))
+
+
+
 @bp.route('/target/<targetid>', methods = ['GET'])
 @flask_login.login_required
 def _target(targetid):
@@ -620,6 +628,7 @@ def _target(targetid):
     #   ...more
     consoles = dict(inventory.get('interfaces', {}).get('console', {}))
 
+    _target_certs_collect(target, calling_user.get_id(), state)
     return flask.render_template(
         'target.html',
         targetid = targetid,

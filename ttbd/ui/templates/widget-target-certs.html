@@ -1,0 +1,111 @@
+<!-- this is start of file ui/widget-target-certificates.html -->
+
+<div class='status'>
+  {% if tunnels is none %}
+    <h4 class='info info-grey'>certificates: not supported</h4>
+  {% else %}
+    <h3 class='info info-grey'>
+      <div class = "tooltip">
+        certificates
+        <span class = "tooltiptext">
+          Manage any number of SSL certificate/private-key pairs tied
+          a Root Certificate Authority that is valid only as long as
+          the allocation is valid. These can be later used to create
+          tunnels, or secure anything in an allocation-specific way,
+          so they cannot be reused later.
+        </span>
+      </div>
+    </h3>
+    <table class='display'>
+      <thead>
+        <th align="left" colspan = 2>Name</th>
+        <th align="left">Actions</th>
+      </thead>
+
+      <!-- certs is just a list of names -->
+      {% if not state.certs  %}
+      <tr>
+        {# FIXME: need to figure out max column size and tooltip out #}
+        {# the label if too big #}
+        <td colspan = 4 style = 'color: gray;'>
+          no certificates have yet been defined
+        </td>
+      </tr>
+      {% endif %}
+      {% for name in ( state.certs if state.certs else [] ) %}
+      <tr>
+        <td>{{ name }}</td>
+        <td align = "right">
+          <div class = "tooltip">
+            <a href = "/ttb-v2/targets/{{ targetid }}/store/file?file_path=certificates_client/{{ name }}.key"
+               download = 'cert-{{ state.alloc }}-{{ targetid }}-{{ name }}.key'
+               style = "text-decoration:none">⚿</a>
+            <span class = "tooltiptext">
+              Download the SSL private key
+              <p>
+                On the command line, you can use:
+                <pre><code class="language-bash">$ tcf certs-get {{targetid }} --save {{ name }}</code></pre>
+              </p>
+            </span>
+          </div>
+          <div class = "tooltip">
+            <a href = "/ttb-v2/targets/{{ targetid }}/store/file?file_path=certificates_client/{{ name }}.cert"
+               download = 'cert-{{ state.alloc }}-{{ targetid }}-{{ name }}.cert'
+               style = "text-decoration:none">🖂</a>
+            <span class = "tooltiptext">
+              Download the SSL certificate
+              <p>
+                On the command line, you can use:
+                <pre><code class="language-bash">$ tcf certs-get {{targetid }} --save {{ name }}</code></pre>
+              </p>
+            </span>
+          </div>
+        </td>
+
+        <td>
+          <div class = "tooltip">
+            <button class = 'warning' onclick = 'js_cert_remove("{{targetid}}", "{{ name }}");'>-</button>
+            <span class = "tooltiptext">
+              Remove this SSL certificate/private-key pair
+              <p>
+                On the command line, you can use:
+                <pre><code class="language-bash">$ tcf certs-rm {{ targetid }} {{ name }}</code></pre>
+              </p>
+            </span>
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+
+      <!-- Add row -->
+      <tr>
+        <td colspan = 2 style='color: gray;'>
+          <div class = "tooltip">
+            <input type = "text" size = 17 id = "input_field_id_cert_add"
+                   placeholder = "enter certificate name"
+                   required>
+            <span class = "tooltiptext">
+              Simple name to identify the SSL certificate/private-key pair
+            </span>
+          </div>
+        </td>
+
+        <td style='color: gray;'>
+          <div class = "tooltip">
+            <button class = 'primary' onclick = 'js_certs_add_from_input_field("{{targetid}}", "input_field_id_cert_add")'>+</button>
+            <span class = "tooltiptext">
+              Create a new SSL certificate/private-key pair
+              <p>
+                On the command line, you can use:
+                <pre><code class="language-bash">$ tcf certs-get {{ targetid }} [--save] NAME</code></pre>
+              </p>
+            </span>
+          </div>
+        </td>
+
+      </tr>
+
+    </table>
+  {% endif %}
+</div>		<!-- certificates -->
+<!-- this is end of file ui/widget-target-certificates.html -->
