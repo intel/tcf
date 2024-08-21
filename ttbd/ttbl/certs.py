@@ -4,10 +4,10 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 #
-# FIXME:
+# Timeouts: we use a common timeout of 10s for generating keys, since
+# in some older machines it might go over 5secs once we increased the
+# default key size to 4kbits
 #
-# use openssl req
-#     -subj "/C=$CERT_COUNTRY/ST=$CERT_STATE/L=$CERT_CITY/O=$CERT_COMPANY_NAME Signing Authority/CN=$CERT_COMPANY_NAME Signing Authority"
 """
 Interface to manage target specific SSL certificates
 ****************************************************
@@ -163,6 +163,7 @@ class interface(ttbl.tt_interface):
                 f" -keyform PEM -keyout ca.key"
                 f" -subj /C=LC/ST=Local/L=Local/O=TCF-Signing-Authority-{target.id}-{allocid}/CN=TTBD"
                 f" -x509 -days 1000 -outform PEM -out ca.cert".split(),
+                timeout = 10,
                 check = True, cwd = cert_path,
                 stdout = subprocess.PIPE, stderr = subprocess.STDOUT)
             target.log.debug(f"created target's certificate authority in {cert_path}")
@@ -170,13 +171,14 @@ class interface(ttbl.tt_interface):
             # Now create a server key
             subprocess.run(
                 f"openssl genrsa -out server.key {self.key_size}".split(),
-                stdin = None, timeout = 5,
+                stdin = None, timeout = 10,
                 capture_output = True, cwd = cert_path, check = True)
             target.log.debug("created target's server key")
 
             subprocess.run(
                 f"openssl req -new -key server.key -out server.req -sha256"
                 f" -subj /C=LC/ST=Local/L=Local/O=TCF-Signing-Authority-{target.id}-{allocid}/CN=TTBD".split(),
+                timeout = 10,
                 check = True, cwd = cert_path,
                 stdout = subprocess.PIPE, stderr = subprocess.STDOUT)
             target.log.debug("created target's server req")
@@ -185,6 +187,7 @@ class interface(ttbl.tt_interface):
                 f"openssl x509 -req -in server.req -CA ca.cert -CAkey ca.key"
                 f" -set_serial 100 -extensions server -days 1460 -outform PEM"
                 f" -out server.cert -sha256".split(),
+                timeout = 10,
                 check = True, cwd = cert_path,
                 stdout = subprocess.PIPE, stderr = subprocess.STDOUT)
             target.log.debug("created target's server cert")
@@ -274,12 +277,13 @@ class interface(ttbl.tt_interface):
             try:
                 subprocess.run(
                     f"openssl genrsa -out {client_key_path} {self.key_size}".split(),
-                    stdin = None, timeout = 5,
+                    stdin = None, timeout = 10,
                     capture_output = True, cwd = cert_path, check = True)
                 allocid = target.fsdb.get("_alloc.id", "UNKNOWN")
                 subprocess.run(
                     f"openssl req -new -key {client_key_path} -out {client_req_path}"
                     f" -subj /C=LC/ST=Local/L=Local/O=TCF-Signing-Authority-{target.id}-{allocid}/CN=TCF-{name}".split(),
+                    timeout = 10,
                     check = True, cwd = cert_path,
                     stdout = subprocess.PIPE, stderr = subprocess.STDOUT)
                 target.log.debug(f"{name}: created client's certificate")
@@ -291,7 +295,7 @@ class interface(ttbl.tt_interface):
                     f"openssl x509 -req -in {client_req_path} -CA ca.cert"
                     " -CAkey ca.key -set_serial 101 -extensions client"
                     f" -days 365 -outform PEM -out {client_cert_path}".split(),
-                    stdin = None, timeout = 5,
+                    stdin = None, timeout = 10,
                     capture_output = True, cwd = cert_path, check = True)
             except subprocess.CalledProcessError as e:
                 target.log.error(f"command {' '.join(e.cmd)} failed: {e.output}")
