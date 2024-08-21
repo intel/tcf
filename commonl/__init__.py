@@ -2887,6 +2887,16 @@ def data_dump_recursive(d, prefix = u"", separator = u".", of = sys.stdout,
                 data_dump_recursive_tls(val, tls,
                                         separator = separator, of = of,
                                         depth_limit = depth_limit - 1)
+    elif isinstance(d, bytes):
+        # this might be a log file, so first try to see if we can
+        # represent it as unicode, so it'll report more readable
+        try:
+            s = d.decode()
+            # this will automatically do the line breaks
+            of.writelines(s)
+        except UnicodeDecodeError:
+            # welp...
+            of.write(prefix + ": " + mkutf8(d) + "\n")
     else:
         of.write(prefix + u": " + mkutf8(d) + u"\n")
 
@@ -2944,6 +2954,16 @@ def data_dump_recursive_tls(d, tls, separator = u".", of = sys.stdout,
         of.writelines(d)
     elif isinstance(d, types.GeneratorType):
         of.writelines(d)
+    elif isinstance(d, bytes):
+        # this might be a log file, so first try to see if we can
+        # represent it as unicode, so it'll report more readable
+        try:
+            s = d.decode()
+            # this will automatically do the line breaks
+            of.writelines(s)
+        except UnicodeDecodeError:
+            # welp...
+            of.write(mkutf8(d) + "\n")
     elif hasattr(d, "__data_dump__") and callable(d.__data_dump__):
         # this is like __repr__, but nested-dict oriented and with more detail
         data_dump = d.__data_dump__()
