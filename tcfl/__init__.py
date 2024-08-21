@@ -370,13 +370,19 @@ class result_c:
         # AND we need result_c to define error_e
         if result_e == None:
             result_e = error_e
+        attachments = {
+            "stdout": e.stdout,
+            "stderr": e.stderr,
+            "cmd": e.cmd
+        }
+        if hasattr(e, "returncode"):
+            # so this works with subprocess.TimeoutExpired too
+            attachments['return'] = getattr(e, "returncode")
+        if hasattr(e, "timeout"):
+            # so this works with subprocess.TimeoutExpired too
+            attachments['timeout'] = getattr(e, "timeout")
         return result_c.report_from_exception(
-            tc, e, attachments = {
-                "stdout": e.stdout,
-                "stderr": e.stderr,
-                "return": e.returncode,
-                "cmd": e.cmd
-            },
+            tc, e, attachments = attachments,
             force_result = result_e
         )
 
@@ -398,7 +404,7 @@ class result_c:
                     newe = blocked_e(e.args[0][0], e.args[0][1])
                     return result_c.report_from_exception(_tc, newe)
             return result_c.report_from_exception(_tc, e)
-        except subprocess.CalledProcessError as e:
+        except ( subprocess.CalledProcessError, subprocess.TimeoutExpired ) as e:
             return result_c.from_exception_cpe(_tc, e)
         except OSError as e:
             attachments = dict(
