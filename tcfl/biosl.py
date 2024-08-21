@@ -524,7 +524,7 @@ def menu_scroll_to_entry(
                 # the state machine since it'll half draw and confuse the expectation
                 target.console.wait_for_no_output(
                     target.console.default, silence_period = 0.6, poll_period = 0.2,
-                    reason = "menu to render, wiggled looking for entry '{entry_string}'")
+                    reason = f"menu to render, wiggled looking for entry '{entry_string}'")
                 continue
             # the key always matches spaces all the way to the end, so it
             # needs to be stripped
