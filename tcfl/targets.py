@@ -541,6 +541,7 @@ def run_fn_on_each_targetspec(
         extensions_only: list = None,
         only_one: bool = False,
         one_per_server: bool = False,
+        projections_minimize: bool = True,
         projections = None, targets_all = False, verbosity = 0,
         parallelization_factor: int = -4,
         pool_type: type = concurrent.futures.ThreadPoolExecutor,
@@ -567,6 +568,12 @@ def run_fn_on_each_targetspec(
 
       This is useful to do operations that are wide for the server but
       driven via a target interface (eg: storage management).
+
+    :param bool projections_minimize: (optional, default *True*)
+      minimize the amount of data we download from the inventory to the
+      bare minimum, which is guessed based on the *projections*,
+      *verbosity*, *interfaces*, *extensions_only* parameters. To
+      ensure the whole inventory is downloaded, set to *False*.
 
     :param list[str] projections: list of fields to download from the
       inventory; normally this function tries to download as little a
@@ -626,22 +633,27 @@ def run_fn_on_each_targetspec(
 
     with tcfl.msgid_c("ui_cli"):
 
-        project = { 'id', 'disabled', 'type' }
-        if iface:
-            project.add('interfaces.' + iface)
-        if ifaces:
-            for _iface in ifaces:
-                project.add('interfaces.' + _iface)
-        if extensions_only != None:
-            commonl.assert_list_of_strings(
-                extensions_only, "extensions_only", "extension")
-            for extension in extensions_only:
-                project.add('interfaces.' + extension)
-        if projections:
-            commonl.assert_list_of_strings(projections,
-                                           "projections", "field")
-            for projection in projections:
-                project.add(projection)
+        if not projections_minimize:
+            # force setup_by_spec to download all fields
+            project = None
+            verbosity = 1
+        else:
+            project = { 'id', 'disabled', 'type' }
+            if iface:
+                project.add('interfaces.' + iface)
+            if ifaces:
+                for _iface in ifaces:
+                    project.add('interfaces.' + _iface)
+            if extensions_only != None:
+                commonl.assert_list_of_strings(
+                    extensions_only, "extensions_only", "extension")
+                for extension in extensions_only:
+                    project.add('interfaces.' + extension)
+            if projections:
+                commonl.assert_list_of_strings(projections,
+                                               "projections", "field")
+                for projection in projections:
+                    project.add(projection)
         # Discover all the targets that match the specs in the command
         # line and pull the minimal inventories as specified per
         # arguments

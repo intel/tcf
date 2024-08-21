@@ -324,7 +324,9 @@ def _cmdline_target_property_get(cli_args: argparse.Namespace):
 def _cmdline_target_healthcheck(cli_args: argparse.Namespace):
     import tcfl.healthcheck
     return tcfl.ui_cli.run_fn_on_each_targetspec(
-        tcfl.healthcheck._target_healthcheck, cli_args, cli_args)[0]
+        tcfl.healthcheck._target_healthcheck, cli_args, cli_args,
+        # ensure we get the whole inventory
+        projections_minimize = False)[0]
 
 
 
