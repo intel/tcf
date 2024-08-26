@@ -33,6 +33,9 @@ git:
 
 gvnc-tools:
   skip_platform: win32
+  # not available in RHEL
+  rhel:
+    skip: true
   ubuntu: gvncviewer
   debian: gvncviewer
   pip:
