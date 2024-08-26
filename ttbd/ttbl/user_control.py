@@ -89,7 +89,16 @@ class User(object):
         # will use the same as the primary
         if self.state_dir != self.state_dir_secondary:
             path_s = self.create_filename(userid, self.state_dir_secondary)
-            if not os.path.isdir(path_s) and fail_if_new == False:
+            if not os.path.exists(path_s):
+                # create the secondary FSDB top level directory for
+                # the user, it does not exist yet
+                commonl.makedirs_p(path_s)
+            elif not os.path.isdir(path_s) and fail_if_new == False:
+                # it exists but it seems to be something else than a
+                # directory--just fail, since this doesn't seem to be
+                # something we can't control and if it is failing
+                # because the directory is corrupted or something,
+                # we'd rather an admin looks at it
                 raise RuntimeError(
                     f'{path_s} exists but it is not a directory, please'
                      'consider erase it so ttbl/user_control can create it'
