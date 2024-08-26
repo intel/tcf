@@ -22,6 +22,13 @@
       </thead>
 
       <!-- tunnels is [ ( protocol, ip_addr, port, local_port )] -->
+      {% if not tunnels  %}
+      <tr>
+        <td colspan = 4 style = 'color: gray;'>
+          no network tunnels have yet been defined
+        </td>
+      </tr>
+      {% endif %}
       {% for protocol, ip_addr, port, local_port in tunnels %}
       <tr>
         <td>{{ protocol }} </td>
