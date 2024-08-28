@@ -957,8 +957,21 @@ def _command_install(args):
     else:
         method_abc.sudo = ""
     packages, method_details = _parse_files(args)
-    methods = [ method_abc.methods_by_name[distro_method] ] \
-        + list(method_abc.generic_methods.values())
+    if os.getenv('VIRTUAL_ENV') != None:
+        # if we are in a virtual environment, we first need to try to
+        # install with pip (eg: generic methods) in the virtual env,
+        # since the distro methods won't install in the venv
+        if args.generic_first == None:
+            logging.error(
+                "WARNING! python virtual_env active, enabling --generic-first"
+                " (you can forcibly disable with --generic-first)")
+            args.generic_first = True
+    if args.generic_first:
+        methods = list(method_abc.generic_methods.values()) + \
+            [ method_abc.methods_by_name[distro_method] ]
+    else:
+        methods = [ method_abc.methods_by_name[distro_method] ] \
+            + list(method_abc.generic_methods.values())
     for package, package_data in packages.items():
         logging.warning(f"{package}: installing")
         logging.info(f"{package}: package data {package_data}")
@@ -1120,6 +1133,17 @@ ap.add_argument(
     action = "store_false", default = True, dest = "sudo",
     help = "Do not run dnf/apt (system level package managers)"
     " under sudo [%(default)s]")
+ap.add_argument(
+    "-g", "--generic-first",
+    action = "store_true", default = None,
+    help = "Run generic methods (eg: pip, etc) first and then system level"
+    " package managers (eg: apt/dnf) afterwards [%(default)s];"
+    " helpful when install eg a whole new python / environ with"
+    " $VIRTUAL_ENV/bin/python nreqs.py")
+ap.add_argument(
+    "--no-generic-first",
+    action = "store_false", dest = "generic_first",
+    help = "disable --generic-first")
 ap.add_argument(
     "filenames", metavar = "PATH|FILE.nreqs.yaml", type = str, nargs = "+",
     help = "requirements file(s) or paths contianing them [*.nreqs.yaml]")
