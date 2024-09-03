@@ -666,7 +666,10 @@ def _target(targetid):
     consoles = dict(inventory.get('interfaces', {}).get('console', {}))
 
     tunnels = _target_tunnel_collect(target, inventory, state)
-    _target_certs_collect(target, calling_user.get_id(), state)
+    if acquired:
+        # you can only know about the certs if you have the machine,
+        # otherwise we are leaking a lot
+        _target_certs_collect(target, calling_user.get_id(), state)
 
     return flask.render_template(
         'target.html',
