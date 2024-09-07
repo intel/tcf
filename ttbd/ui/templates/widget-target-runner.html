@@ -1,0 +1,50 @@
+<!-- this is the start of file ui/widget-target-runner.html -->
+
+<!-- ttbd/conf_00_lib/target_runner_progress_tcf_add() uses these to
+  -- tag colors -->
+<style>
+  .background_PASS {
+      background-color: palegreen
+  }
+  .background_FAIL {
+      background-color: #ff5050
+  }
+  .background_ERRR {
+      background-color: #d000d0
+  }
+  .background_BLCK {
+      background-color: #FFFF10
+  }
+  .background_SKIP {
+      background-color: cyan
+  }
+</style>
+<script type="text/javascript" src="{{url_for('static', filename = 'js/widget-target-runner.js')}}">
+</script>
+<div class='toolbox'>
+  <table>
+    {# Extract the basic parameters so we can expand them, taking base
+       from the target's and using the templates in the local target,
+       first local.runner.RUNNERID, then local.runner.default #}
+    {% for runner, runner_data in inventory.get("runner", {}).items() %}
+      {% set runner_local_default_data = inventory_local.get("runner", {}).get("default", {}) %}
+      {% set runner_local_runner_data = inventory_local.get("runner", {}).get(runner, {}) %}
+
+      {% set runner_button_name = runner_data.get("button_name", runner_local_runner_data.get("button_name", runner_local_default_data.get("button_name", "Run job"))) %}
+      {% set runner_type = runner_data.get("type", runner_local_runner_data.get("type", runner_local_default_data.get("type", None))) %}
+      {% set runner_pipeline = runner_data.get("pipeline", runner_local_runner_data.get("pipeline", runner_local_default_data.get("pipeline", '<UNDEFINED:runner.ID.pipeline>'))) %}
+      {% set runner_repository = runner_data.get("repository", runner_local_runner_data.get("repository", runner_local_default_data.get("repository", '<UNDEFINED:runner.ID.repository>'))) %}
+      {% set runner_file_path = runner_data.get("file_path", runner_local_runner_data.get("file_path", runner_local_default_data.get("file_path", '<UNDEFINED:runner.ID.file_path>'))) %}
+      {% set runner_notify = runner_data.get("notify", runner_local_runner_data.get("notify", runner_local_default_data.get("notify", state.user))) %}
+
+      {% set runner_mongo_url = runner_data.get("mongo_url", runner_local_runner_data.get("mongo_url", runner_local_default_data.get("mongo_url", None))) %}
+      {% set runner_mongo_db = runner_data.get("mongo_db", runner_local_runner_data.get("mongo_db", runner_local_default_data.get("mongo_db", None))) %}
+      {% set runner_mongo_collection = runner_data.get("mongo_collection", runner_local_runner_data.get("mongo_collection", runner_local_default_data.get("mongo_collection", None))) %}
+      <tr>
+        {% include 'widget-target-runner-one.html' %}
+      </tr>
+    {% endfor %}
+  </table>
+
+</div>
+<!-- this is the end of file ui/widget-target-runner.html -->

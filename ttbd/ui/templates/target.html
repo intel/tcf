@@ -32,6 +32,22 @@
 {% block content %}
 
 <script>hljs.highlightAll();</script>
+<script>
+  const ttbd_server_url = new URL(window.location.href);
+  /*
+   * The inventories of all targets being manipulated in this page.
+   *
+   * Here for easy access and to avoid duplicating info.
+   *
+   * It is a dictionary since target might have non javascript valid chars; also later we
+   * might add more targets when we move to an allocation control panel model.
+   */
+  const inventory = {};
+  inventory["{{ targetid }}"] = {{ inventory | tojson | safe }};
+  inventory["local"] = {{ inventory_local | tojson | safe }};
+  /* make the state from ttbl.ui available to Javascript */
+  state = {{ state | tojson | safe }};
+</script>
 
 <dialog id='inventory'>
     <form method='dialog'>
@@ -39,6 +55,8 @@
         <button value="cancel" formmethod="dialog">close</button>
     </form>
     <div>
+      {# FIXME: this is a kludge, we need to store the json for the
+      inventory somewhere where it's reusable -- it's handy #}
         <pre><code class="language-json">{{ inventory_str }}</code></pre>
     </div>
     <form method='dialog'>
@@ -561,6 +579,19 @@ $ tcf ls -vv {{ targetid}}</code> </pre></p>
 
     {% include 'widget-target-tunnels.html' %}
     {% include 'widget-target-certs.html' %}
+
+    {% if not inventory.get("runner", {})  %}
+    <!-- no widget runners defined for this target -->
+    {% else %}   {# {% if not inventory.get("runner", {})  %} #}
+      {% if state.acquired %}
+      {% include 'widget-target-runner.html' %}
+      {% else %}    {# {% if state.acquired %} #}
+        <h4 class='info info-grey'>
+          Runners not available; please acquire this target to be able to use
+        </h4>
+      {% endif %}    {# {% if state.acquired %} #}
+    {% endif %}   {# {% if not inventory.get("runner", {})  %} #}
+
 
 </div>
 

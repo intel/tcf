@@ -833,3 +833,158 @@ def target_add_to_vlan_interconnects(
                     tags[k] = v
 
         target.add_to_interconnect(vlan_target.id, tags)
+
+
+#
+# WebUI helpers
+#
+
+
+def target_runner_progress_tcf_add(target: ttbl.test_target, runner: str):
+    """
+    Create templates for the Widget Runner to be able to summarize
+    log output when execution using TCF
+
+
+    (see :ref:`setting up inventory<webui_widget_runner_setting_up_inventory>`)
+
+    Regexs to parse TCF summary lines to see testcase and subcase;
+    they look like::
+
+      FAIL0/240906-2036-50-9-cajaf REPNAME/PATH/test_healthcheck.py [+0.0s]: some message
+      FAIL0/240906-2036-50-9-cajaf REPNAME/PATH/test_healthcheck.py##150_power_list##serial_BMC_detected @fl31ca303as0507 [+0.0s]: subcase failed
+
+    would report in the WebUI/widget-report summary:
+
+       FAIL +0m  some message
+       FAIL +0m  150_power_list##serial_BMC_detected
+    
+    or summarized::
+
+      <TAG>/<RUNID> TCREPOBASENAME/TCPATH @[SERVER/]SUTNAME [TIMESTAMP]: message
+      <TAG>/<RUNID> TCREPOBASENAME/TCPATH(##SUBCASES) @[SERVER/]SUTNAME [TIMESTAMP]: message
+
+    We have four patterns:
+
+    - two for reporting top level (no subcases):
+
+      - one for passing results that need no URL in the result column
+
+      - one for non-passing results that need a URL in the result column
+
+    - two for reporting subcases:
+
+      - one for passing results that need no URL in the result column
+
+      - one for non-passing results that need a URL in the result column
+
+    They are named progress_tcf_(toplevel|subcase)_(link|nolink)
+
+    """
+
+    # The style definitions background_{PASS,ERRR,BLKC,SKIP} are defined
+    # in widget-target-runner.html; this create a background that is easy
+    # to spot visually. We use it in the result template when links are needed.
+    runner_default_regex_progress_tcf_result_link_template = """\
+    <div class = "background_%(tag)s">
+      <a href = "%(pipeline)s/%(build_id)s/artifact/report-%(runid_hashid)s.txt" target="_blank" rel="noopener noreferrer">
+        <code>%(tag)s</code>
+      </a>
+    </div>"""
+
+
+    # Process top level messages (no subcase, no links)
+    target_local.property_set(
+        "runner.default.regex.progress_tcf_toplevel_nolink.pattern",
+        (
+            "^(?<tag>PASS|INFO|DATA)([0-9]+)" # the tag + verbosity level
+            "/(?<runid_hashid>[-0-9a-z]+)"                        # the runid
+            " +(\\S+)/%(file_path)s"                              # the testcase path after part of the repo name
+            " @.*%(targetid)s"                                    # the targetid
+            " (?<ellapsed>\\[\\+[\.0-9]+s\\]):"                   # the elapsed timestamp
+            " (?<message>.*)$"                                    # the leftovers
+        )
+    )
+    target_local.property_set(
+        "runner.default.regex.progress_tcf_toplevel_nolink.message",
+        "%(message)s")
+    target_local.property_set(
+        "runner.default.regex.progress_tcf_toplevel_nolink.result",
+        '<div class = "background_%(tag)s"><code>%(tag)s</code></div>')
+
+
+    # Process top level messages (no subcase, links)
+    target_local.property_set(
+        "runner.default.regex.progress_tcf_toplevel_link.pattern",
+        (
+            "^(?<tag>FAIL|ERRR|BLCK|SKIP)([0-9]+)" # the tag + verbosity level
+            "/(?<runid_hashid>[-0-9a-z]+)"                        # the runid
+            " +(\\S+)/%(file_path)s"                              # the testcase path after part of the repo name
+            " @.*%(targetid)s"                                    # the targetid
+            " (?<ellapsed>\\[\\+[\.0-9]+s\\]):"                   # the elapsed timestamp
+            " (?<message>.*)$"                                    # the leftovers
+        )
+    )
+    target_local.property_set(
+        "runner.default.regex.progress_tcf_toplevel_link.message",
+        "%(message)s")
+    target_local.property_set(
+        "runner.default.regex.progress_tcf_toplevel_link.result",
+        runner_default_regex_progress_tcf_result_link_template
+        # this comment is used, in the WebUI, byt the javascript code
+        # in _js_runner_build_tbodies_data_add() to decide if this has
+        # to be considered a failure message for filtering purposes.
+        + "<!--failure=1-->")
+
+
+    # Process top level messages (subcase, no links)
+    target_local.property_set(
+        "runner.default.regex.progress_tcf_subcase_nolink.pattern",
+        (
+            "^(?<tag>PASS|INFO|DATA)([0-9]+)" # the tag + verbosity level
+            "/(?<runid_hashid>[-0-9a-z]+)"                        # the runid
+            " +(\\S+)/%(file_path)s"                              # the testcase path after part of the repo name
+            "##(?<subcase>[-_a-zA-Z0-9#]+)*"                      # the subcases
+            " @.*%(targetid)s"                                    # the targetid
+            " (?<ellapsed>\\[\\+[\.0-9]+s\\]):"                   # the elapsed timestamp
+            " (?<message>.*)$"                                    # the leftovers
+        )
+    )
+    target_local.property_set(
+        "runner.default.regex.progress_tcf_subcase_nolink.message",
+        "%(subcase)s")
+    target_local.property_set(
+        "runner.default.regex.progress_tcf_subcase_nolink.result",
+        '<div class = "background_%(tag)s"><code>%(tag)s</code></div>')
+
+    # Process top level messages (subcase, links)
+    target_local.property_set(
+        "runner.default.regex.progress_tcf_subcase_link.pattern",
+        (
+            "^(?<tag>FAIL|ERRR|BLCK|SKIP)([0-9]+)" # the tag + verbosity level
+            "/(?<runid_hashid>[-0-9a-z]+)"                        # the runid
+            " +(\\S+)/%(file_path)s"                              # the testcase path after part of the repo name
+            "##(?<subcase>[-_a-zA-Z0-9#]+)*"                      # the subcases
+            " @.*%(targetid)s"                                    # the targetid
+            " (?<ellapsed>\\[\\+[\.0-9]+s\\]):"                   # the elapsed timestamp
+            " (?<message>.*)$"                                    # the leftovers
+        )
+    )
+    target_local.property_set(
+        "runner.default.regex.progress_tcf_subcase_link.message",
+        "%(subcase)s")
+    target_local.property_set(
+        "runner.default.regex.progress_tcf_subcase_link.result",
+        runner_default_regex_progress_tcf_result_link_template
+        + "<!--failure=1-->")
+
+    # Ignore these, they don't provide anything helpful
+    target_local.property_set(
+        "runner.default.regex.ignore_tcf.pattern",
+        # filter out messages like
+        #
+        ## INFO1/20240101-0101-90-izu5rv repo.git/path/test_name.py @qemu-02e [+0.1s]: will run on target group 'target=qemu-02e:x86_64' (PID 303 / TID 7ffff59d2640)
+        ## INFO1/20240101-0101-90-izu5rv repo.git/path/test_name.py @qemu-02e [+0.1s]: allocation ID: ohqhr_qu
+        #
+        "^.*: (will run on target group.*|allocation ID:.*)$"
+    )

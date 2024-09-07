@@ -1,0 +1,116 @@
+<!-- this is the start of file ui/widget-target-runner-one.html for {{ runner }} -->
+
+<table class='display' id = "label_id_runner_{{ runner }}_table">
+  {# this row has the button to keep status and the button to start #}
+  <thead id = "label_id_runner_{{ runner }}_table_main_control">
+
+      <th align = "left">
+        <code><label id = "label_id_runner__{{ runner}}__status">UNKNOWN</label></code>
+      </th>
+
+      <!-- this is the only way I've managed for both buttons to be
+           in the same line so that i also makes the column the right
+           width. Not a fan of HTML and CSS and all this jazz  -->
+      <th style = "min-width: 5em; display: inline-block; vertical-align: middle; " align = "left">
+        <span class = "tooltip">
+          <button id = 'widget-runner-{{ runner }}-reload-button'
+                  onclick = 'js_runner_state_update("{{ runner}}", "{{ targetid }}")'>
+            <span class=reload>&#x21bb;</span>
+            <script>
+  <!-- update the runner state when we load -->
+  js_runner_state_update("{{ runner}}", "{{ targetid }}")
+            </script>
+          </button>
+          <span class = "tooltiptext">
+            Reload the latest information from the pipeline
+          </span>
+        </span>
+        {# Move to the other button when we clean up all that code so
+        all buttons are together and tips display properly #}
+        <!--Display previous runs if DB access configured-->
+        {% if runner_mongo_url and runner_mongo_db and runner_mongo_collection %}
+        <span class = "tooltip">
+          <button 
+            id = 'widget-runner-{{ runner }}-toggle-previous-builds'
+            onclick = 'js_runner_previous_builds_toggle("{{ runner }}", "{{ targetid }}")'>
+            ⏲
+          </button>
+          <!--Display previous runs-->
+          <span class = "tooltiptext">
+            Display summary information about previous runs.<br>
+            <br>
+            Data is obtained from from MongoDB database <i>{{ runner_mongo_url }}</i>
+            database <i>{{ runner_mongo_db }}</i>
+            collection <i>{{ runner_mongo_collection }}</i>.
+          </span>
+        </span>
+        {% else %}
+        <span class = "tooltip">
+          <button disabled>
+            ⏲
+          </button>
+          <span class = "tooltiptext">
+            Display summary information about previous
+            runs.<br>
+            <br>
+            <b>**Disabled**</b> since target {{targetid}} does not expose in
+            inventory <i>runner.{{ runner }}</i> the
+            fields <i>mongo_url</i>, <i>mongo_db</i>
+            and <i>mongo_collection</i> needed to access the result database.
+          </span>
+        </span>
+        {% endif %}  
+      </th>
+
+      <th align = "left">
+        {# if inventory.{{ runner }}.mongo_url ... #}
+        <span class = "tooltip">
+          <!-- we use the label in the javascript -- note the play
+          icon ▶ gets replaced with the stop icon by Javascript -->
+          <button
+            class = 'primary'
+            id = 'widget-runner-{{ runner }}-run-button'
+            onclick = 'js_runner_start_or_stop("{{ runner }}", "{{ targetid }}", "{{ state.alloc }}")'
+            label_original = "{{ runner_button_name }}">
+            ▶
+          </button>
+          <span class = "tooltiptext">
+            Starts a new run or stops an ongoing one<br>
+            <br>
+            Uses <i>{{ runner_type }}</i> pipeline
+            <a href = "{{ runner_pipeline }}">{{ runner_pipeline }}</a>
+            to run script {{ runner_file_path }} from GIT repo
+            <!-- to link the testcase we need to prune the .git
+                 from the URL and prefix the branch name which currently
+                 we do not have? -->
+            <a href = "{{ runner_repository }}">
+              {{ runner_repository }}</a>,
+            notifying <i>{{ runner_notify }}</i>.
+          </span>
+        </span>
+        {{ runner_button_name }}
+      </th>
+
+  </thead>
+  
+  {# these are for the main build, the one we ran/will run; we make
+  them fixed, this way they are always in the same place; the
+  historical ones we add them after this #}
+  
+  <tbody id = "label_id_runner_{{ runner }}_build_main_header">
+  </tbody>
+  <!-- FIXME: unify names with build ids -->
+  <tbody id = "label_id_runner_{{ runner }}_build_main_data">
+  </tbody>
+
+  {# tables for other builds will be inserted here; one tbody for
+  the build header, one for the data with ids
+
+  - label_id_runner_{{ runner }}_build_BUILD_header
+  - label_id_runner_{{ runner }}_build_BUILD_data
+
+  #}
+  
+</table>
+
+<!-- this is the end of file ui/widget-target-runner-one.html for {{ runner }} -->

@@ -156,7 +156,6 @@ image_path_prefixes = []
 inventory_descriptions = {}
 
 
-
 # FIXME: need to unify this, since ttbd uses it too
 def flask_logi_abort(http_code, message, **kwargs):
     logging.info(message, **kwargs)
@@ -575,6 +574,14 @@ def _target(targetid):
     if not target.check_user_allowed(calling_user):
         flask.abort(404, f"{targetid}: access not allowed")
 
+    # export the local target's inventory, we use it to get templates
+    # in some modules (like widget-runner) for other targets.
+    target_local = ttbl.config.targets.get("local", None)
+    if target_local != None:
+        inventory_local = target_local.to_dict(list())
+    else:
+        inventory_local = dict()
+
     # FIXME: these two are always the same, we shall be able to
     # coalesce them
     inventory = target.to_dict(list())
@@ -675,6 +682,8 @@ def _target(targetid):
         'target.html',
         targetid = targetid,
         inventory_str = inventory_str,
+        inventory = inventory,
+        inventory_local = inventory_local,	# used to generate defaults
         state = state,
         powerls = power_component_description,
         images = images,
