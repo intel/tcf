@@ -5,8 +5,7 @@ junit_xml               # package: fedora=python3-junit_xml ubuntu=python3-junit
 keyring                 # package: fedora,ubuntu=python3-keyring
 mariadb                 # package: fedora,centos=mariadb
 numpy                   # package: python3-numpy
-# CentOS7's pip3 is quite old, barfs at newer; but then 3.1.0.4 can't
-# be found on Ubuntu20...
+# Versions bumped due to https://github.com/intel/tcf/security/dependabot/2 CVE-2023-4863 
 opencv-python==4.8.1.78 # package: fedora,ubuntu=python3-opencv
 pylint                  # package: python3-pylint ubuntu=pylint
 pymongo                 # package: python3-pymongo
