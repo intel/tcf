@@ -597,6 +597,10 @@ Other interfaces
 .. automodule:: ttbl.images
 .. automodule:: ttbl.things
 
+Miscellaneous
+-------------
+
+.. automodule:: ttbl.mongodb
 
 Common helper library
 ---------------------
