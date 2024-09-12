@@ -32,6 +32,11 @@ async function acquire(target_list) {
     });
 
     let b = await r.text();
+    let queue_val = JSON.parse(b);
+    if (queue_val.state == 'busy'){
+        alert('System is already allocated, please select another one');
+        return
+    }
 
     if (r.status == 401) {
         alert(
@@ -42,7 +47,11 @@ async function acquire(target_list) {
     }
 
     if (r.status != 200) {
-        alert(b);
+        alert('Select a target to acquire');
+        return
+    }
+    else{
+        alert("System acquired successfully")
         return
     }
 
