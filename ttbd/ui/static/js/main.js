@@ -676,6 +676,8 @@ function show_inventory() {
 }
 
 
+var TERMINAL_BUFFER = {};
+
 /*
  * Create a terminal and make a loop calling `terminal_get_content` every n
  * (200) miliseconds
@@ -699,10 +701,24 @@ function terminal_create(div_id, targetid, terminal) {
         fontFamily: 'monospace',
         convertEol: true
     });
+
+    /* Initialize buffer for terminal on creation */
+    TERMINAL_BUFFER[div_id] = {buffer: [], sending: false};
+
     term.open(document.getElementById(div_id));
     term.write('\x1b[37;40m \n\r\r\nconsole was started;\r\r\n\n\x1b[0m');
-    term.onData(async function(data) {
-        await terminal_send_keystroke(targetid, terminal, data);
+    term.onData(function(data) {
+        /* we add the data to the buffer, this will be sent to
+         * the server in the next iteration of the interval
+        */
+        TERMINAL_BUFFER[div_id].buffer.push(data);
+
+        /* if we are not sending anything, we start sending the
+         * buffer sequencially 
+        */
+        if (!TERMINAL_BUFFER[div_id].sending) {
+            terminal_send_keystroke_sequencially(div_id, targetid, terminal);
+        }
     });
 
     /* here we loop calling the terminal_get_content function every n
@@ -859,6 +875,39 @@ async function terminal_send_keystroke(targetid, terminal, keystroke) {
         );
         return
     }
+}
+
+
+/**
+ * Recursive function call to send keystrokes sequencially to the terminal.
+ * 
+ * This function reads the global variable `TERMINAL_BUFFER` to get the
+ * keystrokes to send to the terminal. It will send the first keystroke in the
+ * buffer and then call itself again to send the next one. If the buffer is
+ * empty it will set the `sending` flag to false and return.
+ * 
+ * @param {div_id} str -> div id where the terminal is
+ * @param {targetid} str -> target id from where you want to send the string to
+ * @param {terminal} str -> name console you want to send the string to
+ * 
+ * @returns {void}
+ */
+async function terminal_send_keystroke_sequencially(div_id, targetid, terminal) {
+    
+    if (TERMINAL_BUFFER[div_id].buffer.length == 0) {
+        TERMINAL_BUFFER[div_id].sending = false;
+        return;
+    }
+
+    TERMINAL_BUFFER[div_id].sending = true;
+    let keystroke = TERMINAL_BUFFER[div_id].buffer.shift();
+
+    /* we need to wait for the keystroke to be sent before sending
+     * the next one, this is why we need to wait for the promise to resolve
+    */
+    await terminal_send_keystroke(targetid, terminal, keystroke);
+
+    terminal_send_keystroke_sequencially(div_id, targetid, terminal);
 }
 
 
