@@ -129,6 +129,7 @@ def ipxe_sanboot_url(target, sanboot_url, dhcp = None,
     """
     if power_cycle:
         target.power.cycle()
+        tcfl.biosl.main_menu_expect(target)	# take boot to the BIOS menu
 
     if mac_addr != None:
         commonl.assert_macaddr(mac_addr)
@@ -140,7 +141,8 @@ def ipxe_sanboot_url(target, sanboot_url, dhcp = None,
         target,
         # Eg: UEFI PXEv4 (MAC:4AB0155F98A1)
         r"UEFI PXEv4 \(MAC:%s\)" % mac_addr.replace(":", "").upper().strip(),
-        assume_in_main_menu = not power_cycle)
+        assume_in_main_menu = not power_cycle
+    )
 
     expecter_ipxe_error = target.console.text(
         # When iPXE prints an error, it looks like:
