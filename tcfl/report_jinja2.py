@@ -463,7 +463,7 @@ class driver(tc.report_driver_c):
         # list only the servers that contain the current targets
         servers = set(target.server for target in _tc.targets.values())
         kws['tcfl_config_urls'] = []
-        for server in sorted(list(servers)):
+        for server in sorted(servers, key = lambda server: server.url):
             kws['tcfl_config_urls'].append((
                 server.url,
                 not server.ssl_verify,	# ssl_ignore
