@@ -168,7 +168,7 @@ def _mongo_mk_indexes_collection(collection):
     )
 
 def _mongo_mk_indexes():
-    for collection_name in db.collection_names():
+    for collection_name in db.list_collection_names():
         if collection_name == "system.profile":
             continue
         if collection_name.endswith("summary_per_run"):
