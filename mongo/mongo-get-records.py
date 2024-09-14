@@ -172,6 +172,9 @@ arg_parser.add_argument("--no-hint", action = "store_false", dest = 'hint',
 arg_parser.add_argument("--collections", action = "store_true",
                         default = False,
                         help = "List available collections")
+arg_parser.add_argument("--collection-count", action = "store_true",
+                        default = False,
+                        help = "Print number of records in the collections")
 arg_parser.add_argument("--headers", action = "store_true",
                         default = False,
                         help = "Print column headers")
@@ -220,6 +223,13 @@ if args.runids_list:
     l = [ doc['_id'] for doc in iterator ]
     for _id in sorted(l):
         print(_id)
+    sys.exit(0)
+
+if args.collection_count:
+    collection = db[args.collection_id]
+    # this should be allowing us to only get that data, but I can't find it
+    doc_count = db.command("collstats", "widget-runner")['count']
+    print(doc_count)
     sys.exit(0)
 
 if args.runids_raw_list:
