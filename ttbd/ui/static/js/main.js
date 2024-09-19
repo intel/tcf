@@ -714,11 +714,15 @@ function terminal_create(div_id, targetid, terminal) {
         TERMINAL_BUFFER[div_id].buffer.push(data);
 
         /* if we are not sending anything, we start sending the
-         * buffer sequencially 
+         * buffer, this is to avoid sending the buffer multiple times.
+         * 50ms delay is added to send multiple keystrokes at once
+         * instead of one by one.
         */
-        if (!TERMINAL_BUFFER[div_id].sending) {
-            terminal_send_keystroke_sequencially(div_id, targetid, terminal);
-        }
+       setTimeout(function() {
+            if (!TERMINAL_BUFFER[div_id].sending) {
+                terminal_send_keystroke_buffer(div_id, targetid, terminal);
+            }
+        }, 50);
     });
 
     /* here we loop calling the terminal_get_content function every n
@@ -879,11 +883,11 @@ async function terminal_send_keystroke(targetid, terminal, keystroke) {
 
 
 /**
- * Recursive function call to send keystrokes sequencially to the terminal.
+ * Recursive function call to send keystrokes to the terminal.
  * 
  * This function reads the global variable `TERMINAL_BUFFER` to get the
- * keystrokes to send to the terminal. It will send the first keystroke in the
- * buffer and then call itself again to send the next one. If the buffer is
+ * keystrokes to send to the terminal. It will send the complete buffer
+ * and then call itself again to send the next available buffer. If the buffer is
  * empty it will set the `sending` flag to false and return.
  * 
  * @param {div_id} str -> div id where the terminal is
@@ -892,7 +896,7 @@ async function terminal_send_keystroke(targetid, terminal, keystroke) {
  * 
  * @returns {void}
  */
-async function terminal_send_keystroke_sequencially(div_id, targetid, terminal) {
+async function terminal_send_keystroke_buffer(div_id, targetid, terminal) {
     
     if (TERMINAL_BUFFER[div_id].buffer.length == 0) {
         TERMINAL_BUFFER[div_id].sending = false;
@@ -900,14 +904,16 @@ async function terminal_send_keystroke_sequencially(div_id, targetid, terminal) 
     }
 
     TERMINAL_BUFFER[div_id].sending = true;
-    let keystroke = TERMINAL_BUFFER[div_id].buffer.shift();
+    /* convert the buffer to a string */
+    let keystrokes = TERMINAL_BUFFER[div_id].buffer.join("");
+    TERMINAL_BUFFER[div_id].buffer = [];
 
     /* we need to wait for the keystroke to be sent before sending
      * the next one, this is why we need to wait for the promise to resolve
     */
-    await terminal_send_keystroke(targetid, terminal, keystroke);
+    await terminal_send_keystroke(targetid, terminal, keystrokes);
 
-    terminal_send_keystroke_sequencially(div_id, targetid, terminal);
+    terminal_send_keystroke_buffer(div_id, targetid, terminal);
 }
 
 
