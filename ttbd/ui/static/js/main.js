@@ -859,7 +859,8 @@ async function terminal_send_keystroke(targetid, terminal, keystroke) {
     data.append('component', terminal);
     keystroke = keystroke.toString()
 
-    if (/^[0-9]*$/.test(keystroke)) {
+    /* Handle numbers with space and tabs */
+    if (/^([ \t]*[0-9]+[ \t]*)*$/.test(keystroke)) {
         // the keystroke is a number, we need to add the '"' to not trip the
         // js and have him send a integer
         data.append('data', '\"' + keystroke + '\"');
