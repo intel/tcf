@@ -1243,6 +1243,42 @@ class test_target(object):
             return None
         return target
 
+
+
+    def check_user_roles_allowed(self, roles: dict):
+        """
+        Check if a user that has the given roles can access this target
+
+        :param roles dict: dict of user's roles, keyed by role
+          name and value being *True* if active, *False* if inactive
+
+        :returns: bool *True* if user can access this target, *False*
+          otherwise.
+        """
+        if not roles:	# not even logged in
+            return False
+
+        if roles.get('admin') == True:
+            # admins are always in
+            return True
+
+        roles_excluded = self.tags.get('_roles_excluded', [])
+        for role in roles_excluded:	# users to be excluded
+            if roles.get('role') == True:
+                return False
+        roles_required = self.tags.get('_roles_required', [])
+        if roles_required:		# do you require a role?
+            for role in roles_required:
+                if roles.get(role) == True:
+                    return True		# it has the role, good
+            return False		# does not have it, out
+
+        # If there are no requirements and no exclusions, by default
+        # you can come in
+        return True
+
+
+
     def check_user_allowed(self, user):
         """
         Return if *user* is allowed to see/use this target
@@ -1255,25 +1291,10 @@ class test_target(object):
             # get sent by Flask or whoever is wrapping us, which we
             # don't want to know here.
             return False
-        if user.role_get('admin'):	# admins are always in
-            return True
+        user_roles = calling_user.role_list()
+        return self.check_user_roles_allowed(user_roles)
 
-        # Note we get it only from the tags, so it cannot be overriden
-        # by fsdb
-        roles_required = self.tags.get('_roles_required', [])
-        roles_excluded = self.tags.get('_roles_excluded', [])
-        for role in roles_excluded:	# users to be excluded
-            if user.role_get(role):
-                return False
-        if roles_required:		# do you require a role?
-            for role in roles_required:
-                if user.role_get(role):
-                    return True		# it has the role, good
-            return False		# does not have it, out
 
-        # If there are no requirements and no exclusions, by default
-        # you can come in
-        return True
 
     def to_dict(self, projections = None):
         """
