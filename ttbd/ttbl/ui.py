@@ -64,6 +64,7 @@ with this.
 
 import collections
 import copy
+import concurrent
 import fnmatch
 import glob
 import logging
@@ -282,8 +283,80 @@ def short_field_maybe_add(d: dict, fieldname: str, max_length: int):
         d[fieldname + "_short"] = v[:max_length] + "..."
 
 
+def _target_ui_fill(target: ttbl.test_target,
+                    user_roles: dict, preferred_fields_list: list,
+                    preferred_fields_regexes: dict):
+    try:
+        if not target.check_user_roles_allowed(user_roles):
+            return None, None
 
-@bp.route('/', methods = ['GET'])
+        d = None
+        # inventory_to_display is a list of tuples that looks something like:
+        # [('some_key', 'some_value'), ('other.key.name', 'value'),...  ]
+        inventory_to_display = commonl.dict_to_flat(
+            target.tags, preferred_fields_list, sort = False, empty_dict = True)
+        inventory_to_display += target.fsdb.get_as_slist(*preferred_fields_list)
+
+        # We now have in `inventory_to_display` all the info we will show in
+        # the different columns, the thing is, we do not know on which column
+        # to put each item. So we are going to use `fnmatch` to group them.  We
+        # will exec the regex on the entires and group together all those that
+        # match. Under a that looks like this
+        # targets = {
+        #   'target-1': {
+        #       'some_custom_field_*_that_groups_keys': {
+        #           'all_entires': [
+        #               ('some_custom_field_1_that_groups_keys', 'value'),
+        #               ('some_custom_field_2_that_groups_keys', 'other'),
+        #               ('some_custom_field_3_that_groups_keys', 'thing'),
+        #           ],
+        #       },
+        #       'other_field_*': {
+        #           'all_entires': [
+        #               ('other_field_a', 'jose'),
+        #               ('other_field_c', 'pedro'),
+        #           ],
+        #       },
+        #   },
+        #   'target-2': {
+        #   ...
+        # }
+        d = {}
+        for key, entry in inventory_to_display:
+            for preferred_field, preferred_field_regex in preferred_fields_regexes.items():
+                m = preferred_field_regex.match(key)
+                if m:
+                    if preferred_field not in d:
+                        d[preferred_field] = {
+                            'all_entries': [( key, entry )],
+                        }
+                        continue
+                    d[preferred_field]['all_entries'] += [( key, entry )]
+
+        for fields_group_name, fields in d.items():
+            # if one fields_group_name has a lot of elements, the table cell
+            # will look messy with a bunch on the html.
+            # We want to just render the first entries and add a button to show
+            # all the info if needed.
+            #
+            # jinja can not break out of a loop, so if a group of fields is
+            # large enough (> `max_entries_to_render` entries).
+            #
+            # we add a new key to the dict, first_entires, we render those in
+            # the table html, and add everything else to a pop up
+            max_entries_to_render = 3
+            if len(fields['all_entries']) > max_entries_to_render:
+                d[fields_group_name]['first_entries'] = \
+                    fields['all_entries'][:max_entries_to_render]
+                continue
+            d[fields_group_name]['first_entries'] = None
+        return d, None
+    except Exception as e:
+        return None, e
+
+
+
+@bp.route('/', methods = [ 'GET' ])
 def _targets():
     '''
     index page for the website, it consists of a table with all the targets,
@@ -312,78 +385,51 @@ def _targets():
             value = preferred_fields,
         )
 
-    preferred_fields = preferred_fields.split(',')
-    for targetid, target in ttbl.config.targets.items():
-        if not target.check_user_allowed(calling_user):
-            continue
-        target = ttbl.config.targets.get(targetid, None)
+    preferred_fields_regexes = {}
+    preferred_fields_list = preferred_fields.split(',')
+    for preferred_field in preferred_fields_list:
+        # regex is faster than fnmatch (in testing with timeit), so we xlate it
+        preferred_fields_regexes[preferred_field] = re.compile(fnmatch.translate(preferred_field))
 
-        # inventory_to_display is a list of tuples that looks something like:
-        # [('some_key', 'some_value'), ('other.key.name', 'value'),...  ]
-        inventory_to_display = commonl.dict_to_flat(
-            target.tags, preferred_fields, sort = False, empty_dict = True)
-        inventory_to_display += target.fsdb.get_as_slist(*preferred_fields)
+    if isinstance(calling_user, ttbl.user_control.User):
+        user_roles = calling_user.role_list()
+    else:
+        user_roles = {}
 
-        # We now have in `inventory_to_display` all the info we will show in
-        # the different columns, the thing is, we do not know on which column
-        # to put each item. So we are going to use `fnmatch` to group them.  We
-        # will exec the regex on the entires and group together all those that
-        # match. Under a that looks like this
-        # targets = {
-        #   'target-1': {
-        #       'some_custom_field_*_that_groups_keys': {
-        #           'all_entires': [
-        #               ('some_custom_field_1_that_groups_keys', 'value'),
-        #               ('some_custom_field_2_that_groups_keys', 'other'),
-        #               ('some_custom_field_3_that_groups_keys', 'thing'),
-        #           ],
-        #       },
-        #       'other_field_*': {
-        #           'all_entires': [
-        #               ('other_field_a', 'jose'),
-        #               ('other_field_c', 'pedro'),
-        #           ],
-        #       },
-        #   },
-        #   'target-2': {
-        #   ...
-        # }
-        targets[targetid] = {}
-        for key, entry in inventory_to_display:
-            for preferred_field in preferred_fields:
-                regex = fnmatch.translate(preferred_field)
-                r = re.compile(regex)
-                m = r.match(key)
-                if m:
-                    if preferred_field not in targets[targetid]:
-                        targets[targetid][preferred_field] = {
-                            'all_entries': [(key, entry)],
-                        }
-                        continue
-                    targets[targetid][preferred_field]['all_entries'] += [(key, entry)]
+    # see ttbd._targets_gets(), same pattern
+    if len(targets) < 30:
+        for targetid, target in ttbl.config.targets.items():
+            r, _e = _target_ui_fill(target, user_roles,
+                                   preferred_fields_list,
+                                   preferred_fields_regexes)
+            if r != None:
+                targets[targetid] = r
+    else:
+        executor = concurrent.futures.ProcessPoolExecutor(
+            commonl.processes_guess(-1.5))
+        futures = {
+            # for each target, queue a thread that will call
+            # _target_ui_fill, who will call fn taking care
+            # of exceptions
 
-        for fields_group_name, fields in targets[targetid].items():
-            # if one fields_group_name has a lot of elements, the table cell
-            # will look messy with a bunch on the html.
-            # We want to just render the first entries and add a button to show
-            # all the info if needed.
-            #
-            # jinja can not break out of a loop, so if a group of fields is
-            # large enough (> `max_entries_to_render` entries).
-            #
-            # we add a new key to the dict, first_entires, we render those in
-            # the table html, and add everything else to a pop up
-            max_entries_to_render = 3
-            if len(fields['all_entries']) > max_entries_to_render:
-                targets[targetid][fields_group_name]['first_entries'] = \
-                                fields['all_entries'][:max_entries_to_render]
-                continue
-            targets[targetid][fields_group_name]['first_entries'] = None
+            # self.aliases.get(component, component): gets the real
+            # component name if there is an alias; if there is no alias, we just use
+            # the component name we got
+            executor.submit(_target_ui_fill, target, user_roles,
+                            preferred_fields_list,
+                            preferred_fields_regexes): target.id
+            for target in targets
+        }
+        for future in concurrent.futures.as_completed(futures, timeout = 20):
+            targetid = futures[future]
+            d, e = future.result()
+            if d:
+                targets[targetid] = d
 
     return flask.render_template(
         'targets.html',
         targets = targets,
-        preferred_fields = preferred_fields,
+        preferred_fields = preferred_fields_list,
         servers_info = servers_info_get()
     )
 

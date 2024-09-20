@@ -26,6 +26,7 @@ FIXME: write up in progress
 
 import base64
 import collections
+import concurrent
 import contextlib
 import io
 import math
@@ -840,6 +841,24 @@ def _user_role(userid, action, role):
 
 
 
+def _target_get(target: ttbl.test_target, projections: list, roles: dict):
+    try:
+        if not target.check_user_roles_allowed(roles):
+            return None, None
+        d = target.to_dict(projections)
+        if d:
+            # list it only if the projections yielded a non empty
+            # set of data
+            d['id'] = target.id
+            return d, None
+        else:
+            return None, None
+    except Exception as e:
+        logging.exception(e)
+        return None, e
+
+
+
 @app.route(API_PREFIX + 'targets/', methods = ['GET'])
 @app.route(API_PREFIX + 'targets/<string:target_id>', methods = ['GET'])
 @flask_login.login_required
@@ -857,15 +876,37 @@ def _targets_gets(target_id: str = None):
     else:
         targets = ttbl.test_target.known_targets()
     d = None	# keep this out of for for scope, see after for
-    for target in targets:
-        if not target.check_user_allowed(calling_user):
-            continue
-        d = target.to_dict(projections)
-        if d:
-            # list it only if the projections yielded a non empty
-            # set of data
-            d['id'] = target.id
-            result[target.id] = d
+
+    user_roles = calling_user.role_list()
+
+    # if we don't have many targets, do it sequentially; otherwise
+    # parallelize it
+    if len(targets) < 30:
+        for target in targets:
+            d, e = _target_get(target, projections, roles)
+            if d != None:
+                result[target.id] = d
+    else:
+        executor = concurrent.futures.ProcessPoolExecutor(
+            commonl.processes_guess(-1.5))
+        futures = {
+            # for each target, queue a thread that will call
+            # _target_check, who will call fn taking care
+            # of exceptions
+
+            # self.aliases.get(component, component): gets the real
+            # component name if there is an alias; if there is no alias, we just use
+            # the component name we got
+            executor.submit(_target_get, target, projections, user_roles): target.id
+            for target in targets
+        }
+        for future in concurrent.futures.as_completed(
+                futures, timeout = 20):
+            targetid = futures[future]
+            d, e = future.result()
+            if d:
+                result[targetid] = d
+
     if target_id and len(result) == 1:
         # we asked for info about a SINGLE target and we found it, so
         # we return only the info for that single target
