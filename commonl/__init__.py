@@ -3064,7 +3064,14 @@ class io_tls_prefix_lines_c(io.BufferedWriter):
         # first. Accumulate anything left over after the last newline
         # so we can flush it next time we find one.
         offset = 0
-        if not isinstance(s, str):
+        if isinstance(s, bytes):
+            # this might be a log file, so first try to see if we can
+            # represent it as unicode, so it'll report more readable
+            try:
+                s = s.decode()
+            except UnicodeDecodeError:
+                s = str(s)
+        elif not isinstance(s, str):
             s = str(s)
         while offset < len(s):
             pos = s.find('\n', offset)
