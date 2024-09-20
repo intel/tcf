@@ -2785,6 +2785,15 @@ class tls_prefix_c(object):
         return getattr(self.tls, "prefix_c", None)
 
 
+
+def __line__() -> int:
+    """
+    Return the line number this is executing in python source code
+    """
+    return sys._getframe(1).f_lineno
+
+
+
 def data_dump_recursive(d, prefix = u"", separator = u".", of = sys.stdout,
                         depth_limit = 20):
     """
