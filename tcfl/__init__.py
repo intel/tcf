@@ -197,7 +197,7 @@ class result_c:
         return e
 
     def report(self, _reporter, message, attachments = None,
-               level = None, dlevel = 0, alevel = 2):
+               level = None, dlevel = 0, alevel = 2, subcase = None):
         assert isinstance(_reporter, (tc.tc_c, tc.target_c))
         assert isinstance(message, str)
         if attachments:
@@ -236,7 +236,8 @@ class result_c:
             message = '(nothing ran) ' + message
 
         report_fn(message, attachments,
-                  level = level, dlevel = dlevel, alevel = alevel)
+                  level = level, dlevel = dlevel, alevel = alevel,
+                  subcase = subcase)
 
 
     @staticmethod
@@ -2243,7 +2244,8 @@ class server_c:
             # us too long
             if target_id:
                 r = self.send_request("GET", "targets/" + target_id,
-                                      data = data, raw = True, timeout = 10)
+                                      data = data, raw = True,
+                                      timeout = 30)
                 # when we are asking for a single target, we get
                 #
                 ## { FIELD: VALUE, ... }
@@ -2255,7 +2257,8 @@ class server_c:
                 _rt_handle(target_id, rt)
             else:
                 r = self.send_request("GET", "targets/",
-                                      data = data, raw = True, timeout = 10)
+                                      data = data, raw = True,
+                                      timeout = 30)
                 # When asking for multiple targets, we get
                 #
                 ## { TARGETID1: { FIELD: VALUE, ... }, TARGETID2: ... }
@@ -2277,7 +2280,8 @@ class server_c:
             return server_rts, server_rts_flat, server_inventory_keys
         except requests.exceptions.RequestException as e:
             self._record_failure()
-            log_sd.error("%s: can't use: %s", self.url, e)
+            log_sd.error("%s: can't use: %s", self.url, e,
+                         exc_info = commonl.debug_traces)
             return {}, {}, {}
 
 
