@@ -141,7 +141,7 @@ def ipxe_sanboot_url(target, sanboot_url, dhcp = None,
         target,
         # Eg: UEFI PXEv4 (MAC:4AB0155F98A1)
         r"UEFI PXEv4 \(MAC:%s\)" % mac_addr.replace(":", "").upper().strip(),
-        assume_in_main_menu = not power_cycle
+        assume_in_main_menu = power_cycle	# if power cycle, BIOS is in menu
     )
 
     expecter_ipxe_error = target.console.text(

@@ -143,7 +143,7 @@ class _test(tcfl.pos.tc_pos_base):
             target,
             # Eg: UEFI PXEv4 (MAC:4AB0155F98A1)
             r"UEFI PXEv4 \(MAC:%s\)" % mac_addr.replace(":", "").upper().strip(),
-            #assume_in_main_menu = True
+            assume_in_main_menu = True,		# we have taken boot to it already
         )
         # can't wait also for the "ok" -- debugging info might pop in th emiddle
         target.expect("iPXE initialising devices...")
