@@ -30,13 +30,25 @@ logger = logging.getLogger("tcfl.servers")
 
 _subsystem_setup = False
 
-
+#: Discover more servers or only use those in tcfl.config.urls when
+#: initialized?
+servers_discover = True
 
 def _discover_bare(*args, ssl_ignore = True, **kwargs):
     # this takes stuff in added by config files to tcfl.config.urls to
     # seed, stuff we saved on disk from previous runs or defaults to
     # hostname "ttbd" that is resovled
-    tcfl.server_c.discover(*args, ssl_ignore = ssl_ignore, **kwargs)
+
+    if servers_discover == False:
+        tcfl.server_c.discover(
+            # this is a list of [ ( URL, ssl_ignore, origin...) ]
+            seed_url = [ i[0] for i in tcfl.config.urls ],
+            ssl_ignore = ssl_ignore,
+            ignore_cache = True,
+            loops_max = 0
+        )
+    else:
+        tcfl.server_c.discover(*args, ssl_ignore = ssl_ignore, **kwargs)
 
     if not tcfl.server_c.servers:
         logger.warning(

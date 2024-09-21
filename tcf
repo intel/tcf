@@ -158,6 +158,13 @@ if __name__ == "__main__":
         "-u", "--url", action = "append", default = [],
         help = "URL to the test broker (multiple may be specified)")
     arg_parser.add_argument(
+        "--servers-discover", action = "store_true", default = True,
+        help = "Do not discover servers, use only those given with --url")
+    arg_parser.add_argument(
+        "--no-servers-discover", action = "store_false",
+        dest = "servers_discover",
+        help = "Force discovering more servers")
+    arg_parser.add_argument(
         "-d", "--debug", action = "store_true", default = False,
         help = "Enable internal debug prints and checks and"
         " extra logging info")
@@ -426,6 +433,13 @@ tcf-jobserver-run:
             tcfl.config.urls = []
         else:
             tcfl.config.url_add(url, args.ignore_ssl, origin = "command line")
+
+    # ugly hack--if we are disabling server discovery, we need to set
+    # it in tcfl.servers--defaults to True--so that it can be
+    # acknowledged
+    if not args.servers_discover:
+        import tcfl.servers
+        tcfl.servers.servers_discover = False
 
     tcfl.config.load(config_path = args.config_path,
                      config_files = args.config_files,
