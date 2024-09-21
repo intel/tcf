@@ -972,7 +972,23 @@ def _command_install(args):
     else:
         methods = [ method_abc.methods_by_name[distro_method] ] \
             + list(method_abc.generic_methods.values())
+    skip_regexes = []
+    for pattern in args.skip_package:
+        skip_regexes.append(re.compile(pattern))
     for package, package_data in packages.items():
+        # Gotta skip?
+        for skip_regex in skip_regexes:
+            m = skip_regex.search(package)
+            if m:
+                break
+        else:
+            m = None
+        if m:
+            logging.error(f"{package}: skipping, matches"
+                          f" --skip-packages {skip_regex.pattern}")
+            continue
+
+        # clear, let's go
         logging.warning(f"{package}: installing")
         logging.info(f"{package}: package data {package_data}")
         methods_tried = []
@@ -1128,6 +1144,12 @@ ap.add_argument(
     "-s", "--sudo", 
     action = "store_true", default = True, dest = "sudo",
     help = "Run dnf/apt (system level package managers) under sudo [%(default)s]")
+ap.add_argument(
+    "--skip-package", action = "append", metavar = "PACKAGENAMEREGEX",
+    help = "skips any packge that matches python regex PACKAGENAMEREGEX; "
+    " note this only skips top level requests from nreqs specs, not "
+    " dependencies of those"
+    " (eg: ^gcc.* skips installing anything whose name starts with gcc)")
 ap.add_argument(
     "-u", "--no-sudo", 
     action = "store_false", default = True, dest = "sudo",
