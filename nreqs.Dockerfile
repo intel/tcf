@@ -31,10 +31,15 @@ COPY . /home/work/tcf.git
 # rm -rf : leftover lib from pip3 removed
 # chmod: when we run inside Jenkins, it'll use which ever UID it uses
 #        (can't control it), so we need /home/work world accesible
+#
+# Note --skip-packages=tcf-client to nreqs; we try to install in this
+# container images all the deps needed to build TCF itself, but it picks
+# up also the ones needed to run the server (the client package) so
+# when building the container we tell it to skip that.
 RUN \
     chmod a+rwX -R /home/work && \
     dnf install -y python3-pip python3-yaml && \
-    DNF_COMMAND=dnf /home/work/tcf.git/nreqs.py install /home/work/tcf.git && \
+    DNF_COMMAND=dnf /home/work/tcf.git/nreqs.py install --skip-package=tcf-client /home/work/tcf.git && \
     dnf install -y \
         bind-utils \
         iputils \
@@ -45,6 +50,7 @@ RUN \
     sed -i 's|#!python|#! /usr/bin/env python3|' /usr/bin/tcf && \
     rm -rf lib
 
+# we run this from the source package, we do not install it
 ENV HOME=/home/work
 WORKDIR /home/work
 ENTRYPOINT [ "tcf" ]
