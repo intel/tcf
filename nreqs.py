@@ -1146,6 +1146,7 @@ ap.add_argument(
     help = "Run dnf/apt (system level package managers) under sudo [%(default)s]")
 ap.add_argument(
     "--skip-package", action = "append", metavar = "PACKAGENAMEREGEX",
+    default = [],
     help = "skips any packge that matches python regex PACKAGENAMEREGEX; "
     " note this only skips top level requests from nreqs specs, not "
     " dependencies of those"
