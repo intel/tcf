@@ -199,9 +199,9 @@ def _cmdline_servers_discover(cli_args: argparse.Namespace):
         seed_port = cli_args.port,
         herds_exclude = cli_args.herd_exclude,
         herds_include = cli_args.herd_include,
-        loops_max = cli_args.iterations,
+        loops_max = 0 if not cli_args.servers_discover else cli_args.iterations,
         max_cache_age = 0,	        # force discoverying all known servers
-        ignore_cache = cli_args.flush,
+        ignore_cache = cli_args.flush or not cli_args.servers_cache,
         zero_strikes_max = cli_args.zero_strikes_max,
         origin = "command line",
     )

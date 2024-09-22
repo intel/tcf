@@ -34,21 +34,24 @@ _subsystem_setup = False
 #: initialized?
 servers_discover = True
 
+#: Use servers from the cache?
+servers_cache = True
+
 def _discover_bare(*args, ssl_ignore = True, **kwargs):
     # this takes stuff in added by config files to tcfl.config.urls to
     # seed, stuff we saved on disk from previous runs or defaults to
     # hostname "ttbd" that is resovled
 
+    _kwargs = dict(kwargs)
+    if 'ignore_cache' not in _kwargs:
+        _kwargs['ignore_cache'] = not servers_cache
+
     if servers_discover == False:
-        tcfl.server_c.discover(
-            # this is a list of [ ( URL, ssl_ignore, origin...) ]
-            seed_url = [ i[0] for i in tcfl.config.urls ],
-            ssl_ignore = ssl_ignore,
-            ignore_cache = True,
-            loops_max = 0
-        )
-    else:
-        tcfl.server_c.discover(*args, ssl_ignore = ssl_ignore, **kwargs)
+        _kwargs.setdefault('seed_url', [])
+        _kwargs['seed_url'] += [ i[0] for i in tcfl.config.urls ]
+        _kwargs['loops_max'] = 0
+
+    tcfl.server_c.discover(*args, ssl_ignore = ssl_ignore, **_kwargs)
 
     if not tcfl.server_c.servers:
         logger.warning(

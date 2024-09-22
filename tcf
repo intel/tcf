@@ -165,6 +165,14 @@ if __name__ == "__main__":
         dest = "servers_discover",
         help = "Force discovering more servers")
     arg_parser.add_argument(
+        "--servers-cache", action = "store_true", default = True,
+        dest = "servers_cache",
+        help = "Use the servers previosuly discovered (cached)")
+    arg_parser.add_argument(
+        "--no-servers-cache", action = "store_false",
+        dest = "servers_cache",
+        help = "Ignore previosuly discovered servers")
+    arg_parser.add_argument(
         "-d", "--debug", action = "store_true", default = False,
         help = "Enable internal debug prints and checks and"
         " extra logging info")
@@ -440,6 +448,10 @@ tcf-jobserver-run:
     if not args.servers_discover:
         import tcfl.servers
         tcfl.servers.servers_discover = False
+
+    if not args.servers_cache:
+        import tcfl.servers
+        tcfl.servers.servers_cache = False
 
     tcfl.config.load(config_path = args.config_path,
                      config_files = args.config_files,
