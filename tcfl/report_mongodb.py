@@ -374,7 +374,7 @@ class driver(tcfl.tc.report_driver_c):
         doc['tc_name'] = tc_name
         doc['timestamp' ] = datetime.datetime.utcnow()
         if runid:
-            doc['_id'] = runid + tcfl.report_runid_hashid_separator + hashid
+            doc['_id'] = runid + tcfl.tc.report_runid_hashid_separator + hashid
         else:
             doc['_id'] = hashid
 
