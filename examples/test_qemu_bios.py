@@ -48,7 +48,9 @@ command fits your distribution)::
 
 now run the testcase::
 
+  $ sudo dnf install -y  gcc git iasl make nasm  # or apt install -y
   $ git clone https://github.com/tianocore/edk2 edk2.git
+  $ git -C edk2.git submodule update --init
   $ git -C edk2.git checkout cb5f4f45ce1f
   $ export EDK2_DIR=$HOME/edk2.git 
   $ IMAGE=clear tcf run -vv /usr/share/tcf/examples/test_qemu_bios.py
@@ -108,24 +110,19 @@ class _test(tcfl.tc.tc_c):
                 "configured, built or ready-to-build tree", dict(level = 0))
         self.builddir = os.environ["EDK2_DIR"]
 
+    new_vendor_name = os.environ.get("BIOS_VENDOR_NAME", "I am the vendor now")
 
     def build_00(self):
-        # Modify the BIOS vendor string to showcase a change
+        # Modify the BIOS vendor string to showcase a change, this is
+        # in file MdeModulePkg/MdeModulePkg.dec, a string that looks like:
         #
-        # Backslashes here are killing us; the original C code is
+        ## gEfiMdeModulePkgTokenSpaceGuid.PcdFirmwareVendor|L"EDK II"|VOID*|0x00010050
         #
-        ## #define TYPE0_STRINGS \
-        ##   "EFI Development Kit II / OVMF\0"     /* Vendor */ \
-        ##   "0.0.0\0"                             /* BiosVersion */ \
-        ##   "02/06/2015\0"                        /* BiosReleaseDate */
-        #
-        # So we need to replace all in the Vendor string until the \0,
-        # but we need to escape that \\ for both python and the
-        # shell. bleh.
+        # We are going to say "I am the vendor now" instead
         self.shcmd_local(
             r"sed -i"
-            " '/Vendor/s|.*\\\\0\"|\"I am the vendor now\\\\0\"|'"
-            " '%s/OvmfPkg/SmbiosPlatformDxe/SmbiosPlatformDxe.c'"
+            f" '/gEfiMdeModulePkgTokenSpaceGuid.PcdFirmwareVendor/s/|L\".*\"|/|L\"{self.new_vendor_name}\"|/'"
+            " '%s/MdeModulePkg/MdeModulePkg.dec'"
             % self.builddir)
 
         #
@@ -185,5 +182,6 @@ class _test(tcfl.tc.tc_c):
         ic.power.cycle()		# need the network to boot POS
         target.pos.boot_to_pos()
         target.shell.run("dmidecode -t bios",
-                         re.compile("Vendor:.*I am the vendor now"))
-        target.report_pass("New BIOS is reporting via DMI/bios Vendor field")
+                         re.compile(f"Vendor:.*{self.new_vendor_name}"))
+        target.report_pass(
+            f"BIOS reports the new vendor name as: {self.new_vendor_name}")

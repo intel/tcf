@@ -43,7 +43,9 @@ machines simultaneously.
 
 Execute :download:`the testcase <../examples/test_qemu_bios_N.py>`::
 
+  $ sudo dnf install -y  gcc git iasl make nasm  # or apt install -y
   $ git clone https://github.com/tianocore/edk2 edk2.git
+  $ git -C edk2.git submodule update --init
   $ git -C edk2.git checkout cb5f4f45ce1f
   $ export EDK2_DIR=$HOME/edk2.git
   $ TARGETS=3 tcf run -vv /usr/share/tcf/examples/test_qemu_bios_N.py
@@ -134,17 +136,16 @@ import tcfl.pos
 TARGETS = int(os.environ.get('TARGETS', 4))
 MODE = os.environ.get('MODE', 'one-per-type')
 
-@tcfl.tc.interconnect("ipv4_addr", mode = MODE)
-@tcfl.tc.target('pos_capable and interfaces.images.bios.instrument', count = TARGETS)
-class _test(tcfl.tc.tc_c):
+import test_qemu_bios
 
-    def configure_00(self):
-        if not 'EDK2_DIR' in os.environ:
-            raise tcfl.tc.skip_e(
-                "please export env EDK2_DIR pointing to path of "
-                "configured, built or ready-to-build tree", dict(level = 0))
-        self.builddir = os.environ["EDK2_DIR"]
+# note we are inheriting test_qemu_bios which ALREADY is asking for an
+# interconnect and 1 target; so we ask for TARGETS-1 more and done
+@tcfl.tc.target('pos_capable and interfaces.images.bios.instrument', count = TARGETS - 1)
+class _test(test_qemu_bios._test):
 
+    # test_qemu_bios._test.configure_00 will be run here
+
+    def configure_10(self):
         # select the targets that can be flashed with the images
         # interface all of them (target, target1, target2...) except
         # for the interconnect (ic).
@@ -154,76 +155,17 @@ class _test(tcfl.tc.tc_c):
                 self.roles.append(role)
 
 
-    def build_00(self):
-        # Modify the BIOS vendor string to showcase a change
-        #
-        # Backslashes here are killing us; the original C code is
-        #
-        ## #define TYPE0_STRINGS \
-        ##   "EFI Development Kit II / OVMF\0"     /* Vendor */ \
-        ##   "0.0.0\0"                             /* BiosVersion */ \
-        ##   "02/06/2015\0"                        /* BiosReleaseDate */
-        #
-        # So we need to replace all in the Vendor string until the \0,
-        # but we need to escape that \\ for both python and the
-        # shell. bleh.
-        self.shcmd_local(
-            r"sed -i"
-            " '/Vendor/s|.*\\\\0\"|\"I am the vendor now\\\\0\"|'"
-            " '%s/OvmfPkg/SmbiosPlatformDxe/SmbiosPlatformDxe.c'"
-            % self.builddir)
+    # test_qemu_bios._test.build_00 will be run here
 
-        #
-        # Build the new BIOS
-        #
-        # I lifted the build instructions of the Fedora 29 spec file
-        # and simplified to the max, but I only know them to work on
-        # this git version; complain otherwise
-        rev = subprocess.check_output(
-            "git -C '%s' rev-parse HEAD" % self.builddir,
-            shell = True)
-        if rev.strip() != "cb5f4f45ce1fca390b99dae5c42b9c4c8b53deea":
-            self.report_info(
-                "WARNING!! WARNING!!! These build process only verified to"
-                " workwith git version cb5f4f45ce, found %s" % rev,
-                level = 0)
-        env = dict(
-            EDK_DIR = self.builddir,
-            GCC5_X64_PREFIX = "x86_64-linux-gnu-",
-            CC_FLAGS = "-t GCC5 -n 4 --cmd-len=65536 -b DEBUG --hash" ,
-            EDK_TOOLS_PATH = os.path.join(self.builddir, "BaseTools"),
-        )
-        env['OVMF_FLAGS'] = "%(CC_FLAGS)s -FD_SIZE_2MB" % env
-
-        self.report_pass("re/building BaseTools in %s" % self.builddir)
-        self.shcmd_local(
-            "cd %s;"
-            " source ./edksetup.sh;"
-            " ${MAKE:-make} -C BaseTools -j4" % self.builddir, env = env)
-
-        # remove -Werror from the configuratio, as there are warnings
-        # that otherwise kill the build
-        self.shcmd_local(
-            "sed -i -e 's/-Werror//' '%s/Conf/tools_def.txt'" % self.builddir)
-
-        self.report_pass("re/building OVMF in %s" % self.builddir)
-        self.shcmd_local(
-            "cd %(EDK_DIR)s;"
-            " source ./edksetup.sh;"
-            " build -a X64 -t GCC5 -p OvmfPkg/OvmfPkgX64.dsc"
-            % env, env = env)
-
-        self.report_pass("built BIOS")
-
-
-
-    def deploy_50(self, ic):
+    def deploy_50(self, ic):	# overrides test_qemu_bios._test.deploy_50
         
         class server_data_c(object):
             def __init__(self):
                 self.lock = threading.Lock()
                 self.remote_file = None
 
+        # keyed by server URL, this means we'll have only ONE entry
+        # per server, so we'll only upload once to each server.
         server_datas = collections.defaultdict(server_data_c)
         
         # Flash the new BIOS before power cycling; make sure we upload
@@ -255,7 +197,7 @@ class _test(tcfl.tc.tc_c):
         self.report_pass("flashed BIOS", dlevel = -1)
 
 
-    def start_00(self, ic):
+    def start_00(self, ic):	# overrides test_qemu_bios._test.start_50()
         ic.power.on()		# need the network to boot POS
 
         @self.threaded
@@ -266,12 +208,14 @@ class _test(tcfl.tc.tc_c):
             _target_start, targets = self.roles)
 
 
-    def eval(self):
+    def eval(self):		# overrides test_qemu_bios._test.eval()
 
         @self.threaded
         def _target_eval(target):
             target.shell.run("dmidecode -t bios",
-                             re.compile("Vendor:.*I am the vendor now"))
+                             re.compile(f"Vendor:.*{self.new_vendor_name}"))
+            target.report_pass(
+                f"BIOS reports the new vendor name as: {self.new_vendor_name}")
 
         self.run_for_each_target_threaded(
             _target_eval, targets = self.roles)
