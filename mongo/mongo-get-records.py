@@ -188,7 +188,7 @@ mc = pymongo.MongoClient(args.mongo_url, **extra_params)
 db = mc[args.mongo_db]
 
 if args.collections:
-    for collection in db.collection_names():
+    for collection in db.list_collection_names():
         print(collection)
     sys.exit(0)
 
