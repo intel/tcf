@@ -1485,19 +1485,24 @@ class server_c:
         with concurrent.futures.ThreadPoolExecutor(
                 len(servers) + len(bad_servers)) as executor:
 
-            rs = executor.map(
-                lambda i: i._herds_get(count, loops_max),
-                itertools.chain(
-                    servers.values(),
-                    bad_servers.values()
-                )
-            )
+            log_sd.debug(f"#{count}/{loops_max}: scheduling _herds_get()")
+            futures = {
+                executor.submit(server._herds_get, count, loops_max): server
+                for server in itertools.chain(servers.values(),
+                                              bad_servers.values())
+
+            }
+            log_sd.debug(f"#{count}/{loops_max}: scheduled all _herds_get()")
             # now gather each the resposne from each server we queried
             # and join them into the current list FIXME: pass a lock
             # to _herds_get() and have it done straight to save an
             # iteration? when we have multiple servers, it'll add to
             # significant wasted computation
-            for server, new_hosts_on_this_server, reason in rs:
+            for future in concurrent.futures.as_completed(futures):
+                server = futures[future]
+                log_sd.debug(f"#{count}/{loops_max}: done {server}")
+                server, new_hosts_on_this_server, reason = future.result()
+                log_sd.debug(f"#{count}/{loops_max}: got {server} results")
                 if new_hosts_on_this_server == None:
                     # this means there was an error querying this
                     # server and is bad (as in we can't contact it or
