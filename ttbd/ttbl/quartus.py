@@ -471,6 +471,7 @@ class jtagd_c(ttbl.power.daemon_c):
     """
 
     jtagd_path = "/opt/quartus/qprogrammer/bin/jtagd"
+    check_path = "/opt/quartus/qprogrammer/linux64/jtagd"
 
     def __init__(self, usb_serial_number, tcp_port, jtagd_path = None,
                  check_path = None, explicit = "off", **kwargs):
@@ -487,6 +488,9 @@ class jtagd_c(ttbl.power.daemon_c):
         self.usb_serial_number = usb_serial_number
         self.tcp_port = tcp_port
 
+        if check_path == None:
+            check_path = self.check_path
+
         cmdline = [
             self.jtagd_path,
             "--no-config",
@@ -502,7 +506,7 @@ class jtagd_c(ttbl.power.daemon_c):
             name = "jtagd", explicit = explicit,
             # ...linux64/jtagd renames itself to jtagd and it makes it hard to kill
             path = "jtagd",
-            check_path = "/opt/quartus/qprogrammer/linux64/jtagd",
+            check_path = check_path,
             **kwargs)
 
         # Register the instrument like this, so it matches pgm_c and
