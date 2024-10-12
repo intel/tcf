@@ -126,11 +126,7 @@ class _test(tcfl.pos.tc_pos_base):
     def eval(self, ic, target):
 
         if self.sanboot_url == None:
-            SANBOOT_URL = os.environ.get("SANBOOT_URL", None)
-            if SANBOOT_URL == None:
-                raise tcfl.tc.blocked_e(
-                    "No default sanboot_url programmed or"
-                    " SANBOOT_URL environment given")
+            SANBOOT_URL = os.environ.get("SANBOOT_URL", "skip")
             self.sanboot_url = SANBOOT_URL
 
         boot_ic = target.kws['pos_boot_interconnect']
