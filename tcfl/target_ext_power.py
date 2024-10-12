@@ -189,13 +189,20 @@ class extension(tc.target_extension_c):
         target.report_info("powered off" + component_s)
 
 
-    def on(self, component = None, explicit = False):
+    def on(self, component = None, explicit = False,
+           console_default_reset: bool = True):
         """
         Power on a target or parts of its power rail
 
         :param str component: (optional) name of component to
           power on, defaults to whole target's power rail
+
+        :param bool console_default_reset: (optional, default *True*)
+          after powering on, reset the default console to it's default
+          value (which is normally a serial port).
         """
+        assert isinstance(console_default_reset, bool), \
+            f"console_default_reset: expected bool, got {type(console_default_reset)}"
         if component != None:
             assert isinstance(component, str)
             component_s = f" component {component}"
@@ -217,8 +224,11 @@ class extension(tc.target_extension_c):
             # extra time, since power ops can take long
             timeout = timeout)
         target.report_info("powered on" + component_s)
-        if hasattr(target, "console"):
-            target.console._set_default()
+        if hasattr(target, "console") and console_default_reset:
+            # reset the default console -- when we boot, any preferred
+            # console will most likely be non-operative and this
+            # causes a lot of grief
+            target.console.default = None
 
 
     def cycle(self, component = None, wait = None, explicit = False):
