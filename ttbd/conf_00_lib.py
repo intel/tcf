@@ -839,6 +839,10 @@ def target_add_to_vlan_interconnects(
 # WebUI helpers
 #
 
+# The Widget Runner allows setting the build_id by any user, so they
+# can reflect on what build they are running
+ttbl.test_target.properties_user.add(re.compile("runner\.[^\.]+\.build_id"))
+
 
 def target_runner_progress_tcf_add(target: ttbl.test_target, runner: str):
     """

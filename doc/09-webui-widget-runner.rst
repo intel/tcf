@@ -450,6 +450,10 @@ The HTML provides the following main input points:
   If access to a MongoDB is enabled and the pipeline has reported
   there, we can report historical information.
 
+The configuration file :mod:`conf_00_lib.py` sets up the ability for
+any user to manipulate the inventory property *runner.RUNNER.build_id*
+of a target they have allocated.
+
 FIXME: Architecture: document MongoDB caching using doc count
 
 
