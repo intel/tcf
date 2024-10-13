@@ -18,8 +18,8 @@
       js_runner_jenkins_log_parse: read jeknins console, parse it
         _js_runner_build_tbodies_add(): add a row header for a build
         _js_runner_build_tbodies_data_add():  add a row of data
-      js_runner_jenkins_state_update_deferred           if the build still going
-        js_runner_jenkins_state_update -> async after 2s
+        calls after 1s in the bground           if the build still going
+          js_runner_jenkins_state_update -> async after 2s
 
 
     js_runner_previous_builds_toggle():
@@ -355,16 +355,6 @@ function js_runner_run_button_disable(runner, reason) {
 }
 
 
-async function js_runner_jenkins_state_update_deferred(
-    runner, targetid, pipeline, file_path, build_id) {
-    /* sleep some */
-    console.log(`js_runner_jenkins_state_update_deferred(${runner}, ${targetid}, ${pipeline}): waiting 1s`)
-    await new Promise(r => setTimeout(r, 2000));	// 1s im ms
-    console.log(`js_runner_jenkins_state_update_deferred(${runner}, ${targetid}, ${pipeline}): calling 1s`)
-    await js_runner_jenkins_state_update(runner, targetid, pipeline, file_path, null);
-}
-
-
 
 /*
   Read the jenkins console output and parse it out to produce
@@ -384,7 +374,7 @@ async function js_runner_jenkins_state_update_deferred(
   only one is running at the same time
 */
 async function js_runner_jenkins_log_parse(
-    runner, targetid, pipeline, build_id, file_path) {
+    runner, targetid, pipeline, build_id, file_path, console_offset_lines) {
 
     const repository = js_runner_field_get(targetid, runner, 'repository');
     const runner_info = {
@@ -401,12 +391,6 @@ async function js_runner_jenkins_log_parse(
 
     let tbody_data_el = document.getElementById(`label_id_runner_${runner}_build_main_data`);
     let table_main_control_el = document.getElementById(`label_id_runner_${runner}_table_main_control`);
-    /* do one attr per build, to simplify not havig to clean it up */
-    let console_offset_lines = table_main_control_el.getAttribute(`console_offset_lines-${build_id}`);
-    if (console_offset_lines == null)
-	console_offset_lines = 0;
-    else
-	console_offset_lines = parseInt(console_offset_lines);
 
     /* get all lines since last count of lines
      *
@@ -421,10 +405,18 @@ async function js_runner_jenkins_log_parse(
 	pipeline, `/${build_id}/timestamps?${search_params.toString()}`,
 	"GET")
     let text = await r.text();
-    var lines = 0;
+    if (!text) {
+	// otherwise we count an extra line and we miss stuff
+	console.log(`js_runner_jenkins_log_parse(${runner}, ${targetid}, ${pipeline}, ${build_id}): got no text empty -> ${console_offset_lines}`)
+	return console_offset_lines;
+    }
 
-    /* extract the regexes from the inventory
-       FIXME: cache this somewhere */
+    /*
+      We got text and need to process it; first extract the regexes
+       from the inventory FIXME: cache this somewhere, noting some of
+       the regexes are relative to this runner and this build, since
+       they can use %(FIELD)s
+    */
 
     const regexes_from_inv = js_runner_field_get(targetid, runner, 'regex');
     const regexes = {}
@@ -472,13 +464,27 @@ CONFIGURATION ERROR: runner.${runner}.regex.${key}.pattern: pattern template con
      * the inventory in runner.RUNNER.regex.* and set displays for it
      *
      */
+    var lines = 0;
     let m = null;
     let parts = null;
     let elapsed = null;
     let rest = null;
-    //console.log(`js_runner_jenkins_log_parse(${runner}, ${targetid}, ${pipeline}, ${build_id}): got text: ${text}`)
-    for (const line of text.split("\n")) {
-	//console.log(`line ${lines} is ${line}`);
+    //console.log(`DEBUG:line text escaped ${escape(text)}`);
+
+    // split() will split lines for a text like L1\nL2\n will be sth
+    // like [ "L1", "L2", "" ]...which can skew the count; so we check
+    // if the last component is an empty string and remove it. If
+    // there is an empty line at the tail it will still show as
+    // L1\nL2\n\n, which would be [ "L1", "L2", "", "" ]
+    let text_split = text.split("\n");
+
+    if (text_split[text_split.length - 1] === '') {
+	// remove the last one to avoid skewing, since it is not a real line
+	text_split.pop();
+    }
+
+    for (const line of text_split) {
+	//console.log(`DEBUG:line ${lines}/${console_offset_lines+lines} is ${line}`);
 	lines++;
 
 	let result = null;
@@ -531,16 +537,14 @@ CONFIGURATION ERROR: runner.${runner}.regex.${key}.pattern: pattern template con
 	// no regex matched with this line, ignored
 	
     }
-    console.log(`js_runner_jenkins_log_parse(${runner}, ${targetid}, ${pipeline}, ${build_id}): got ${lines} more lines`)
-    console_offset_lines += lines;
-    table_main_control_el.setAttribute(`console_offset_lines-${build_id}`,
-				       console_offset_lines);
+    console.log(`js_runner_jenkins_log_parse(${runner}, ${targetid}, ${pipeline}, ${build_id}): got ${lines} more lines -> ${console_offset_lines + lines}`)
+    return console_offset_lines + lines;
 }
 
 
 
 async function js_runner_jenkins_state_update(
-    runner, targetid, pipeline, file_path, build_id = null) {
+    runner, targetid, pipeline, file_path, build_id = null, console_offset_lines = 1) {
     let r = null;
     let html_state_table_el_control = $(`#label_id_runner_${runner}_table_main_control`);
     js_runner_ui_state_set(runner, '<span style="background-color: yellow;">PENDING</span>');
@@ -552,12 +556,16 @@ async function js_runner_jenkins_state_update(
 	// there is a build declared that was running, let's check status on it
 	const [ building, result ] = await js_runner_jenkins_build_state_check(pipeline, build_id)
 	if (building) {
-	    // the build is still going, get the current log and
+	    // the build is still going, get the current log and keep udpating until done
 	    console.log(`js_runner_jenkins_state_update(${runner}, ${targetid}, ${pipeline}): we are running`)
 	    js_runner_ui_state_set(runner, '<span style="background-color: orange;">RUNNING</span>')
 	    js_runner_run_button_disable(runner, `jenkins ${pipeline} running build ${build_id}`);
-	    js_runner_jenkins_log_parse(runner, targetid, pipeline, build_id, file_path);
-	    js_runner_jenkins_state_update_deferred(runner, targetid, pipeline, file_path, build_id);
+	    console_offset_lines = await js_runner_jenkins_log_parse(runner, targetid, pipeline,
+								     build_id, file_path, console_offset_lines);
+	    setTimeout(() =>
+		{ js_runner_jenkins_state_update(runner, targetid, pipeline, file_path,
+						 build_id, console_offset_lines); },
+		2000);
 	} else if (!building && !result) {
 	    // Since this build doesn't exist, just clear it out
 	    console.log(`js_runner_jenkins_state_update(${runner}, ${targetid}, ${pipeline}): ${build_id} doesn't exist, clening`)
@@ -573,7 +581,8 @@ async function js_runner_jenkins_state_update(
 	    let tbody_el = document.getElementById(`label_id_runner_${runner}_build_main_header`);
 	    tbody_el.innerHTML = '';
 	    tbody_el.appendChild(tr_el);
-	    await js_runner_jenkins_log_parse(runner, targetid, pipeline, build_id, file_path);
+	    await js_runner_jenkins_log_parse(runner, targetid, pipeline,
+					      build_id, file_path, console_offset_lines);
 	    // we don't clear the build ID in here, since this was the
 	    // last build run and we can use it to map to results
 	    //js_ttbd_target_property_set(targetid, `runner.${runner}.build_id`, null)
