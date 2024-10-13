@@ -40,7 +40,6 @@
 
   - add error regxes to catch
     - jenkins: failed tcf stuff doesn't error the build
-    - BUG: failed build odesn't report error
 
   - add a tip: you can run this with "tcf run -vt {{ targetid }} ... "
 
@@ -51,8 +50,6 @@
 
   - remove dep on .build_id -> just query jenkins for builds and see
     who is active? who was last?
-
-    - set runner.*.build_id to user setable
 
   - FIXME: this means user A could cancel user B's, which at some
      point we have to address, maybe with dynamic pipelines per
@@ -113,8 +110,8 @@ function js_runner_field_get(targetid, runner, field) {
     const local_runner_value = inventory["local"].runner?.[runner]?.[field] ?? null;
     const runner_value = runner_data[field] ?? null;
 
-    console.log(`js_runner_field_get(${targetid}, ${runner}, ${field}):`
-		+ ` ${local_default_value} ${local_runner_value} ${runner_value}`)
+    //console.log(`js_runner_field_get(${targetid}, ${runner}, ${field}):`
+    //		+ ` ${local_default_value} ${local_runner_value} ${runner_value}`)
 
     // note the values might be objects/dictionaries, so we have to
     // merge them up, with values from targetid.runner.RUNNER
@@ -153,11 +150,9 @@ const jenkins_crumbs = {};
 
 async function jenkins_fetch(pipeline, path, method, body = null) {
     let headers = {};
-    console.log(`jenkins_fetch(${pipeline}, ${path}, ${method}): one`);
     if (pipeline.endsWith("/")) {
 	pipeline = pipeline.slice(0, -1);
     }
-    console.log(`jenkins_fetch(${pipeline}, ${path}, ${method}): two`);
     let url = new URL(pipeline);
     if (!path.endsWith("/crumbIssuer/api/json")) {
   	headers['Jenkins-Crumb'] = await js_widget_runner_jenkins_get_crumb(pipeline);
@@ -455,8 +450,8 @@ CONFIGURATION ERROR: runner.${runner}.regex.${key}.pattern: pattern template con
  ${pattern_templated} is tryingcontains unknown fields ${key}`);
 	    continue;
 	}
-	console.log(`js_runner_jenkins_log_parse(${runner}, ${targetid}, ${pipeline}, ${build_id}):`
-		    + ` compiling regex ${pattern_templated}`);
+	//console.log(`js_runner_jenkins_log_parse(${runner}, ${targetid}, ${pipeline}, ${build_id}):`
+	//	    + ` compiling regex ${pattern_templated}`);
 	regexes[key] = [ new RegExp(pattern_templated), message, result ];
     }
 
