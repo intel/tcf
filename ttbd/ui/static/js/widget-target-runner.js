@@ -162,12 +162,18 @@ async function jenkins_fetch(pipeline, path, method, body = null) {
         console.log(`jenkins_fetch(${pipeline}, ${path}, ${method}): not using crumbs`);
     let r = null
     try {
-	r = await fetch(`${pipeline}/${path}`, {
+	let args =  {
 	    headers: headers,
 	    method: method,
 	    credentials: 'include',
 	    body: body,
-	});
+	};
+	if (path.endsWith("/kill")) {
+	    // when we do kill, we get a 302 but shows as a 0 for whatever
+	    // reaosns, but it's ok
+	    args['redirect'] =  "manual";
+	}
+	r = await fetch(`${pipeline}/${path}`, args);
 	if (r.ok)
 	    return r;
     } catch (e) {
@@ -208,7 +214,11 @@ async function jenkins_fetch(pipeline, path, method, body = null) {
 	);
 	window.location.reload();	// need to reload so the cookies are picked up
     }
-    else  {
+    else if (r.status == 0 && path.endsWith("/kill") && method == "POST") {
+	// when we do kill, we get a 302 but shows as a 0 for whatever
+	// reaosns, but it's ok
+	return r;
+    } else  {
 	confirm_dialog(
 	    `Jenkins call ${pipeline}/${path} returned ${r.status}; check the web console`,
 	    "I am done"
@@ -228,7 +238,7 @@ async function js_widget_runner_jenkins_get_crumb(pipeline) {
     }
     let url = new URL(pipeline);
     let r = await jenkins_fetch(`${url.protocol}//${url.host}`, '/crumbIssuer/api/json',
-				"GET")
+				"GET");
     crumb = (await r.json())['crumb'];
     console.log(`js_widget_runner_jenkins_get_crumb(${pipeline}): got new ${crumb}`);
     jenkins_crumbs[pipeline] = crumb;
@@ -478,8 +488,8 @@ CONFIGURATION ERROR: runner.${runner}.regex.${key}.pattern: pattern template con
 	rest = parts[1];
 
 	for (let regex_key in regexes) {
-	    let regex = regexes[regex_key][0]
-	
+	    let regex = regexes[regex_key][0];
+
 	    m = regex.exec(rest);
 	    if (m == null)
 		continue;
@@ -624,7 +634,7 @@ async function js_runner_jenkins_stop_if_running(runner, targetid, allocid) {
 	 * query jenkins for info */
 	const [ building, result ] = await js_runner_jenkins_build_state_check(pipeline, build_id)
 	if (building) {
-	    await jenkins_fetch(pipeline, `/${build_id}/kill`, 'POST');
+	    await jenkins_fetch(pipeline, `${build_id}/kill`, 'POST');
 	    js_runner_ui_state_set(runner, "READY");
 	    js_runner_run_button_enable(runner, `jenkins ${pipeline} build ${build_id} killed`);
 	    r = await js_ttbd_target_property_set(targetid, `runner.${runner}.build_id`, null);
