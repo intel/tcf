@@ -39,7 +39,7 @@ python_ldap     # package: centos,fedora=python3-ldap
 pytz            # package: python3-pytz
 pyusb           # package: centos,fedora=python3-pyusb ubuntu=python3-usb
 requests        # package: python3-requests
-rpyc            # package: centos,fedora=python3-rpyc
+rpyc            # package: fedora=python3-rpyc
 setuptools      # package: python3-setuptools
 systemd-python  # package: python3-systemd
 tornado         # package: python3-tornado
