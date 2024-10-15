@@ -92,6 +92,6 @@ if args["config"]:
     with open(args["config"], "w") as f:
         f.write(data)
 elif args["nodistro"]:
-    print(" ".join(no_distro_packages))
+    print("\n".join(no_distro_packages))
 else:
-    print(" ".join(packages))
+    print("\n".join(packages))
