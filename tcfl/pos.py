@@ -2342,8 +2342,8 @@ def image_seed_match(lp, goal):
     try:
         import Levenshtein
     except ImportError as e:
-        logging.error("Please install the Levenshtein package"
-                      " (aka: python3-Levenshtein or levenshtein)")
+        tcfl.tc.tc_global.report_blck(
+            "MISSING MODULES: install them with: pip install --user levenshtein")
         raise
 
     goall = image_spec_to_tuple(str(goal))
