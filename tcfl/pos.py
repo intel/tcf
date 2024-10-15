@@ -106,7 +106,6 @@ import time
 import urllib.parse
 
 import packaging.version
-import Levenshtein
 
 from . import biosl
 import commonl
@@ -2340,6 +2339,12 @@ def image_seed_match(lp, goal):
     >>> ('part5', 0.933333333333, 'rtk::114')
 
     """
+    try:
+        import Levenshtein
+    except ImportError as e:
+        logging.error("Please install the Levenshtein package"
+                      " (aka: python3-Levenshtein or levenshtein)")
+        raise
 
     goall = image_spec_to_tuple(str(goal))
     scores = {}
