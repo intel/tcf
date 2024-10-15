@@ -87,6 +87,9 @@ if args["config"]:
     with open(args["config"] + ".in", "r") as f:
         data = f.read()
 
+    logging.error(
+        f'I: setup-requirements.py: {args["config"] + ".in"}:'
+        f' replacing the following dependencies: " ".join(packages)}')
     data = data.replace("{{requirements}}", "\n    " + "\n    ".join(packages))
 
     with open(args["config"], "w") as f:
