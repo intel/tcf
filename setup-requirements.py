@@ -43,8 +43,9 @@ if version:
     # Pattern for version specific requirements
     pattern_version = distro + r":" + version \
                     + r"[a-zA-Z0-9\_\-,]*\=?(?P<package>[a-zA-Z0-9\_\-\+,]+)"
-# Pattern for distro specific requirements
-pattern = distro + r"[a-zA-Z0-9\_\-,]*\=?(?P<package>[a-zA-Z0-9\_\-\+,]+)"
+# Pattern for distro specific requirements; note we want to support
+# DISTRO= (empty) to cancel a package for a distro
+pattern = distro + r"[a-zA-Z0-9\_\-,]*\=?(?P<package>[a-zA-Z0-9\_\-\+,]*)"
 # Pattern for general requirements
 pattern_general = r"# package: (?P<package>[a-zA-Z0-9\_\-\+,]+)" \
                   + r"(?: [a-zA-Z0-9\_\-,]+|$)"
@@ -65,7 +66,9 @@ try:
 
                 result = re.search(pattern, line)
                 if result:
-                    packages += result.group("package").split(",")
+                    package = result.group("package")
+                    if package:
+                        packages += result.group("package").split(",")
                     continue
 
                 result_general = re.search(pattern_general, line)
@@ -87,9 +90,10 @@ if args["config"]:
     with open(args["config"] + ".in", "r") as f:
         data = f.read()
 
-    logging.error(
+    print(
         f'I: setup-requirements.py: {args["config"] + ".in"}:'
-        f' replacing the following dependencies: {" ".join(packages)}')
+        f' replacing the following dependencies: {" ".join(packages)}',
+        file = sys.stderr)
     data = data.replace("{{requirements}}", "\n    " + "\n    ".join(packages))
 
     with open(args["config"], "w") as f:
