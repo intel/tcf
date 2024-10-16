@@ -7,7 +7,7 @@ argcomplete         # package: python3-argcomplete
 filelock	    # package: python3-filelock
 # Ubuntu 20.4 -- issue installing 3.x
 Jinja2              # package: python3-jinja2
-PyYAML              # package: centos,fedora=python3-pyyaml 
+PyYAML              # package: centos,fedora,rhel=python3-pyyaml
 imutils
 markupsafe==2.0.1   # package: python3-markupsafe
 packaging           # package: python3-packaging
