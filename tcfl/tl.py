@@ -84,6 +84,7 @@ def ansi_render_approx(s, width = 80, height = 2000):
 
 def ipxe_sanboot_url(target, sanboot_url, dhcp = None,
                      power_cycle: bool = True,
+                     assume_in_main_menu: bool = None,
                      precommands: list = None,
                      mac_addr: str = None):
     """Use iPXE to sanboot a given URL
@@ -116,6 +117,9 @@ def ipxe_sanboot_url(target, sanboot_url, dhcp = None,
       the target before starting; if *False*, it is assumed the target
       is power cycled and in the BIOS main menu.
 
+    :param bool assume_in_main_menu: (optional; default *not power_cycle*)
+      Assume the BIOS is already in the main menu.
+
     :param list[str] precomands: list of pre-commands to run before
       launching
 
@@ -137,11 +141,17 @@ def ipxe_sanboot_url(target, sanboot_url, dhcp = None,
         boot_ic = target.kws['pos_boot_interconnect']
         mac_addr = target.kws['interconnects'][boot_ic]['mac_addr']
 
+    if assume_in_main_menu == None:
+        # if we had to power cycle, BIOS is in menu
+        assume_in_main_menu = power_cycle
+    else:
+        assert isinstance(assume_in_main_menu, bool), \
+            f"assume_in_main_menu: expected bool, got {type(assume_in_main_menu).__name__}"
     tcfl.biosl.boot_network_pxe(
         target,
         # Eg: UEFI PXEv4 (MAC:4AB0155F98A1)
         r"UEFI PXEv4 \(MAC:%s\)" % mac_addr.replace(":", "").upper().strip(),
-        assume_in_main_menu = power_cycle	# if power cycle, BIOS is in menu
+        assume_in_main_menu = assume_in_main_menu
     )
 
     expecter_ipxe_error = target.console.text(
