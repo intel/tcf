@@ -862,7 +862,7 @@ def target_runner_progress_tcf_add(target: ttbl.test_target, runner: str):
 
        FAIL +0m  some message
        FAIL +0m  150_power_list##serial_BMC_detected
-    
+
     or summarized::
 
       <TAG>/<RUNID> TCREPOBASENAME/TCPATH @[SERVER/]SUTNAME [TIMESTAMP]: message
@@ -896,6 +896,15 @@ def target_runner_progress_tcf_add(target: ttbl.test_target, runner: str):
       </a>
     </div>"""
 
+    #
+    # Notes for regexes!
+    #
+    # - \S shall be \\S since this will be processed by Javascript, so
+    #   python will convert \\ to \
+    #
+    # - avoid .* in most cases, as it makes for a lot of backtracking
+    #   and causes regexes to do either too much recursion errors or
+    #   hanging your browser
 
     # Process top level messages (no subcase, no links)
     target_local.property_set(
@@ -904,7 +913,7 @@ def target_runner_progress_tcf_add(target: ttbl.test_target, runner: str):
             "^(?<tag>PASS|INFO|DATA)([0-9]+)" # the tag + verbosity level
             "/(?<runid_hashid>[-0-9a-z]+)"                        # the runid
             " +(\\S+)/%(file_path)s"                              # the testcase path after part of the repo name
-            " @.*%(targetid)s"                                    # the targetid
+            " @\\S*%(targetid)s"                                    # the targetid
             " (?<ellapsed>\\[\\+[\.0-9]+s\\]):"                   # the elapsed timestamp
             " (?<message>.*)$"                                    # the leftovers
         )
@@ -924,7 +933,7 @@ def target_runner_progress_tcf_add(target: ttbl.test_target, runner: str):
             "^(?<tag>FAIL|ERRR|BLCK|SKIP)([0-9]+)" # the tag + verbosity level
             "/(?<runid_hashid>[-0-9a-z]+)"                        # the runid
             " +(\\S+)/%(file_path)s"                              # the testcase path after part of the repo name
-            " @.*%(targetid)s"                                    # the targetid
+            " @\\S*%(targetid)s"                                    # the targetid
             " (?<ellapsed>\\[\\+[\.0-9]+s\\]):"                   # the elapsed timestamp
             " (?<message>.*)$"                                    # the leftovers
         )
@@ -948,8 +957,8 @@ def target_runner_progress_tcf_add(target: ttbl.test_target, runner: str):
             "^(?<tag>PASS|INFO|DATA)([0-9]+)" # the tag + verbosity level
             "/(?<runid_hashid>[-0-9a-z]+)"                        # the runid
             " +(\\S+)/%(file_path)s"                              # the testcase path after part of the repo name
-            "##(?<subcase>[-_a-zA-Z0-9#]+)*"                      # the subcases
-            " @.*%(targetid)s"                                    # the targetid
+            "##(?<subcase>[-_a-zA-Z0-9#]+)"                      # the subcases
+            " @\\S*%(targetid)s"                                    # the targetid
             " (?<ellapsed>\\[\\+[\.0-9]+s\\]):"                   # the elapsed timestamp
             " (?<message>.*)$"                                    # the leftovers
         )
@@ -968,8 +977,8 @@ def target_runner_progress_tcf_add(target: ttbl.test_target, runner: str):
             "^(?<tag>FAIL|ERRR|BLCK|SKIP)([0-9]+)" # the tag + verbosity level
             "/(?<runid_hashid>[-0-9a-z]+)"                        # the runid
             " +(\\S+)/%(file_path)s"                              # the testcase path after part of the repo name
-            "##(?<subcase>[-_a-zA-Z0-9#]+)*"                      # the subcases
-            " @.*%(targetid)s"                                    # the targetid
+            "##(?<subcase>[-_a-zA-Z0-9#]+)"                      # the subcases
+            " @\\S*%(targetid)s"                                    # the targetid
             " (?<ellapsed>\\[\\+[\.0-9]+s\\]):"                   # the elapsed timestamp
             " (?<message>.*)$"                                    # the leftovers
         )
