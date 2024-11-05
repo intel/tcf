@@ -144,6 +144,37 @@ function js_runner_field_get(targetid, runner, field) {
 
 
 
+/*
+  Run a function, raising an exception if timeout passes before it completes
+
+  @param {fn} function to call (can't be a method)
+
+  @param {timeout} max time in milliseconds we allow the function to
+  run before raising an exception
+
+  @param ...args arguments to the function
+
+  */
+function js_run_fn_timeout(fn, timeout, ...args) {
+    return new Promise((resolve, reject) => {
+        const timer = setTimeout(() => {
+            reject(new Error(`js_run_fn_timeout: ${fn}() timedout after ${timeout}ms`));
+        }, timeout);
+
+	// resolve execution as a promise and clear the timer when we
+	// are done via the return value (r) or exception (e)
+        Promise.resolve(fn(...args)).then(r => {
+            clearTimeout(timer);
+            resolve(r);
+        }).catch(e => {
+            clearTimeout(timer);
+            reject(e);
+        });
+    });
+}
+
+
+
 /* jenkins crumbs by sever -- read in doc header -- */
 const jenkins_crumbs = {};
 
@@ -357,6 +388,16 @@ function js_runner_run_button_disable(runner, reason) {
 
 
 /*
+  Helper to run regexe's exec() method as a function, rather than a
+  method, so we can pass it around
+ */
+function js_regex_exec(regex, line) {
+    return regex.exec(line);
+}
+
+
+
+/*
   Read the jenkins console output and parse it out to produce
   summarized rows of information in a table
 
@@ -488,6 +529,7 @@ CONFIGURATION ERROR: runner.${runner}.regex.${key}.pattern: pattern template con
 	lines++;
 
 	let result = null;
+	let bug_reported = false;
 	// Each log line is <ELAPSED-TIME-IN-MINS> <LINE>
 	parts = line.split("  ", 2);
 	elapsed = parts[0];
@@ -496,9 +538,30 @@ CONFIGURATION ERROR: runner.${runner}.regex.${key}.pattern: pattern template con
 	for (let regex_key in regexes) {
 	    let regex = regexes[regex_key][0];
 
-	    m = regex.exec(rest);
-	    if (m == null)
+	    regex.lastIndex = 0;	/* reset from prev use */
+	    try {
+		// if this tries to run for more than 200msecs, it might
+		// be a messed up regex, so we protect this in case
+		// there is a config error
+		m = await js_run_fn_timeout(js_regex_exec, 200, regex, rest); // .2 seconds timeout
+	    }
+	    catch(error) {
+		console.error(`BUG! regex matching errored or ran for too long: ${error}`);
+		console.error(`CONFIGURATION ERROR? regex was: ${regex}`);
+		console.error(`CONFIGURATION ERROR? line was: ${rest}`);
+		if (!bug_reported) {
+		    bug_reported = true;
+		    await confirm_dialog(
+			`CONFIGURATION ERROR? regex matching errored or ran for too long: ${error}<br>`
+			    + "Check the browser's console log for details",
+			"Got it (this dialog won't be shown again)"
+		    );
+		}
 		continue;
+	    }
+	    if (m == null) {
+		continue;
+	    }
 
 	    // now format the replacement template, all the
 	    // %(FIELD)s in there, with the matches from the regex
