@@ -205,24 +205,60 @@ def _cmdline_ls(cli_args):
             # only prints ID, owner
             cli_args.project = None
         else:
-            cli_args.project = { 'id', 'disabled' }
+            projections_list = []
+            projections_set = { 'id', 'disabled' }
+
+    if cli_args.project:
+        projections_list = cli_args.project       # respect user's order
+        projections_set = set(cli_args.project)   # to help avoid dups
     else:
-        cli_args.project = set(cli_args.project)   # to help avoid dups
+        projections_list = []
+        projections_set = set()
 
     # ensure the most basic fields for each verbosity level are queried
     if cli_args.project and verbosity < 1:
-        cli_args.project.add('id')
-        cli_args.project.add('disabled')
+        projections_set.add('id')
+        projections_set.add('disabled')
     if cli_args.project and verbosity > 0:
-        cli_args.project.add('interfaces.power.state')
-        cli_args.project.add('owner')
+        projections_set.add('interfaces.power.state')
+        projections_set.add('owner')
 
     tcfl.targets.setup_by_spec(
         cli_args.target, verbosity = verbosity,
-        project = cli_args.project, targets_all = cli_args.all,
+        project = projections_set, targets_all = cli_args.all,
         shorten_names = cli_args.shorten_names)
 
-    if verbosity < 0:
+    if cli_args.csv:
+        import csv
+
+        row_header =  [ "Name" ] + projections_list
+        rows = [
+            row_header
+        ]
+
+        for rtid, rt in tcfl.rts_flat.items():
+            fields = collections.defaultdict(set)
+            for k, v in rt.items():
+                if isinstance(v, dict):
+                    continue
+                projection = commonl.field_needed(k, projections_list)
+                if not projection:
+                    continue
+                if cli_args.csv_aggregate_add_fields:
+                    fields[projection].add(f"{k}:{v}")
+                else:
+                    fields[projection].add(v)
+            row = [ rtid ]
+            for projection in projections_list:
+                row.append(' '.join(fields[projection]))
+            rows.append(row)
+
+        writer = csv.writer(sys.stdout, delimiter = ',',
+                            quotechar = '|',
+                            quoting = csv.QUOTE_MINIMAL)
+        writer.writerows(rows)
+
+    elif verbosity < 0:
         print(" \n".join(tcfl.targets.discovery_agent.rts_fullid_sorted))
     elif verbosity == 0:
         _targets_print_v0(tcfl.targets.discovery_agent)
@@ -489,6 +525,13 @@ def _cmdline_setup(arg_subparsers):
         action = "append", type = str,
         help = "consider only the given fields "
         "(default depends on verbosity")
+    ap.add_argument(
+        "-c", "--csv", action = "store_true", default = False,
+        help = "output the fields given with --project in CSV format")
+    ap.add_argument(
+        "--csv-aggregate-add-fields", action = "store_true", default = False,
+        help = "when fields have multiple values because we are aggregating"
+        " (eg: interconnects.*.mac_addr), prefix the field name to the value")
     ap.add_argument(
         "--shorten-names",
         action = "store_true", default = True,
