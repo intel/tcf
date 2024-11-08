@@ -50,12 +50,10 @@ async function acquire(target_list) {
         alert('Select a target to acquire');
         return
     }
-    else{
-        alert("System acquired successfully")
-        return
-    }
 
-    window.location.reload()
+    alert("System acquired successfully");
+    window.location.reload();
+    return;
 }
 
 /*
