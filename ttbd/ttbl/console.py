@@ -832,7 +832,12 @@ class generic_c(impl_c):
                                  "console-%s.write" % component)
         target.log.debug("%s: writing %dB to console (%s)",
                          component, len(data), data.encode('unicode-escape'))
-        stat_info = os.stat(file_name)
+        try:
+            stat_info = os.stat(file_name)
+        except FileNotFoundError as e:
+            raise RuntimeError(
+                f"console '{component}' is disabled;"
+                " enable it before writing") from e
         if stat.S_ISSOCK(stat_info.st_mode):
             # consoles whose input is implemented as a socket
             with contextlib.closing(socket.socket(socket.AF_UNIX,
