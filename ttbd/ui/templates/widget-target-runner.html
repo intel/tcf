@@ -30,7 +30,7 @@
       {% set runner_local_default_data = inventory_local.get("runner", {}).get("default", {}) %}
       {% set runner_local_runner_data = inventory_local.get("runner", {}).get(runner, {}) %}
 
-      {% set runner_button_name = runner_data.get("button_name", runner_local_runner_data.get("button_name", runner_local_default_data.get("button_name", "Run job"))) %}
+      {% set runner_button_name = runner_data.get("button_name", runner_local_runner_data.get("button_name", runner_local_default_data.get("button_name", "Run job '" + runner + "'"))) %}
       {% set runner_type = runner_data.get("type", runner_local_runner_data.get("type", runner_local_default_data.get("type", None))) %}
       {% set runner_pipeline = runner_data.get("pipeline", runner_local_runner_data.get("pipeline", runner_local_default_data.get("pipeline", '<UNDEFINED:runner.ID.pipeline>'))) %}
       {% set runner_repository = runner_data.get("repository", runner_local_runner_data.get("repository", runner_local_default_data.get("repository", '<UNDEFINED:runner.ID.repository>'))) %}
