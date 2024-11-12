@@ -913,7 +913,7 @@ def target_runner_progress_tcf_add(target: ttbl.test_target, runner: str):
             "^(?<tag>PASS|INFO|DATA)([0-9]+)" # the tag + verbosity level
             "/(?<runid_hashid>[-0-9a-z]+)"                        # the runid
             " +(\\S+)/%(file_path)s"                              # the testcase path after part of the repo name
-            " @\\S*%(targetid)s"                                    # the targetid
+            " @(\\S*%(targetid)s|local)"                          # the targetid
             " (?<ellapsed>\\[\\+[\.0-9]+s\\]):"                   # the elapsed timestamp
             " (?<message>.*)$"                                    # the leftovers
         )
@@ -933,7 +933,7 @@ def target_runner_progress_tcf_add(target: ttbl.test_target, runner: str):
             "^(?<tag>FAIL|ERRR|BLCK|SKIP)([0-9]+)" # the tag + verbosity level
             "/(?<runid_hashid>[-0-9a-z]+)"                        # the runid
             " +(\\S+)/%(file_path)s"                              # the testcase path after part of the repo name
-            " @\\S*%(targetid)s"                                    # the targetid
+            " @(\\S*%(targetid)s|local)"                          # the targetid
             " (?<ellapsed>\\[\\+[\.0-9]+s\\]):"                   # the elapsed timestamp
             " (?<message>.*)$"                                    # the leftovers
         )
@@ -949,7 +949,7 @@ def target_runner_progress_tcf_add(target: ttbl.test_target, runner: str):
         # to be considered a failure message for filtering purposes.
         + "<!--failure=1-->")
 
-
+l
     # Process top level messages (subcase, no links)
     target_local.property_set(
         "runner.default.regex.progress_tcf_subcase_nolink.pattern",
@@ -957,8 +957,8 @@ def target_runner_progress_tcf_add(target: ttbl.test_target, runner: str):
             "^(?<tag>PASS|INFO|DATA)([0-9]+)" # the tag + verbosity level
             "/(?<runid_hashid>[-0-9a-z]+)"                        # the runid
             " +(\\S+)/%(file_path)s"                              # the testcase path after part of the repo name
-            "##(?<subcase>[-_a-zA-Z0-9#]+)"                      # the subcases
-            " @\\S*%(targetid)s"                                    # the targetid
+            "##(?<subcase>[-_a-zA-Z0-9#]+)"                       # the subcases
+            " @(\\S*%(targetid)s|local)"                          # the targetid
             " (?<ellapsed>\\[\\+[\.0-9]+s\\]):"                   # the elapsed timestamp
             " (?<message>.*)$"                                    # the leftovers
         )
@@ -977,8 +977,8 @@ def target_runner_progress_tcf_add(target: ttbl.test_target, runner: str):
             "^(?<tag>FAIL|ERRR|BLCK|SKIP)([0-9]+)" # the tag + verbosity level
             "/(?<runid_hashid>[-0-9a-z]+)"                        # the runid
             " +(\\S+)/%(file_path)s"                              # the testcase path after part of the repo name
-            "##(?<subcase>[-_a-zA-Z0-9#]+)"                      # the subcases
-            " @\\S*%(targetid)s"                                    # the targetid
+            "##(?<subcase>[-_a-zA-Z0-9#]+)"                       # the subcases
+            " @(\\S*%(targetid)s|local)"                          # the targetid
             " (?<ellapsed>\\[\\+[\.0-9]+s\\]):"                   # the elapsed timestamp
             " (?<message>.*)$"                                    # the leftovers
         )
@@ -990,6 +990,18 @@ def target_runner_progress_tcf_add(target: ttbl.test_target, runner: str):
         "runner.default.regex.progress_tcf_subcase_link.result",
         runner_default_regex_progress_tcf_result_link_template
         + "<!--failure=1-->")
+
+    # Ignore these, they don't provide anything helpful
+    target_local.property_set(
+        "runner.default.regex.ignore_tcf.pattern",
+        # filter out messages like
+        #
+        ## INFO1/20240101-0101-90-izu5rv repo.git/path/test_name.py @qemu-02e [+0.1s]: will run on target group 'target=qemu-02e:x86_64' (PID 303 / TID 7ffff59d2640)
+        ## INFO1/20240101-0101-90-izu5rv repo.git/path/test_name.py @qemu-02e [+0.1s]: allocation ID: ohqhr_qu
+        #
+        "^.*: (will run on target group.*|allocation ID:.*)$"
+    )
+
 
     # Ignore these, they don't provide anything helpful
     target_local.property_set(
