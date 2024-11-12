@@ -57,6 +57,16 @@ The target's inventory describes the runner in the section
 inventory key (eg: *[-_a-zA-Z0-9]*) (FIXME:link). This allows fine
 grained configuration of what shall be run where.
 
+When you have multiple runners, they will be displayed in
+alphabeticaly order of *RUNNER* names; thus, to enforce a given order
+you can use something like:
+
+- *runner.00_test_C*
+- *runner.20_test_D*
+- *runner.30_test_F*
+- *runner.40_test_A*
+
+so they are ordered CDFA.
 
 Since each runner can have a sizeable amount of information to
 describe its operation, it is not practical to put it in every
