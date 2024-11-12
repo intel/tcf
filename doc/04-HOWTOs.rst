@@ -2639,16 +2639,37 @@ your laptop (`Windows utility
 
   $ sudo dnf install -y libftdi-devel
   $ cat > file.conf <<EOF
-  vendor_id=0x0403
-  product_id=0x6010
   serial="NEWSERIALNUMBER"
   use_serial=true
   EOF
 
-Now plug the USB cable to your server or laptop, making sure it is the
-only one and run, as super user::
+Now plug the USB cable to your server or laptop, list it and let's
+find the bus and device numbers::
 
-  # ftdi_eeprom --flash-eeprom file.conf
+  $ lsusb.py -ci | grep -i 0403
+  ...
+      13-1.1.2          0403:6011 00 4IFs [USB 2.00,   480 Mbps, 500mA] (FTDI Quad RS232-HS)
+      13-1.4.1          0403:6011 00 4IFs [USB 2.00,   480 Mbps, 150mA] (FTDI FT4232H MiniModule FT80WM8E)
+      19-1.4.4          0403:6011 00 4IFs [USB 2.00,   480 Mbps, 150mA] (FTDI FT4232H MiniModule FT80WOO6)
+      21-1.3.4          0403:6011 00 4IFs [USB 2.00,   480 Mbps, 150mA] (FTDI FT4232H MiniModule FT80TUAW)
+      23-1.1.4          0403:6011 00 4IFs [USB 2.00,   480 Mbps, 150mA] (FTDI FT4232H MiniModule FT80WLYQ)
+      23-1.4.4          0403:6011 00 4IFs [USB 2.00,   480 Mbps, 150mA] (FTDI FT4232H MiniModule FT80WLY2)
+  ...
+
+In this case, it is::
+
+      13-1.1.2          0403:6011 00 4IFs [USB 2.00,   480 Mbps, 500mA] (FTDI Quad RS232-HS)
+
+it's USB bus and device numbers are 13 and 72::
+
+  $ cat /sys/bus/usb/devices/13-1.1.2/{busnum,devnum}
+  13
+  72
+
+
+now let's feed those to *ftdi_eeprom* with a 0 prefix, as super user::
+
+  # ftdi_eeprom --device d:013/072 --flash-eeprom file.conf
 
 Reconnect it to have the system read the new serial number / description.
 
