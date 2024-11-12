@@ -949,7 +949,7 @@ def target_runner_progress_tcf_add(target: ttbl.test_target, runner: str):
         # to be considered a failure message for filtering purposes.
         + "<!--failure=1-->")
 
-l
+
     # Process top level messages (subcase, no links)
     target_local.property_set(
         "runner.default.regex.progress_tcf_subcase_nolink.pattern",
