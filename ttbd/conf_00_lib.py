@@ -1013,3 +1013,21 @@ def target_runner_progress_tcf_add(target: ttbl.test_target, runner: str):
         #
         "^.*: (will run on target group.*|allocation ID:.*)$"
     )
+
+
+
+    target_local.property_set(
+        "runner.default.regex.error_notfound.pattern",
+        "E: tcfl.tc: WARNING! No testcases found")
+    target_local.property_set(
+        "runner.default.regex.error_notfound.message",
+        'CONFIGURATION ERROR? test case scripts not found'
+    )
+    target_local.property_set(
+        "runner.default.regex.error_notfound.result",
+        """
+        <div class = "background_ERRR">
+        <a href = "%(pipeline)s/%(build_id)s//consoleFull" target="_blank" rel="noopener noreferrer">
+        <code>%(tag)s</code>
+        </a>
+        </div><!--failure=1-->""")
