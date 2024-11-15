@@ -92,6 +92,12 @@ import commonl
 from . import msgid_c
 from . import tc
 
+# if we are running multiple threads, we don't want console output or
+# file output to be messed up; buffering won't cut it so let's just
+# lock; might not be the most efficient, but keeps it simple
+console_write_lock = threading.Lock()
+file_write_lock = threading.Lock()
+
 class driver(tc.report_driver_c):
     """
     Driver to write progress messages to console and a log file
@@ -264,7 +270,8 @@ class driver(tc.report_driver_c):
                     f" {testcase._report_prefix}{target_fullid} [+{delta:0.1f}s]: "
             with commonl.tls_prefix_c(self.tls, _prefix):
                 message += "\n"
-                self.consolef.write(message)
+                with console_write_lock:
+                    self.consolef.write(message)
         if logfile_p:
             _prefix = \
                 f"{tag}{level}/{testcase.runid_hashid}{testcase.ident()}" \
@@ -272,7 +279,8 @@ class driver(tc.report_driver_c):
             with commonl.tls_prefix_c(self.tls, _prefix):
                 message += "\n"
                 if self.logf and logfile_p:
-                    self.logf.write(message)
+                    with file_write_lock:
+                        self.logf.write(message)
 
         if attachments != None:
             assert isinstance(attachments, dict)
