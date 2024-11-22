@@ -114,6 +114,7 @@ import subprocess
 import sys
 
 import tempfile
+import textwrap
 import threading
 import time
 import traceback
@@ -121,6 +122,7 @@ import types
 import typing
 
 import tcfl
+logging.basicConfig(level = logging.ERROR)
 
 # We multithread to run testcases in parallel
 #
@@ -2983,6 +2985,370 @@ def subcase(subcase = None, break_on_non_pass = False):
     return wrapper
 
 
+
+class parameter_c:
+    """
+    A simple string-based parameter for a testcase
+
+    if the value  can't be determined because there is  no default, an
+    exception will be raised. Values are obtained from:
+
+    - environment variables *PARAMETER_<NAME>* (or *PARAMETER_<NAME>_USER*
+      and *PARAMETER_<NAME>_PASSWORD* for username/password parameters)
+    - keyrings (if the parameter is considered a credential)
+    - defaults
+
+    Top level user does not use this class, but declares with a
+    decorator to a test class what parameters are needed using classes
+    derived from this one for further customization.
+
+    Parameters are declared as:
+
+    >>> @tcfl.tc.parameters(
+    >>>     tcfl.tc.parameter_c(
+    >>>          "param1", "this is parameter 1", "default value1"),
+    >>>     tcfl.tc.parameter_token_c(
+    >>>         "token2", "this is parameter 2", "KEYRING:somedomain"),
+    >>>     tcfl.tc.parameter_username_password_c(
+    >>>         "creds", "this is username/password",
+    >>>         "USERNAME", "KEYRING:someotherdomain"))
+    >>> class _test(tcfl.tc.tc_c):
+    >>>    ...
+
+    inside the code, the values are obtained with :meth:`parameter_get`:
+
+    >>> value = self.parameter_get("param1")
+    >>> token = self.parameter_get("token2")
+    >>> username, password = self.parameter_get("creds")
+
+
+    :param str name: simple name for this parameter ([_a-zA-Z0-9]);
+      will be used to refer to environment variables (eg:
+      PARAMETER_NAME) and refer to it from inside the code, eg:
+
+      >>> value = self.parameter_get("NAME")
+
+    :param str name_ui: (optional; default same as *name*) name suited
+      for a UI; keep to a single line; eg:
+
+      >>> name = "creds"
+      >>> name_ui = "Credentials for accessing http://place.com"
+
+    :param str description: a description for the parameter, so the
+      user can know what it is used for; might include any information
+      useful to fill it up, eg:
+
+      >>> description = "this is a token that is obtained from https://github.com"
+
+    :param default: (optional) a default value to use if nothing is
+      speciifed as input to the testcase.
+
+      **WARNING!!!*** adding parameters to testcases without reasonable
+      defaults *only* makes them harder to use--aim for making your
+      testcases ready to use with no inputs.
+
+      If the parameter is a credential, keyrings can be used and the
+      default value can be used to drive to keyring:
+
+      >>> default = "KEYRING:DOMAIN"
+
+      will query the keyring system for the *password* for domain
+      *DOMAIN* username *NAME*.
+
+    :param credential bool: (optional; default *False*) indicate this
+      parameter is a credential, so defaults will be obtained also
+      from keyrings; this is also useful to hide inputs in UIs.
+
+    """
+    # Note this API is non-public, only tcfl.tc.tc_c.parameter_get() uses it
+    #
+    # FIXME:
+    # - add multiple choice?
+    # - add info CLI to extract to FSDB config
+    # - directory -> validate an existing local directory?
+
+    def __init__(self, name: str, description: str, default = None,
+                 credential: bool = False, origin: str = None,
+                 name_ui: str = None):
+        assert isinstance(name, str), \
+            f"name: bad type for parameter name; expected 'str', got {type(name)}"
+        assert isinstance(name_ui, (type(None), str)), \
+            f"name_ui: bad type for parameter name_ui; expected 'str', got {type(name_ui)}"
+        commonl.verify_str_safe(
+            name,
+            safe_chars = set('_' + string.ascii_letters + string.digits),
+            name = f"parameter {name}")
+        assert isinstance(description, str), \
+            f"parameter {name}: bad type for description;" \
+            f" expected 'str', got {type(description)}"
+        assert isinstance(credential, bool), \
+            f"parameter {name}: bad type for 'credential' argument; " \
+            f"expected bool, got {type(credential)}"
+
+        if origin:
+            self.origin = origin
+        else:
+            self.origin = commonl.origin_get(2)
+        self.name = name
+        if name_ui == None:
+            self.name_ui = name
+        else:
+            self.name_ui = name_ui
+        self.description = description
+        self.default = default
+        self.credential = credential
+
+
+    def _get(self, tc):
+        assert isinstance(tc, tc_c)
+        # Note this API is non-public, only tcfl.tc.tc_c.parameter_get() uses it
+        #
+        # get from the following order:
+        # - environment PARAMETER_<NAME>
+        # - if a credential, the keyring
+        # - defaults
+        env_name = f'PARAMETER_{self.name}'
+        if env_name in os.environ:
+            val = os.environ[env_name]
+            if self.credential:
+                val_censored = "<credential-censored>"
+            else:
+                val_censored = val
+            tc.report_info(
+                f"retrieved parameter '{self.name}' from"
+                f" environment {env_name}: {val_censored}")
+        elif self.default:
+            val = self.default
+            if self.credential:
+                val_censored = "<credential-censored>"
+            else:
+                val_censored = val
+            tc.report_info(
+                f"retrieved parameter '{self.name}' from"
+                f" default at {self.origin}: {val}")
+        else:
+            raise tcfl.block_e(
+                f"can't find value for parameter '{self.name}';"
+                f" set environment PARAMETER_{self.name}")
+
+        if self.credential \
+           and ( val.startswith("KEYRING:") or val.startswith("FILE:") ):
+            # this is a credential, we might have to expand it from keyrings
+            # now expand the password to maybe access from keyrings or files
+            try:
+                val_resolved = commonl.password_get("parameters",
+                                                    self.name, val)
+            except RuntimeError as e:
+                es = str(e)
+                # if the text looks like
+                #
+                ## keyring: no password for user USERNAME @ DOMAIN
+                #
+                # this means the password is not set in the keyring, make
+                # a more meaningful error
+                if 'keyring: no password for user ' in es:
+                    raise tcfl.block_e(
+                        f"parameter {self.name}: can't retrieve token from the"
+                        f" keyring {val} for user '{name}' since"
+                        f" it is not set"
+                        " (eg: if using KEYRING:parameters as default, echo TOKEN | keyring set parameters {self.name})") \
+                        from e
+                raise
+        else:
+            val_resolved = val
+
+        if val_resolved != val:
+            tc.report_info(
+                f"resolved token parameter '{self.name}' from keyring/files")
+            return val_resolved
+        else:
+            tc.report_info(
+                f"retrieved token parameter '{self.name}'")
+            return val
+
+
+
+class parameter_username_password_c(parameter_c):
+    """
+    A parameter to specify a username/password
+
+    This is the same as :class:`parameter_c`, except the defaults are two:
+
+    :param str username: a username to use, also can be set from
+      environment *PARAMETER_<NAME>_USER*
+
+    :param str password: the password to use; can be set from
+      environment *PARAMETER_<NAME>_PASSWORD* or the keyring (see
+      :class:`parameter_c` on keyring usage and more examples
+
+    The return value for getting a parameter is a tuple username and
+    password:
+
+    >>> username, password = self.parameter_get("creds")
+
+    """
+
+    def __init__(self, name: str, description: str,
+                 default_user: str = None, default_password: str = None,
+                 **kwargs):
+        assert isinstance(default_user, (type(None), str)), \
+            f"parameter {name}: bad type for default user;" \
+            f" expected None or str, got {type(default_user)}"
+        assert isinstance(default_password, (type(None), str)), \
+            f"parameter {name}: bad type for default password;" \
+            f" expected None or str, got {type(default_password)}"
+        parameter_c.__init__(self, name = name, description = description,
+                             credential = True, **kwargs,
+                             default = ( default_user, default_password),
+                             origin = commonl.origin_get(2))
+
+
+    def _get(self, tc):
+        assert isinstance(tc, tc_c)
+        # get from:
+        # - environment PARAMETER_<NAME>_DIR
+        # - keyring
+        # - defaults (if both present)
+
+        username = None
+        password = None
+
+        # We have to have a USERNAME yes or yes (either from
+        # environment or defaults), we can't get it from anywhere else
+        env_username = f'PARAMETER_{self.name}_USER'
+        if env_username in os.environ:
+            username = os.environ[env_username]
+            tc.report_info(
+                f"retrieved username parameter '{self.name}' from"
+                f" environment {env_username}: {username}")
+        elif self.default and self.default[0]:
+            username = self.default[0]
+            tc.report_info(
+                f"retrieved username parameter '{self.name}' from"
+                f" default at {self.origin}: {username}")
+        else:
+            raise tcfl.block_e(
+                f"can't find username for parameter '{self.name}';"
+                f" set environment PARAMETER_{self.name}_DIR")
+
+        # password is trickier; we can get it from the environment, or
+        # a keyring...
+
+        env_password = f'PARAMETER_{self.name}_PASSWORD'
+        if env_password in os.environ:
+            password = os.environ[env_password]
+            if password.startswith("KEYRING:") \
+               or password.startswith("FILE:"):
+                password_censored = password
+            else:
+                password_censored = "<password-censored>"
+            tc.report_info(
+                f"resolving password parameter '{self.name}' from"
+                f" environment {env_password}: {password_censored}")
+        elif self.default and self.default[1]:
+            password = self.default[1]
+            if password.startswith("KEYRING:") \
+               or password.startswith("FILE:"):
+                password_censored = password
+            else:
+                password_censored = "<password-censored>"
+            tc.report_info(
+                f"resolving password parameter '{self.name}' from"
+                f" default at {self.origin}: {password_censored}")
+        else:
+            raise tcfl.block_e(
+                f"can't find password for parameter '{self.name}';"
+                f" set environment PARAMETER_{self.name}_DIR")
+
+        # now expand the password to maybe access from keyrings or files
+        try:
+            password_resolved = commonl.password_get("parameters",
+                                                     username, password)
+        except RuntimeError as e:
+            es = str(e)
+            # if the text looks like
+            #
+            ## keyring: no password for user USERNAME @ DOMAIN
+            #
+            # this means the password is not set in the keyring, make
+            # a more meaningful error
+            if 'keyring: no password for user ' in es:
+                raise tcfl.block_e(
+                    f"parameter {self.name}: can't retrieve a password from the"
+                    f" keyring {password} for user '{username}' since"
+                    f" it is not set"
+                    f" (eg: echo PASSWORD | keyring set parameters {username})") \
+                 from e
+            raise
+
+        if password_resolved != password:
+            tc.report_info(
+                f"resolved password parameter '{self.name}' from keyring/files")
+            return username, password_resolved
+        else:
+            tc.report_info(
+                f"retrieved password parameter '{self.name}'")
+            return username, password
+
+
+
+class parameter_token_c(parameter_c):
+    """Parameter for specifying a token
+
+    This is different from :class:`parameter_c` that is considered a
+    credential, so keyrings will be used to resolve it and values
+    won't be printed
+
+    See :class:`parameter_c` for usage examples.
+
+    """
+    def __init__(self, *args, **kwargs):
+        parameter_c.__init__(self, *args, credential = True,
+                             origin = commonl.origin_get(2), **kwargs)
+
+
+
+def parameters(*args):
+    """
+    Decorator to declare parameters to a testcase
+
+    Parameters are declared as:
+
+    >>> @tcfl.tc.parameters(
+    >>>     tcfl.tc.parameter_c(
+    >>>          "param1", "this is parameter 1", "default value1"),
+    >>>     tcfl.tc.parameter_token_c(
+    >>>         "token2", "this is parameter 2", "KEYRING:somedomain"),
+    >>>     tcfl.tc.parameter_username_password_c(
+    >>>         "creds", "this is username/password",
+    >>>         "USERNAME", "KEYRING:someotherdomain"))
+    >>> class _test(tcfl.tc.tc_c):
+    >>>    ...
+
+    See :class:`parameter_c` for more information
+    """
+    def decorate_class(cls):
+        # Ugly way of doing it; we want to build upon the parameters
+        # of the base class -- but not modify them; so when we add, we
+        # COPY the dictionary from our base class to modify it
+        # specific to this class
+        if id(super(cls, cls)._parameters) == id(cls._parameters):
+            print("creating copy dict", file = sys.stderr)
+            cls._parameters = dict(super(cls, cls)._parameters)
+
+        for parameter in args:
+            # name can only be a-zA-Z_ so it can be passed in an env
+            # var, eg as PARAM_NAME_USER PARAM_NAME_PASSWORD
+            assert isinstance(parameter, parameter_c), \
+                f"{name}: bad parameter instance, expected child of" \
+                f" tcfl.tc.parameter_c, got {type(parameter)}"
+            cls._parameters[parameter.name] = parameter
+        return cls
+    return decorate_class
+
+
+
+
 def _target_app_setup(obj, cls_name, target_want_name):
     """
     Setup the phase hooks so that the App builder is called in the
@@ -3971,6 +4337,12 @@ class tc_c(reporter_c, metaclass=_tc_mc):
     #: reporting hooks on exception keyed by callable, value origin
     _report_exception_hooks = {}
 
+    # Parameters for this testcase; this is a class specific field
+    # that might be customized per-instance (very rarely); modified by
+    # decorator tcfl.tc.parameters()
+    _parameters = dict()
+
+
     def __init__(self, name, tc_file_path, origin, hashid = None):
         #
         # need this before calling reporter_c.__init__
@@ -4321,6 +4693,49 @@ class tc_c(reporter_c, metaclass=_tc_mc):
             f"name: expected str, got {type(name)}"
         assert '##' not in name, \
             f"test case names cannot contain '##', got '{name}'"
+
+
+
+    def parameter_get(self, name):
+        """
+        Obtain the value of a testcase parameter
+
+        :param str name: name of the parameter whose value we need to
+          resolve; must have been declared with
+          :func:`tcfl.tc.parameters` as in:
+
+          >>> @tcfl.tc.parameters(
+          >>>    tcfl.tc.parameter_c("SOMENAME", "DESCRIPTION"...))
+          >>> class _test(tcfl.tc.tc_c):
+          >>>    ...
+
+        Given a testcase parameter declared with the
+        :func:`tcfl.tc.parameters` decorator, obtain its current
+        value from the environment, default values or keyrings.
+
+        >>> username, password = self.parameter_get("logincreds")
+        >>> token = self.parameter_get("token1")
+        >>> directory_a = self.parameter_get("directory_a")
+
+        """
+        if name not in self._parameters:
+            raise tcfl.block_e(
+                f"{name}: unknown testcase parameter; known are"
+                f" {' '.join(self._parameters.keys())}",
+                {
+                    name: {
+                        "origin": parameter.origin,
+                        # we textrap so it is kinda easier to read in the
+                        # report files
+                        "description": textwrap.wrap(
+                            parameter.description, width = 50),
+                        "default": parameter.default,
+                    }
+                    for name, parameter in self._parameters.items()
+                }
+            )
+        return self._parameters[name]._get(self)
+
 
 
     def subcase(self, subcase):

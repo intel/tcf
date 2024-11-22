@@ -2480,6 +2480,7 @@ class tc_info_c:
                  origin = None,
                  subcase_spec = None,
                  axes = None,
+                 parameters = None,
                  target_roles = None, driver_name = None, tags = None,
                  result = None, output = "",
                  exception = None, formatted_traceback = None):
@@ -2561,6 +2562,14 @@ class tc_info_c:
         # method to filter axes permutations
         self._axes_permutation_filter = None
 
+        #: List of parameters the testcase takes; dict keyed by : :
+        #parameter name; values are dictionaries with the parameters :
+        #fields (*name_ui*, *type*, *description*, *credential*,
+        #*origin* and *default*, which mimic
+        #:class:`tcfl.tc.parameter_c` in types). See
+        #:func:`tcfl.discovery._tc_info_from_tc_c` for conversion
+        #example.
+        self.parameters = parameters
 
         #
         # Orchestrator specific area

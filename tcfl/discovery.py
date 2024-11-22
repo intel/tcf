@@ -318,10 +318,24 @@ def _tc_info_from_tc_c(testcase):
         )
     if not target_roles:
         target_roles = None
+
+    # Translate tc_c's parameters' definition to tc_info_c
+    parameters = dict()
+    for name, parameter in type(testcase)._parameters.items():
+        parameters[name] = dict(
+            name_ui = parameter.name_ui,
+            type = type(parameter).__name__,
+            description = parameter.description,
+            credential = parameter.credential,
+            origin = parameter.origin,
+            default = parameter.default)
+
+
     tc_info = tcfl.tc_info_c(
         testcase.name, testcase.kws['thisfile'],
         origin = testcase.origin,
         target_roles = target_roles,
+        parameters = parameters,
         subcase_spec = testcase.subcases,
         driver_name = str(testcase),
         tags = testcase._tags,

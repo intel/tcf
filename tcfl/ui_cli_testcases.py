@@ -102,6 +102,8 @@ def _axes_info_print(axes, prefix):
 
 
 def _testcase_info_print(testcase):
+    import textwrap
+
     assert isinstance(testcase, tcfl.tc_info_c)
     # Print information about a testcase
     #
@@ -136,6 +138,32 @@ def _testcase_info_print(testcase):
                 print(f"      interconnect spec: '{role.ic_spec}'"
                       f" {'args: ' + str(role.ic_spec_args) if role.ic_spec_args else '(no extra args)'}")
             _axes_info_print(role.axes, "      ")
+            print()
+
+    if testcase.parameters:
+        print(f"  Testcase needs/requires {len(testcase.parameters)} parameters:\n")
+        for parameter_name, parameter in testcase.parameters.items():
+            if parameter['name_ui'] != parameter_name:
+                name_ui = " " + parameter['name_ui']
+            else:
+                name_ui = ""
+            if parameter['credential']:
+                credential_s = "(credential)"
+            else:
+                credential_s = "(not a credential)"
+            print(f"   - {parameter_name}:{name_ui} {credential_s} @{parameter['origin']}")
+            if parameter['default']:
+                print(f"     optional; default: {parameter['default']}")
+            else:
+                print(f"     required (no defaults)")
+            print("\n".join(textwrap.wrap(
+                parameter['description'], width = 60,
+                subsequent_indent = "       ", initial_indent = "       ")))
+            print()
+
+    else:
+        print(f"  No parameters")
+
 
     if False and testcase.axes:
         # FIXME: this needs more data digging from the permutation,
