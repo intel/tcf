@@ -231,6 +231,15 @@ _method_phase_prefixes = frozenset({
     'clean',
 })
 
+
+
+def _phase_consolidate(phase: str) -> str:
+    if phase in frozenset({ 'setup', 'start', 'eval', 'teardown' }):
+        return 'eval'
+    return phase
+
+
+
 class _simple_namespace:
     def __init__(self, kw):
         self.__dict__.update(kw)
@@ -4342,6 +4351,24 @@ class tc_c(reporter_c, metaclass=_tc_mc):
     # decorator tcfl.tc.parameters()
     _parameters = dict()
 
+    #
+    # When executing, when do we start running methods from this
+    # testcase.
+    #
+    # Each execution consists of multiple phases
+    # (:data:`_method_phase_prefixes`); each phase has multiple
+    # methods that are executed in alphabetical order.
+    #
+    # By default we run them all, but if we set a trigger with
+    # --start-at-fname, we skip methods from that phase until the
+    # triggering one (and then the rest).
+    #
+    # keyed by phase, function names that trigger
+    _start_triggers = collections.defaultdict(set)
+    # keyed by phase, defaults to True, since by default we always run
+    # all the stuff from the phase
+    _start_triggered = collections.defaultdict(lambda: True)
+
 
     def __init__(self, name, tc_file_path, origin, hashid = None):
         #
@@ -5793,8 +5820,38 @@ class tc_c(reporter_c, metaclass=_tc_mc):
 
         :returns result_c: aggregated result of all the methods.
         """
+
+        # Run a method, but only if the phase is already triggered
+        # methods are usually PHASE_SOMENAME(); see doc for
+        # _start_triggers* for more info.
+        try:
+            phase, _ = fname.split("_", 1)
+        except ValueError as e:
+            # ...except when they are just called PHASE()
+            if fname not in _method_phase_prefixes:
+                logging.error(f"BUG? method name {fname} doesn't"
+                              " fit PHASE[_SOMENAME](): {e}")
+                raise
+            phase = fname
+        # eg: setup/start/eval are all the eval phase
+        phase = _phase_consolidate(phase)
+        if not self._start_triggered[phase]:
+            if fname not in self._start_triggers[phase]:
+                self.report_skip(
+                    f"{fname} skipped because phase '{phase}' is not"
+                    " triggered with --start-at-fname",
+                    # these are important for clarity: report'em at #1
+                    level = 1)
+                return result_c(skipped = 1)
+            self.report_info(
+                f"{fname} triggers phase '{phase}' (because --start-at-fname)",
+                    # these are important for clarity: report'em at #1
+                    level = 1)
+            self._start_triggered[phase] = True
         targets = self._mk_target_args_for_fn(fn, args)
         return self.__method_trampoline_call(fname, fn, _type, targets)
+
+
 
     def _methods_run(self, do_serially, serial_list, parallel_list):
         """
@@ -9406,6 +9463,21 @@ def _run(args):
     report_driver_c.add(report_file_impl)
     report_driver_c.add(report_data_json.driver())
 
+    # see doc for _start_triggers* and _method_run() to understand
+    # how/why this works.
+    for start_at_fname in  args.start_at_fname:
+        phase, _ = start_at_fname.split("_", 1)
+        phase = _phase_consolidate(phase)
+        assert phase in _method_phase_prefixes, \
+            f"{start_at_fname}: bad method name given with --start-at-fname; " \
+            " expected PHASENAME_<rest>(), known phases: {', ',join(_method_phase_prefixes)}"
+        tcfl.tc.tc_c._start_triggers[phase].add(start_at_fname)
+        tcfl.tc.tc_c._start_triggered[phase] = False
+        tc_global.report_info(
+            f"WARNING! phase '{phase}': will only execute starting at"
+            f" {start_at_fname}()",
+            level = 0)
+
     # Setup defaults in the base testcase class
     tc_c.preempt = args.preempt
     tc_c.priority = args.priority
@@ -9804,6 +9876,12 @@ def argp_setup(arg_subparsers):
         "--preempt", action = "store_true", default = False,
         help = "Enable allocation preemption (disabled by default);"
         " server policy might restrict if allowed or not.")
+    ap.add_argument(
+        "--start-at-fname", metavar = "FUNCTIONAME",
+        action = "append", default = [],
+        help = "Start executing from a function called FUNCTIONNAME;"
+        " note this skips anything previous until said function; note the"
+        " WARNING!! use only with a single testcase!")
     ap.add_argument(
         "--taps", action = "store_true", default = False,
         help = "Report in TAPS format")
