@@ -3021,6 +3021,17 @@ class parameter_c:
     >>>     tcfl.tc.parameter_username_password_c(
     >>>         "creds", "this is username/password",
     >>>         "USERNAME", "KEYRING:someotherdomain"))
+    >>>     tcfl.tc.parameter_choices_c(
+    >>>         "os_flavour",
+    >>>         "Which OS flavour we want to install",
+    >>>         "linux",		# default
+    >>>         name_ui = "OS to install",
+    >>>         choices = {
+    >>>             'linux': "Install Linux",
+    >>>             'windows': "Install Windows",
+    >>>             'macos': "Install MacOS",
+    >>>         })
+    >>> )
     >>> class _test(tcfl.tc.tc_c):
     >>>    ...
 
@@ -3312,6 +3323,53 @@ class parameter_token_c(parameter_c):
     def __init__(self, *args, **kwargs):
         parameter_c.__init__(self, *args, credential = True,
                              origin = commonl.origin_get(2), **kwargs)
+
+
+
+class parameter_choices_c(parameter_c):
+    """Parameter that allows choosing one of multiple values
+
+    :param dict choices: a dictionary keyed by choice name (a
+      short, simple string _a-zA-Z0-9) and the value being a single
+      line longer string with the description. The shorter it is kept,
+      the better.
+
+    See :class:`parameter_c` for usage examples.
+
+    """
+    def __init__(self, *args, choices: dict, **kwargs):
+        commonl.assert_dict_of_strings(choices, "choices")
+        parameter_c.__init__(self, *args,
+                             origin = commonl.origin_get(2), **kwargs)
+        if not choices:
+            raise tcfl.block_e(
+                f"parameter '{self.name}':"
+                f" must specify at least one choice")
+        for choice in choices.keys():
+            # we only allow choice names that can be a python variable
+            # name or a valid inventory entry name
+            commonl.verify_str_safe(
+            choice,
+                safe_chars = set('_' + string.ascii_letters + string.digits),
+                name = f"parameter {self.name}, choice '{choice}'")
+
+        self.choices = choices
+        # self.default is set by parameter_c.__init__ from *args and
+        # **kwargs
+        if self.default and self.default not in choices.keys():
+            raise tcfl.block_e(
+                f"parameter '{self.name}':"
+                f" invalid default '{self.default}': must be one of:"
+                f" {', '.join(self.choices)}")
+
+
+    def _get(self, tc):
+        choice = parameter_c._get(self, tc)
+        if choice not in self.choices.keys():
+            raise tcfl.block_e(
+                f"parameter '{self.name}':"
+                f" invalid value '{choice}': must be one of: "
+                f" {', '.join(self.choices)}")
 
 
 

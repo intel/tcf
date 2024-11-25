@@ -330,6 +330,9 @@ def _tc_info_from_tc_c(testcase):
             origin = parameter.origin,
             default = parameter.default)
 
+        if hasattr(parameter, "choices"):
+            # parameter.choices is a pure dict, so we can copy like this
+            parameters[name]["choices"] = parameter.choices
 
     tc_info = tcfl.tc_info_c(
         testcase.name, testcase.kws['thisfile'],
