@@ -3168,12 +3168,10 @@ class parameter_c:
 
         if val_resolved != val:
             tc.report_info(
-                f"resolved token parameter '{self.name}' from keyring/files")
+                f"resolved parameter '{self.name}' from keyring/files")
             return val_resolved
-        else:
-            tc.report_info(
-                f"retrieved token parameter '{self.name}'")
-            return val
+        # no need to report, we did already
+        return val
 
 
 
@@ -3342,7 +3340,6 @@ def parameters(*args):
         # COPY the dictionary from our base class to modify it
         # specific to this class
         if id(super(cls, cls)._parameters) == id(cls._parameters):
-            print("creating copy dict", file = sys.stderr)
             cls._parameters = dict(super(cls, cls)._parameters)
 
         for parameter in args:
