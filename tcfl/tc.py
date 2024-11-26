@@ -122,7 +122,6 @@ import types
 import typing
 
 import tcfl
-logging.basicConfig(level = logging.ERROR)
 
 # We multithread to run testcases in parallel
 #

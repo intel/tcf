@@ -45,6 +45,20 @@ means TCF is trying to contact a host that is either:
   is not responding or the server has crashed)
 - blocked by a firewall (check your proxy settings are ok)
 
+
+
+*tcf* verbosity increase with -v reports no logging messages
+------------------------------------------------------------
+
+Adding `-vvv` as an option to *tcf* is supposed to increase logging
+verbosity.
+
+If no loggin output is reported, it has happened in the past that some
+piece of code has reinitialized the logging subsystem calling
+`logging.basicConfig()`, causing logging output to die.
+
+
+
 Client operations report *EOF occurred in violation of protocol*
 ----------------------------------------------------------------
 
