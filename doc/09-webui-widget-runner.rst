@@ -16,6 +16,7 @@ Each runner needs:
  - a remote git repository and a path to a script in it
  - a user name for the runner to use to access the target
  - an email address for the engine to notify (optional)
+ - (optional) parameters the user needs to give to pass
 
 This will present controls in a UI to start and stop the script
 execution and provide information about the progress in three columns:
@@ -155,6 +156,47 @@ Thus, for each runner, declare entries in the inventory (again: in
     etc) with maybe a hyperlink to state, a color. eg::
 
       <div display="background-color: green;"><a href = "%(pipeline)s/%(build_id)s/log">PASS</a></div>
+
+  - **parameter**: dictionary keyed by parameter name (and their
+    display will be sorted by it); each entry matches TCFL's
+    :class:`tcfl.tc.parameter_c` fields).
+
+    Note templates to create this in Python or Shell can be generated
+    with the *tcf parameters-template-make* command.
+
+    - **name_ui**: (str) A short (<20 chars), simple, one line string
+      that will be displayed to describe this parameter next to the
+      input box
+
+      >>> "runner.runner1.parameter.parameterA.name_ui": "OS to install"
+
+    - **description**: (str) A longer string that describes this
+      parameter in more detail; will be shown in the parameter's UI
+      tooltips.
+
+      >>> "runner.runner1.parameter.parameterA.description": "Specify the OS to install during execution"
+
+    - **default**: (optional; str) if given, specifies the default
+      value to use if none given
+
+      >>> "runner.runner1.parameter.parameterA.default": "linux"
+
+      For :class:`tcfl.tc.parameter_user_password_c` types, this is
+      actually a **default_user** and **default_password**.
+
+    - **type**: (str) A class name, see :class:`tcfl.tc.parameter_c`
+      or its derivatives.
+
+      >>> "runner.runner1.parameter.parameterA.type": "parameter_c"
+      >>> "runner.runner1.parameter.parameterA.type": "parameter_choices_c"
+      >>> "runner.runner1.parameter.parameterA.type": "parameter_user_password_c"
+
+    - **credential**: (bool) True if this describes a security
+      sensitive value (credential, password, token, etc); False
+      otherwise. This allows the UI to decide hiding or showing the
+      value. A button is placed to show the value as needed.
+
+      >>> "runner.runner1.parameter.parameterA.type": False
 
   Notes on adding regexes for processing:
 

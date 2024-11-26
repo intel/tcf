@@ -307,6 +307,15 @@ hr {
     margin-top: 0;
 }
 
+
+.text_truncate_7em {
+    overflow: hidden;     /* hide overfling text */
+    width: 7em;           /* truncate text larget than that */
+    white-space: nowrap;  /* no wrapping to following line */
+    text-overflow: ellipsis;
+}
+
+
 .dialog-inventory-details {
     min-width: 50em;
     border: 0;

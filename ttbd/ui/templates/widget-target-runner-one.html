@@ -30,7 +30,7 @@
         <!--Display previous runs if DB access configured-->
         {% if runner_mongo_url and runner_mongo_db and runner_mongo_collection %}
         <span class = "tooltip">
-          <button 
+          <button
             id = 'widget-runner-{{ runner }}-toggle-previous-builds'
             onclick = 'js_runner_previous_builds_toggle("{{ runner }}", "{{ targetid }}")'>
             ⏲
@@ -59,7 +59,7 @@
             and <i>mongo_collection</i> needed to access the result database.
           </span>
         </span>
-        {% endif %}  
+        {% endif %}
       </th>
 
       <th align = "left">
@@ -92,11 +92,96 @@
       </th>
 
   </thead>
-  
+
+  <tbody id = "label_id_runner_{{ runner }}_parameters">
+
+    {% if not runner_parameters %}
+    <!-- no runner parameters have been defined in runner.{{ runner }}.parameters -->
+    {% endif %}
+
+    {% for parameter_name, parameter_data in runner_parameters.items() %}
+    <!-- Row for inputing parameter {{ parameter_name }} -->
+    <tr id == "label_id_runner_{{ runner }}_parameter_{{ parameter_name }}">
+      <td colspan = 2 halign = top>
+        <!-- Name of the parameter, make it shortish so it doesn't mess up
+             columns #1 and #2 -->
+        <span class = "tooltip">
+          <div class = "text_truncate_7em">
+            {{ parameter_data.get("name_ui", parameter_name) }}
+          </div>
+          <span class = "tooltiptext">
+            {{ parameter_data.get("name_ui", parameter_name) }}
+            <p>
+              {{ parameter_data.get("description", "description n/a") }}
+            </p>
+          </span>
+        </span>
+      </td>
+
+      <td>
+
+        {%  if parameter_data.get("type", None) == "parameter_username_password_c" %}
+        <!-- input fieeld: username/password must hide password -->
+        <input type = "text"
+          id = "label_id_runner_{{ runner }}_parameter_{{ parameter_name }}_user"
+          placeholder = "{{ parameter_data.get('default_user', '') }}"
+          autocomplete = "new-password" width = "100%" required>
+        <br>
+        <input type = "password"
+          id = "label_id_runner_{{ runner }}_parameter_{{ parameter_name }}_password"
+          placeholder = "{{ parameter_data.get('default_password', '') }}"
+          autocomplete = "new-password" width = "100%" required>
+        <button type = "button"
+                id = "label_id_runner_{{ runner }}_parameter_{{ parameter_name }}"
+                onclick = "toggle_type_text_password(event, 'label_id_runner_{{ runner }}_parameter_{{ parameter_name }}_password')" >👁</button>
+
+
+        {% elif parameter_data.get("type", None) == "parameter_choices_c" %}
+        <!-- input fiedl, multiple option FIXME: preselect default -->
+        <select id = "label_id_runner_{{ runner }}_parameter_{{ parameter_name }}_value"
+                class = 'list_versions'>
+          {% for choice_name, choice in parameter_data.get('choice', {}).items() %}
+          <option value = '{{ choice_name }}' width = 20em>
+            {{ choice }}
+          </option>
+          {% endfor %}
+        </select>
+
+
+        {% else %}
+        <!-- input fiedl, not username/password, still , must hide if credential/token -->
+        <input
+          {% if parameter_data.get("credential", False) %}
+            type = "password"
+          {% else %}
+            type = "text"
+          {% endif %}
+          id = "label_id_runner_{{ runner }}_parameter_{{ parameter_name }}_value"
+          placeholder = "{{ parameter_data.get('default', '') }}"
+          autocomplete = "new-password"
+          width = "100%"
+          required>
+           {% if parameter_data.get("credential", False) %}
+        <!-- it is a credential, add a button to toggle showing it -->
+        <button type = "button"
+                id = "label_id_runner_{{ runner }}_parameter_{{ parameter_name }}"
+                onclick = "toggle_type_text_password(event, 'label_id_runner_{{ runner }}_parameter_{{ parameter_name }}_value')" >👁</button>
+           {% endif %} {# if parameter_data.get("credential", False) #}
+
+
+        {% endif %} {# if parameter_data.get("type", None) == "parameter_username_password_c" #}
+      </td>
+
+    </tr>
+    <!-- Done with testcase parameter {{ parameter_name }} -->
+    {% endfor %} {# iterate over parameters #}
+
+  </tbody>
+
   {# these are for the main build, the one we ran/will run; we make
   them fixed, this way they are always in the same place; the
   historical ones we add them after this #}
-  
+
   <tbody id = "label_id_runner_{{ runner }}_build_main_header">
   </tbody>
   <!-- FIXME: unify names with build ids -->
@@ -110,7 +195,7 @@
   - label_id_runner_{{ runner }}_build_BUILD_data
 
   #}
-  
+
 </table>
 
 <!-- this is the end of file ui/widget-target-runner-one.html for {{ runner }} -->

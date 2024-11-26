@@ -1149,3 +1149,13 @@ function close_dialog_element_by_id(dialog_id){
     let dialog_element = document.getElementById(dialog_id);
     dialog_element.close();
 }
+
+
+function toggle_type_text_password(event, field_name) {
+    const field = document.getElementById(field_name);
+    if (field.type == "password") {	// toggle text/password so it hides/shows
+        field.type = 'text';
+    } else {
+        field.type = 'password';
+    }
+}
