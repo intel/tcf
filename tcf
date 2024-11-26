@@ -299,6 +299,8 @@ if __name__ == "__main__":
     import tcfl.ui_cli_certs
     tcfl.ui_cli_certs.cmdline_setup(arg_subparsers)
 
+    import tcfl.ui_cli_testcases
+    tcfl.ui_cli_testcases._cmdline_setup(arg_subparsers)
 
     # advanced commands
     tcfl.ui_cli_servers.cmdline_setup_advanced(arg_subparsers)
@@ -331,11 +333,9 @@ if __name__ == "__main__":
     import tcfl.ui_cli_alloc_monitor
     tcfl.ui_cli_alloc_monitor._cmdline_setup(arg_subparsers)
 
-    import tcfl.ui_cli_testcases
-    tcfl.ui_cli_testcases._cmdline_setup(arg_subparsers)
-
     import commonl.ui_cli
     commonl.ui_cli._cmdline_setup_advanced(arg_subparsers)
+    tcfl.ui_cli_testcases._cmdline_setup_advanced(arg_subparsers)
 
     argcomplete.autocomplete(arg_parser)
     global args
