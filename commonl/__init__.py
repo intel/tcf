@@ -726,8 +726,8 @@ def verify_str_safe(s, safe_chars = None, do_raise = True, name = "string"):
     if not do_raise:
         return not s_unsafe
     assert not s_unsafe, \
-        f"{name}: contains invalid characters: {''.join(s_unsafe)}" \
-        f" (valid are: {''.join(safe_chars)})"
+        f"{name}: contains invalid characters '{''.join(s_unsafe)}'" \
+        f" (valid are: {''.join(sorted(safe_chars))})"
     return None		# keep pylint happy
 
 
