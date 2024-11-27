@@ -2429,6 +2429,8 @@ def password_get(domain, user, password):
         $ ttbd...etc
 
     """
+    # FIXME: implement expanding user from ENV[:DOMAIN],
+    # KEYRING[:DOMAIN] and FILE[:LOCATION]
     assert domain == None or isinstance(domain, str)
     assert isinstance(user, str) or user == None
     assert password == None or isinstance(password, str)
@@ -2462,8 +2464,10 @@ def password_get(domain, user, password):
             domain, user = domain.split(":", 1)
         return _keyring_get(domain, user)
 
-    # Load form a file?
+    # Load from a file?
     def _file_get(filename):
+        # FIXME: implement verification of acceptable locations this
+        # can read from, otherwise we are opening it for ripe abuse
         with open(filename) as f:
             return f.read().strip()
 
@@ -2474,6 +2478,9 @@ def password_get(domain, user, password):
     if password.startswith("FILE="):
         _, filename = password.split("=", 1)
         return _file_get(filename)
+
+    elif password.startswith("FILE"):
+        return _file_get(domain)
 
     # Load from environment? DOMAIN_PASSWORD
     def _env_get(domain):
