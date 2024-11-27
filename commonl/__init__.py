@@ -2526,20 +2526,23 @@ def field_needed(field, projections):
     :param list(str) projections: list of :mod:`fnmatch` patterns
       against which to check field. Can be *None* and *[ ]* (empty).
 
-    :returns bool: *True* if *field* matches a pattern in *patterns*
-      or if *patterns* is empty or *None*. *False* otherwise.
+    :returns str:
+       - if *field* matches a pattern in *patterns*, return that pattern
+       - if there are no projections, we assume yes and return *field*
+       - *None* if the field should not be included
     """
     if projections:
         # there is a list of must haves, check here first
         for projection in projections:
             if fnmatch.fnmatch(field, projection):
-                return True	# we need this field
+                return projection	# we need this field
             # match projection a to fields a.[x.[y.[...]]]
             if field.startswith(projection + "."):
-                return True
-        return False		# we do not need this field
+                return projection
+        return None		# we do not need this field
     else:
-        return True	# no list, have it
+        return field	# no list, have it
+
 
 def dict_to_flat(d, projections = None, sort = True, empty_dict = False,
                  add_dict: bool = True):
