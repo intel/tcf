@@ -2406,6 +2406,9 @@ def password_get(domain, user, password):
       - *FILE=PATH* (or *FILE:PATH*) will read the password from
         filename *PATH*.
 
+      - *ENV:DOMAIN* (or *ENV:DOMAIN*) will read the password from
+        an environment variable called DOMAIN_PASSWORD
+
       Note that using the colon notation *FILE:PATH* can make some URL
       parsing not work, hence you can default to using =
 
@@ -2472,7 +2475,27 @@ def password_get(domain, user, password):
         _, filename = password.split("=", 1)
         return _file_get(filename)
 
+    # Load from environment? DOMAIN_PASSWORD
+    def _env_get(domain):
+        val = os.getenv(f"{domain}_PASSWORD")
+        if val == None:
+            raise RuntimeError(
+                f"commonl.password_get(): no password set in environment"
+                f" for domain {domain} (no environment variable"
+                f" {domain}_PASSWORD)")
+        return val
+
+    if password.startswith("ENV:"):
+        _, domain = password.split(":", 1)
+        return _env_get(domain)
+    elif password.startswith("ENV="):
+        _, domain = password.split("=", 1)
+        return _env_get(domain)
+    elif password == "ENV":
+        return _env_get(domain)
+
     return password			# passthough, no special handling
+
 
 
 def split_user_pwd_hostname(s):
