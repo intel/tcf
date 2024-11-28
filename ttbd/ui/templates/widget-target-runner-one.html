@@ -121,27 +121,46 @@
       <td>
 
         {%  if parameter_data.get("type", None) == "parameter_username_password_c" %}
-        <!-- input fieeld: username/password must hide password -->
-        <input type = "text"
-          id = "label_id_runner_{{ runner }}_parameter_{{ parameter_name }}_user"
-          placeholder = "{{ parameter_data.get('default_user', '') }}"
-          autocomplete = "new-password" width = "100%" required>
-        <br>
-        <input type = "password"
-          id = "label_id_runner_{{ runner }}_parameter_{{ parameter_name }}_password"
-          placeholder = "{{ parameter_data.get('default_password', '') }}"
-          autocomplete = "new-password" width = "100%" required>
-        <button type = "button"
-                id = "label_id_runner_{{ runner }}_parameter_{{ parameter_name }}"
-                onclick = "toggle_type_text_password(event, 'label_id_runner_{{ runner }}_parameter_{{ parameter_name }}_password')" >👁</button>
-
+        <!-- input field: username/password; must hide password but
+        toggle visibility; the <div> is there so the username and
+        password are in the same column; the styles are to ensure the
+        boxes don't have a lot of space in between-->
+        <div>
+          <span class = "tooltip">
+            <input type = "text"
+                   id = "label_id_runner_{{ runner }}_parameter_{{ parameter_name }}_user"
+                   placeholder = "{{ parameter_data.get('default_user', '') }}"
+                   autocomplete = "new-password" width = "100%" required
+                   style = "margin-bottom: 0;" >
+            <span class = "tooltiptext">
+              User or login name
+            </span>
+          </span>
+          <span class = "tooltip">
+            <input type = "password"
+                   id = "label_id_runner_{{ runner }}_parameter_{{ parameter_name }}_password"
+                   placeholder = "{{ parameter_data.get('default_password', '') }}"
+                   autocomplete = "new-password" width = "100%" required
+                   style = "margin-top: 0;" >
+            <span class = "tooltiptext">
+              Password
+            </span>
+          </span>
+          <button type = "button"
+                  id = "label_id_runner_{{ runner }}_parameter_{{ parameter_name }}"
+                  onclick = "toggle_type_text_password(event, 'label_id_runner_{{ runner }}_parameter_{{ parameter_name }}_password')" >👁</button>
+        </div>
 
         {% elif parameter_data.get("type", None) == "parameter_choices_c" %}
         <!-- input fiedl, multiple option FIXME: preselect default -->
         <select id = "label_id_runner_{{ runner }}_parameter_{{ parameter_name }}_value"
                 class = 'list_versions'>
           {% for choice_name, choice in parameter_data.get('choice', {}).items() %}
-          <option value = '{{ choice_name }}' width = 20em>
+          <option value = '{{ choice_name }}' width = 20em
+                  {% if choice_name == parameter_data.get('default', None) %}
+                  selected
+                  {% endif %}
+                  >
             {{ choice }}
           </option>
           {% endfor %}
