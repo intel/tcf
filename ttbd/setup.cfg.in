@@ -10,6 +10,7 @@ requires = {{requirements}}
     tcf-client == %%{version}-%%{release}
     python3-tornado
     python3-gunicorn
+    python3-pymongo
     lockdev
 
 build_requires =

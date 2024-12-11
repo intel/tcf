@@ -30,6 +30,7 @@ keyring         # package: fedora,ubuntu=python3-keyring
 netifaces       # package: python3-netifaces
 pexpect         # package: python3-pexpect
 ply             # package: python3-ply
+pymongo         # package: python3-pymongo
 pyOpenSSL       # package: centos,fedora,rhel=python3-pyOpenSSL ubuntu=python3-openssl
 python-prctl    # package: ubuntu=python3-prctl
 pyroute2        # package: python3-pyroute2

@@ -25,6 +25,8 @@ python3-ldap:
 python3-netifaces:
 python3-pexpect:
 python3-ply:
+python3-pymongo:
+  reason: used to build bridges to mongo Databases
 python3-pyOpenSSL:
 python3-pyroute2:
 python3-pyserial:
