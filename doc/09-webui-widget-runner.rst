@@ -184,6 +184,15 @@ Thus, for each runner, declare entries in the inventory (again: in
       For :class:`tcfl.tc.parameter_user_password_c` types, this is
       actually a **default_user** and **default_password**.
 
+      Note that when integrating with Jenkins, you can set the
+      password to something like::
+
+        ENV:CREDENTIAL1
+
+      and you can program in Jenkins the credential storage for the
+      job implementing the pipeline so the password is there and users
+      don't need to change it.
+
     - **type**: (str) A class name, see :class:`tcfl.tc.parameter_c`
       or its derivatives.
 
