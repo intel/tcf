@@ -60,6 +60,197 @@ class delay(ttbl.power.impl_c):
         return None
 
 
+
+class delay_til_device_spec_c(ttbl.power.impl_c):
+    
+    """
+    Delay power-on until a device dis/appears.
+
+    This is meant to be used in a stacked list of power
+    implementations given to a power control interface.
+
+    This replaces :class:`ttbl.pc.delay_til_usb_device` and company,
+    since it look for a generic device specification
+
+    :param str device_spec: device specification, see
+      :class:`ttbl.device_resolver_c`
+
+    :param upid: Unique Physical IDentification descriptor used to
+      identify this device we are looking for; normally set to match
+      that that describes the object to tie them together; eg:
+
+      >>> serial0 = ttbl.console.serial_pc("usb,#12141323")
+      >>> delay_til_serial0 = ttbl.console.delay_til_device_spec_c(
+      >>>     "usb,#12141323", upid = serial0.upid)
+
+    :param str property_name: (optional, default *usb_serial_number*)
+      where to read the device specification from in the inventory,
+      normally instrumentation.UPID.PROPERTYNAME.
+
+    :param str spec_prefix: (optional, default *usb,#*) see
+      :class:`ttbl.device_resolver_c`.
+
+    :param bool when_powering_on: Check when powering on if True
+      (default) or when powering off (if false)
+
+    :param bool want_connected: when checking, we want the device to
+      be connected (True) or disconnected (False)
+
+    :param collections.Callable action: action to execute when the
+      device is not found, before waiting. Note the first parameter
+      passed to the action is the target itself and then any other
+      parameter given in ``action_args``
+
+    :param action_args: tuple of parameters to pass to ``action``.
+
+    Other parameters as to :class:ttbl.power.impl_c.
+    """
+
+    def __init__(self, device_spec, when_powering_on = True, want_connected = True,
+                 poll_period = 0.25, timeout = 25,
+                 action = None, action_args = None,
+                 # most devices are USB anyway
+                 property_name = "usb_serial_number",
+                 spec_prefix = "usb,#",
+                 expected_count = 1,
+                 upid = None,
+                 **kwargs):
+        assert isinstance(expected_count, int), \
+            f"expected_count: expected >= 1 integer, got {type(expected_count)}"
+        assert expected_count >= 1, \
+            f"expected_count: expected >= 1 integer, got {expected_count}"
+        ttbl.power.impl_c.__init__(self, **kwargs)
+        self.device_spec = device_spec
+        self.when_powering_on = when_powering_on
+        self.want_connected = want_connected
+        self.poll_period = poll_period
+        self.timeout = timeout
+        self.action = action
+        self.action_args = action_args
+        self.component = None		# filled in by _on/_off/_get
+        self.property_name = property_name
+        self.spec_prefix = spec_prefix
+        self.expected_count = expected_count
+        if action != None:
+            assert callable(action)
+        self.log = None			# filled out in _on/_off/_get
+        when = "powering-on" if when_powering_on else "powering-off"
+        what = "connected" if want_connected else "disconnected"
+        if upid == None:
+            self.upid_set(
+                "Delayer until device with device_spec '%s' is %s when %s,"
+                " checking every %.2fs timing out at %.1fs" % (
+                    device_spec, what, when, poll_period, timeout),
+                device_spec = device_spec,
+                when_powering_on = when_powering_on,
+                want_connected = want_connected,
+                poll_period = poll_period,
+                timeout = timeout)
+        else:
+            self.upid = upid
+
+
+    class not_found_e(Exception):
+        """Exception raised when a device is not found."""
+
+        pass
+
+
+
+    def _is_device_present(self, target, action, timeout = None):
+        if timeout == None:
+            timeout = self.timeout
+        t0 = time.time()
+        self.log = target.log
+        if self.want_connected:
+            text = "appear"
+            text_past = "appear"
+        else:
+            text = "disappear"
+            text_past = "disappear"
+        dev = None
+        device_resolver = ttbl.device_resolver_c(
+            target, self.device_spec,
+            f"instrumentation.{self.upid_index}.{self.property_name}",
+            spec_prefix = self.spec_prefix)
+        spec, origin = device_resolver.spec_get()
+
+        while True:
+            t = time.time()
+            if t - t0 > timeout:
+                raise self.not_found_e(
+                    "%s: timeout (%.2fs) on %s waiting for "
+                    "device %s @%s to %s"
+                    % (self.component, t - t0, action,
+                       spec, origin, text))
+
+            devices = device_resolver.devices_find_by_spec()
+            if not devices:
+                self.log.debug("%s: device %s @%s: NOT FOUND",
+                               self.component, spec, origin)
+                if not self.want_connected:
+                    break
+            else:		# this can be more than one edevice...
+                self.log.debug("%s: device %s@%s: found: %s",
+                               spec, origin, " ".join(devices))
+                if self.want_connected:
+                    break
+
+            if self.action:
+                self.log.debug("%s/%s: executing action %s"
+                               % (self.component, action, self.action))
+                try:
+                    self.action(target, *self.action_args)
+                except Exception as e:
+                    self.log.error("%s/%s: error executing action %s: %s",
+                                   self.component, action, self.action, e)
+                    raise
+            self.log.info("%s/%s: delaying %.2fs for device %s @%s to %s"
+                          % (self.component, action, self.poll_period,
+                             spec, origin, text))
+            time.sleep(self.poll_period)
+        target.log.debug(
+            "%s/%s: delayed %.2fs for USB device %s @%s to %s"
+            % (self.component, action, t - t0, spec, origin, text_past))
+        return dev
+
+
+    def on(self, target, component):
+        self.log = target.log		# for _is_device_present
+        self.component = component	# for _is_device_present
+        if self.when_powering_on:
+            self._is_device_present(target, "power-on")
+
+
+    def off(self, target, component):
+        self.log = target.log		# for _is_device_present
+        self.component = component	# for _is_device_present
+        if not self.when_powering_on:
+            self._is_device_present(target, "power-off")
+
+
+    def get(self, target, component):
+        # Return if the USB device is connected
+        #
+        # Why? because for some targets, we can only tell if they are
+        # connected by seeing a USB device plugged to the system. For
+        # example, a USB connected Android target which we power
+        # on/off by tweaking the buttons so there is no PDU to act upon.
+        self.log = target.log		# for _is_device_present
+        self.component = component	# for _is_device_present
+
+        device_resolver = ttbl.device_resolver_c(
+            target, self.device_spec,
+            f"instrumentation.{self.upid_index}.{self.property_name}",
+            spec_prefix = self.spec_prefix)
+
+        devices = device_resolver.devices_find_by_spec()
+        if devices:
+            return True
+        return False
+
+
+
 class delay_til_file_gone(ttbl.power.impl_c):
     """
     Delay until a file dissapears.
