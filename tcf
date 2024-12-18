@@ -118,7 +118,8 @@ if __name__ == "__main__":
         tcfl.ui_cli.commands_old_suffix = ""
         tcfl.ui_cli.commands_new_suffix = "2"
 
-    arg_parser = argparse.ArgumentParser()
+    # set @ so we can get args from a file
+    arg_parser = argparse.ArgumentParser(fromfile_prefix_chars = '@')
     commonl.cmdline_log_options(arg_parser)
     # FIXME: should be in cmdline_log_options() but it does not work :/
     arg_parser.set_defaults(level = logging.ERROR)
