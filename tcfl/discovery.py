@@ -379,20 +379,20 @@ def _create_from_file_name(tcis, file_name, from_path, subcases_cmdline,
       as at this stage we cannot know), blocked (due to error
       importing) or skipped(due to whichever condition).
     """
+    assert isinstance(tcis, dict)
     result = tcfl.result_c(0, 0, 0, 0, 0)
 
     tc_name = file_name
     if subcases_cmdline:
         tc_name += "#" + "#".join(subcases_cmdline)
     for _tc_driver in tcfl.tc.tc_c._tc_drivers:
-        testcases = []
         logger.info("scanning with driver %s", _tc_driver)
         with tcfl.msgid_c(depth = 1) as _msgid:	# FIXME: remove, unneeded here
             try:
                 # FIXME: replce with __name__ when we remove tc_mc from tcfl.tc_c
                 logger_driver = logger.getChild(f"[{_tc_driver}]")
                 logger_driver.info("scanning")
-                testcases += _is_testcase_call(
+                testcases = _is_testcase_call(
                     _tc_driver, tc_name,
                     file_name, from_path,
                     subcases_cmdline,
@@ -404,13 +404,14 @@ def _create_from_file_name(tcis, file_name, from_path, subcases_cmdline,
                         # FIXME: warn once for each driver
                         logger_driver.warning(
                             f"fix driver '{_tc_driver.__name__}' to return tcfl.tc_info_c")
-                        tcis[file_name].append(_tc_info_from_tc_c(testcase))
+                        tci = _tc_info_from_tc_c(testcase)
+                        tcis[file_name][tci.name] = tci
                     elif isinstance(testcase, tcfl.tc_info_c):
                         logger_driver.info("testcase found @ %s by %s",
                                            testcase.origin, _tc_driver)
-                        tcis[file_name].append(testcase)
+                        tcis[file_name][testcase.name] = testcase
                     else:
-                        tcis[file_name].append(tcfl.tc_info_c(
+                        tci = tcfl.tc_info_c(
                             file_name, file_name,
                             origin = commonl.origin_get() + ":" + file_name,
                             subcase_spec = subcases_cmdline,
@@ -418,7 +419,8 @@ def _create_from_file_name(tcis, file_name, from_path, subcases_cmdline,
                             exception = RuntimeError(
                                 f"BUG: invalid type {type(testcase)} returned"
                                 f" by testcase driver {_tc_driver}")
-                        ))
+                        )
+                        tcis[file_name][tci.name] = tci
 
             # this is so ugly, need to merge better with result_c's handling
             except subprocess.CalledProcessError as e:
@@ -426,13 +428,14 @@ def _create_from_file_name(tcis, file_name, from_path, subcases_cmdline,
                 # formatted_traceback down there that can be
                 # seen
                 logger_driver.info("scanning exception: subprocess %s", e)
-                tcis[file_name].append(tcfl.tc_info_c(
+                tcis[file_name][tc_name] = tcfl.tc_info_c(
                     tc_name, file_name,
+                    origin = commonl.origin_get() + ":" + file_name,
                     subcase_spec = subcases_cmdline,
                     result = tcfl.result_c(blocked = 1),
                     exception = e,
                     formatted_traceback = traceback.format_tb(sys.exc_info()[2]),
-                ))
+                )
                 continue
             except OSError as e:
                 logger_driver.info("scanning exception: oserror %s", e)
@@ -442,13 +445,14 @@ def _create_from_file_name(tcis, file_name, from_path, subcases_cmdline,
                 )
                 if e.filename:
                     attachments['filename'] = e.filename
-                tcis[file_name].append(tcfl.tc_info_c(
+                tcis[file_name][tc_name] = tcfl.tc_info_c(
                     tc_name, file_name,
+                    origin = commonl.origin_get() + ":" + file_name,
                     subcase_spec = subcases_cmdline,
                     result = tcfl.result_c(blocked = 1),
                     exception = e,
                     formatted_traceback = traceback.format_tb(sys.exc_info()[2])
-                ))
+                )
                 continue
             except Exception as e:
                 if isinstance(e, ( AttributeError, TypeError )):
@@ -460,13 +464,14 @@ def _create_from_file_name(tcis, file_name, from_path, subcases_cmdline,
                     logger_driver.info(
                         "scanning exception: %s %s", type(e), e,
                         exc_info = commonl.debug_traces)
-                tcis[file_name].append(tcfl.tc_info_c(
+                tcis[file_name][tc_name] = tcfl.tc_info_c(
                     tc_name, file_name,
+                    origin = commonl.origin_get() + ":" + file_name,
                     subcase_spec = subcases_cmdline,
                     result = tcfl.result_c(blocked = 1),
                     exception = e,
                     formatted_traceback = traceback.format_tb(sys.exc_info()[2])
-                ))
+                )
                 continue
     else:
         logger.log(7, "%s: no testcase driver got it", file_name)
@@ -554,8 +559,9 @@ class agent_c:
         #: Number of testcases found
         self.tcis_count = 0
         #: Info about testcases found, indexed by file where found;
-        #: #each entry is a list of :class:`tcfl.tc_info_c`
-        self.tcis = {}
+        #: each entry is a dict keyed by the name of the testcase
+        #: inside the file
+        self.tcis = collections.defaultdict(dict)
         self.result = tcfl.result_c()
         self.proc_by_filename = {}
 
@@ -584,19 +590,22 @@ class agent_c:
         # - OOM killer won't affect main image and we'll be able to
         #   track it
 
-        orig_stderr = sys.stderr
-        sys.stderr = sys.stdout = io.StringIO()
-
         pid = os.getpid()
-        logger = log_sub.getChild(f"{path}[{pid}]" )
-        tcis = collections.defaultdict(list)
-        logger.info("scanning for subcases %s", subcase_spec)
+        logger = log.getChild(f"server|{path}[{pid}]" )
+        tcis = collections.defaultdict(dict)
+        logger.info("scanning for subcases %s subcase_spec %s",
+                    path, subcase_spec)
+        orig_stderr = sys.stderr
+        orig_stdout = sys.stdout
         try:
+            sys.stderr = sys.stdout = io.StringIO()
             _create_from_file_name(tcis, path, path, subcase_spec,
                                    logger = logger)
             output = sys.stderr.getvalue()
-            for path, tcil in tcis.items():
-                for tci in tcil:
+            # tcis -> dict keyed by filename of list of testcase instances
+            for _path, tcid in tcis.items():
+                # tcid -> dict keyed by testcase name of testcases found in that filename
+                for _tc_name, tci in tcid.items():
                     # we are just appending; the output of the
                     # discover process
                     if tci.output:
@@ -611,19 +620,35 @@ class agent_c:
             else:
                 # FIXME: get from traceback, last item
                 origin = None
-            tcis[path] = [
-                tcfl.tc_info_c(
-                    path, path,
-                    subcase_spec = subcase_spec,
-                    origin = origin,
-                    result = tcfl.result_c(blocked = 1),
-                    output = "Discovery Process output:\n" + sys.stderr.getvalue(),
-                    exception = e,
-                    formatted_traceback = traceback.format_tb(sys.exc_info()[2])
-                )
-            ]
+            output = sys.stderr.getvalue()
+            tcis[path][path] = tcfl.tc_info_c(
+                path, path,
+                subcase_spec = subcase_spec,
+                origin = origin,
+                result = tcfl.result_c(blocked = 1),
+                output = "Discovery Process output:\n" + output,
+                exception = e,
+                formatted_traceback = traceback.format_tb(sys.exc_info()[2])
+            )
+        finally:
+            sys.stderr = orig_stderr
+            sys.stdout = orig_stdout
+
+        # FIXME: we are very sentitvie to errors here, the output gets
+        # not captured and only printed to stderr; we shall be able to
+        # capture something as a testcase output
         logger.info("scanning found %d testcases", len(tcis))
+        # if there are non-completed testcases, we must move to be a
+        # server to spawn processes when the orchestrator tells us to.
+        for tci in tcis:
+            logger.info(f"scanning found testcase {tci}")
         self.queue.put({ "discovery_result": tcis })
+        logger.info("reported %d testcases to main process", len(tcis))
+
+
+        while True:
+            logger.error("waiting for commands from agent_c.queue")
+            time.sleep(1)
 
 
     def _find_in_file(self, path, subcase_spec):
@@ -709,6 +734,25 @@ class agent_c:
             except queue.Empty as e:	# queue.get() will raise on empty
                 break
         return tcis
+
+    def tcis_update_from_queue(self) -> dict:
+        tcis_by_filename = self.tcis_get_from_queue()
+        # This is a dict keyed by filename which contains a dicy keyed
+        # by testcasename of each individual testcase information
+        for filename, tcid in tcis_by_filename.items():
+            # FIXME: verify we are getting the right format of info
+            # here
+            log.error(f"{filename}: queue received {tcid=}")
+            for _tc_name, tci in tcid.items():
+                log.error(f"{filename}/{_tc_name}: queue received {tci=}")
+                tci_existing = self.tcis[filename].get(tci.name, None)
+                if tci_existing:
+                    log.error(f"{filename}/{_tc_name}: merging onto existing {tci_existing=}")
+                    log.error(f"{filename}/{_tc_name}: DEBUG {tci.output=}")
+                    tci_existing.merge_from(tci)
+                else:
+                    self.tcis[filename][tci.name] = tci
+        return tcis_by_filename
 
 
     # COMPAT: removing list[str] so we work in python 3.8
@@ -797,21 +841,42 @@ class agent_c:
                 elif p.exitcode != None:   # done
                     self.proc_by_filename[filename] = True
                     completed += 1
-                    log.error(f"{filename}: errored out")
-                    self.tcis[filename] = [
-                        tcfl.tc_info_c(
-                            filename, filename,
-                            origin = filename,
-                            result = tcfl.result_c(blocked = 1),
-                            exception = RuntimeError(
-                                f"process failed with exitcode {p.exitcode}"),
-                            formatted_traceback = traceback.format_stack(),
-                        )
-                    ]
+                    log.error(f"{filename}: process failed with exitcode {p.exitcode}")
+                    # If this has failed, it might have emitted
+                    # a discovery result before failing; we will try
+                    # to merge it later at the end of agent_c.run().
+                    # Because here we do not know the name of the
+                    # driver, we keep it to None, since
+                    # tc_info_c.merge_from() takes this as an special
+                    # case for this very situation.
+                    self.tcis[filename][filename] = tcfl.tc_info_c(
+                        filename, filename,
+                        origin = commonl.origin_get() + ":" \
+                        + filename + f"/exitcode/{p.exitcode}",
+                        result = tcfl.result_c(blocked = 1),
+                        exception = RuntimeError(
+                            f"process failed with exitcode {p.exitcode}"),
+                        formatted_traceback = traceback.format_stack(),
+                    )
                 else:
-                    log.info(f"currently running: {p.filename}")
+                    log.info(f"{p.filename}: discovery/server is running")
                     running += 1
-            log.warning(f"current loop {pending}/{running}/{completed}"
+
+            # Check if any of the running processes has returned some
+            # info about testcases and started waiting to run as a
+            # server, we have to mark it as completed
+            #
+            # we get a dict keyed by filename of dicts keyed by
+            # testcasename of discovered testcase; this means we can
+            # mark those as done
+            tcis_by_filename = self.tcis_update_from_queue()
+            for filename, _tcid in tcis_by_filename.items():
+                # ok, this fileis done -- in this case, we have a
+                # process server running
+                self.proc_by_filename[filename] = True
+                completed += 1
+
+            log.warning(f"current loop {pending=}/{running=}/{completed=}"
                         f" out of {procs}")
 
             if completed == procs:
@@ -837,7 +902,6 @@ class agent_c:
                     self.proc_by_filename[filename] = p
                     p.start()
 
-            self.tcis.update(self.tcis_get_from_queue())
             log.warning(
                 f"waiting {self.wait_period}s for"
                 f" {pending=}/{running=}/{completed=}"
@@ -847,7 +911,7 @@ class agent_c:
 
         # we are done launching all subprocesses that discover
         # testcases
-        self.tcis.update(self.tcis_get_from_queue())	# flush the queue
+        self.tcis_update_from_queue()	# flush the queue
 
         if len(self.tcis) == 0:
             log.error("WARNING! No testcases found")
@@ -859,8 +923,15 @@ class agent_c:
                         testcase_name = testcase_name)
 
         self.tcis_count = 0
-        for path, v in self.tcis.items():
-            self.tcis_count += len(v)
+        log.warning(f"testcase scan found {len(self.tcis)} testcases")
+        for filename, tcid in self.tcis.items():
+            log.info(f"testcase scan in {filename} found {len(tcid)} testcases")
+            i = 0
+            for tc_name in tcid:
+                log.info(f"testcase scan in {filename} found #{i} {tc_name}")
+                i += 1
+            self.tcis_count += len(tcid)
+        log.warning("testcase scan has finished")
 
 
 
