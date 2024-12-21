@@ -582,6 +582,24 @@ class agent_c:
     ]
 
 
+
+    def process_testcase_server(self, path: str):
+        """
+        Stays in the background waiting for commands from the main
+        orchestrator to fork subrprocesses that run a particular
+        instance of a testcase
+
+        """
+        # want the PID? add --log-pid-tid
+        logger = log.getChild(f"testcase-server|{path}" )
+        logger.info("starting")
+        while True:
+            logger.error("FIXME: waiting for commands from agent_c.queue")
+            time.sleep(1)
+        logger.warning("finishing")
+
+
+
     def _process_find_in_file(self, path, subcase_spec):
         # RUNS IN A SEPARATE IMAGE
         # - makes main image inmune from random imports
@@ -590,8 +608,8 @@ class agent_c:
         # - OOM killer won't affect main image and we'll be able to
         #   track it
 
-        pid = os.getpid()
-        logger = log.getChild(f"server|{path}[{pid}]" )
+        # want the PID? add --log-pid-tid
+        logger = log.getChild(f"scan-server|{path}" )
         tcis = collections.defaultdict(dict)
         logger.info("scanning for subcases %s subcase_spec %s",
                     path, subcase_spec)
@@ -644,11 +662,8 @@ class agent_c:
             logger.info(f"scanning found testcase {tci}")
         self.queue.put({ "discovery_result": tcis })
         logger.info("reported %d testcases to main process", len(tcis))
+        self.process_testcase_server(path)
 
-
-        while True:
-            logger.error("waiting for commands from agent_c.queue")
-            time.sleep(1)
 
 
     def _find_in_file(self, path, subcase_spec):
