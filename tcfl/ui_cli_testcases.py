@@ -205,7 +205,7 @@ def _cmdline_run(args):
     log = logger.getChild("run")
     import tcfl.orchestrate		# lazy imports on demand
 
-    log.warning(f"looking servers, targets and testcases")
+    log.warning(f"looking for servers, targets and testcases")
     tcfl.orchestrate.subsystem_setup()
 
     # FIXME: chicken and egg problem--axis discovery when value None needs
@@ -232,6 +232,11 @@ def _cmdline_run(args):
         #
         # - discovered all available targets and read their inventory
         #   FIXME: filter targets to select
+        #   FIXME: filter interconnects separately, so we can by
+        #          default select all the interconnects but just
+        #          filter targets with -t; add -i|--interconnects to
+        #          filter those and a --all-target-filter to replace
+        #          current -t
         #
         # - discovered all suitable testcases and filtered thembased
         #   on specification
@@ -247,17 +252,23 @@ def _cmdline_run(args):
             len(executor.testcase_discovery_agent.tcis)
         )
 
-        for _filename, tcis in executor.testcases.items():
+        for filename, tcis in executor.testcases.items():
+            log.info(f"{filename}: found {len(tcis)} testcases")
             for testcase in tcis:
-                print(f"DEBUG found {testcase.name}", file = sys.stderr)
+                log.info(f"{filename}: testcase {testcase}")
 
-        executor.start()
+        # the executor objects knows all the testcases that have to be
+        # run, so we can just tell it to get moving
+        # FIXME: set a timeout? maybe add run_for_time()?
+        if args.debug_run_pre_wait_s:
+            log.error("waiting for %ss before running",
+                     args.debug_run_pre_wait_s)
+            time.sleep(args.debug_run_pre_wait_s)
+        executor.run()
 
-        print("DEBUG: scheduled, waiting 60")
-        time.sleep(60)
-
+        # FIME: rename to wait_for_completion and add a timeout
         executor.wait_for_done()
-
+        # FIXME: finally: executor object kills everything
 
 
 
@@ -316,4 +327,8 @@ def _cmdline_setup(arg_subparsers):
     ap = arg_subparsers.add_parser(
         "run2", help = "Run testcases on targets")
     _common_args_add(ap)
+    ap.add_argument(
+        "--debug-run-pre-wait-s", action = "store",
+        metavar = "SECONDS", type = int, default = 0,
+        help = "Wait for N seconds before running")
     ap.set_defaults(func = _cmdline_run)
