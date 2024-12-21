@@ -29,44 +29,7 @@ The following is implemented by this module:
 - collecting and reporting results
 
 
-Workflow
---------
-
-This is done with the following processes:
-
-- 1 main process: starts the process
-
-- 1 allocator subprocess: allocates and keeps alive current
-  allocations (taking input from the allocator_queue)
-
-- N worker subprocesses: execute the actual testcases (taking input
-  from the work_queue)
-
-A testcase execution starts with the main process by queing in the
-work_queue a request to discover the testcase's axes.
-
-A worker subprocess will start the axes discovery process, which
-iterates all the possible permutations with FIXME axes_iterate(); for
-each axes permutation, the testcase object is cloned and a static run
-is scheduled.
-
-Another worker process will run the static run of each testcase. In
-the static run the configure and build phases of the testcase are
-executed (eg: those that do not need the targets). When those are
-complete, the systems schedules N allocation of targets groups
-(depending on how many concurrent executions on target groups have
-been configured) [cloning the testcase for each]. If the testcase is
-purely static (no execution on targets), this part is skipped.
-
-The allocator process picks up the allocation request
-(_alloc_create()) and proceeds to allocate with the servers; when the
-allocation of each target group is complete, it schedules the
-execution of the testcase on the testgroup just allocated
-(_worker_run_tg).
-
-This is picked up by a worker process which execute on the targets;
-when complete, the targets are released.
-
+See :class:`executor_c` for execution details
 
 Pending
 -------
@@ -175,48 +138,173 @@ class cache_c(collections.OrderedDict):
 
 
 def groups_to_str(groups):
+    # FIXME: move to commonl.format_dict_as_str()
     l = []
     for name, target_list in groups.items():
         l.append(f"{name}:{','.join(target_list)}")
     return ' '.join(l)
 
 
+class tc_run_c(tcfl.tc_info_c):
+    """Defines a testcase execution
+
+    Contains all the information relative to the execution of a
+    testcase in an specific Axes Permutation and target group.
+
+    The orchestrator has determined a particular axes permutation for
+    executing a testcase and decided a target group (if it requires
+    targets) where to run it:
+
+    - don't want to pack this into tc_info_c because this shall
+      contain only the orchestrator specific info
+
+    - however, the result is in tc_info_c, so at the end we need one
+      instance per run anyway
+
+    - so pass as argument the "parent", copy its fields
+
+    """
+    def __init__(self,
+                 testcase: tcfl.tc_info_c,
+                 apid: int,
+                 axes: dict,
+                 tgid: int = None,
+                 targets: dict = None):
+
+        # hack shallow copy
+        for attr, val in testcase.__dict__.items():
+            setattr(self, attr, val)
+
+        self.apid = apid
+        self.axes = axes
+        self.tgid = tgid
+        self.targets = targets
+
+
+
 class executor_c(contextlib.AbstractContextManager):
+    """Testcase orchestrator
 
-    # FIXME: move to commonl
-    @classmethod
-    def __debug_pickle(cls, root, o):
-        r = []
-        for k, v in o.__dict__.items():
-            path = root + "." + str(k)
-            try:
-                if hasattr(v, "__dict__"):
-                    r += cls.__debug_pickle(path, v)
-                else:
-                    pickle.dumps(v)
-            except Exception as e:
-                if 'cannot pickle' in str(e):
-                    print(f"DEBUG {path}: failure at {k}: {v} ({e})",
-                          file = sys.stderr)
-                r.append(path)
-        return r
+    Run one or more testcases in the targets available
+
+    :params str logdir: (optional; default *None*, current) where to
+      write logs to
+
+    :params str tmpdir: (optional; default *None*, will be generated
+      and deleted when done) where to write temporary files to.
+
+    :params bool remove_tmpdir: (optional; default *None*) wether to
+      remove the temporary file on completion.
+
+      - *None*: will remove if *tmpdir* was *None* and we created it
+      - *True*: will always remove
+      - *False*: will never remove
+
+    :param List[str] testcase_paths: (optional, default *None* which
+      scans current directory recursively looking for testcases) list
+      of filenames or directory paths that might contain testcases to execute.
+
+      These can be any type of testcase for which there is a driver
+      that can load and run it.
+
+    :param List[str] testcase_manifests: list of filenames to testcase
+      manifests that contain list of testcase files or path to scan
+      for testcases.
+
+      These are added to those in *testcase_paths* and treated the same.
+
+    :param str testcase_filter_spec: (optional; default *None*)
+      boolean expression to filter testcases that want to be
+      included in execution.
+
+    Other params as of :class:`tcfl.targets.discovery_agent_c`, are
+    meant to refine the targets that will be used.
+
+    Workflow
+    --------
+
+    This is done with the following processes:
+
+    - main process (but as instances as needed can be created):
+
+      - scans for servers
+
+      - scans for targets, obtains inventories
+
+      - scans for testcases: each scanned testcase file might spawn a
+        server process that is waiting to be told what to do
+
+      - for each testcase, decides which axes permutations are going
+        to be spun.
+
+        Eg: if testcase declares it spins on the target's type and
+        then on an axes called *versions* with values 1, 2 and 3) and
+        there are three targets available, two of type A, one of type
+        B (two types), the executor will spin 6 (2 * 3) axes permutations::
+
+          Type  Version
+          ----  -------
+          A     1
+          A     2
+          A     3
+          B     1
+          B     2
+          B     3
+
+      - With all the axes permutations decided for each testcase, the
+        executor then decides which targets support each execution and
+        decides decides pairing of testcases with 1 or more target
+        grous based on what they declare they need and what targets
+        are available
+
+      - allocates targets for each testcase
+
+      - notify server subprocesses when they can span execution
+        subprocesses on each target group and axes permutation
+
+      - send keepalives to the server for each active target group
+        until execution completed
+
+    - N testcase server subprocesses: for each discovered testcase,
+      and depending on the testcase framework needs and other details
+
+      when discovering each testcase, first thing is discovering its
+      axes, so the execution will iterate all the possible
+      permutations. (eg: on target type and OSes).
+
+    Each discovered test case will be then run, for each Axes
+    Permutation:
+
+    - once with no access to targets (the static run)
+
+    - N (>=0) on each Target Group that satisfies the testcase's
+      conditions. N is determined by the user and is normally 1, but
+      it can be anything (eg: to always run a testcase 3 times in
+      different HW)
 
 
+    FIXME: complete docs, explain how this works
 
-    # FIXME: make argument
-    work_processes = 2
+    """
 
-    
     def __init__(self,
                  *args,
-                 logdir = None,
-                 tmpdir = None,
-                 remove_tmpdir = None,
-                 testcase_paths = None,
-                 testcase_manifests = None,
-                 testcase_filter_spec = None,
+                 logdir: str = None,
+                 tmpdir: str = None,
+                 remove_tmpdir: bool = None,
+                 testcase_paths: list[str] = None,
+                 testcase_manifests: list[str] = None,
+                 testcase_filter_spec: str = None,
                  **kwargs
                  ):
+
+        # FIXME:
+        #
+        # - make usable only once; once run is called, the object
+        #   is a goner
+        #
+        # - make it take discovery agents as arguments, in case we
+        #   want to reuse server or target or tc discovery results
 
         self.allocator_queue = None
         self.allocator_thread = None
@@ -234,6 +322,9 @@ class executor_c(contextlib.AbstractContextManager):
         # process once they start
         self.pid = None
 
+
+        # FIXME: add a name option
+        self.log = logger.getChild(str(id(self)))
 
         # lazy imports, only if needed
         import tcfl.mrn
@@ -282,6 +373,22 @@ class executor_c(contextlib.AbstractContextManager):
 
         self.axes_permutation_filters = {}
 
+        self.testcases_pending = collections.defaultdict(list)
+        self.testcases_completed = collections.defaultdict(list)
+        self.testcases_running = collections.defaultdict(list)
+
+        #: Overall result of discovering testcases
+        self.result_discovery = tcfl.result_c()
+        #: Overall result of executing testcases (includes the
+        #: discovery result) -- this allows us to keep tab on all
+        #: testcase execution
+        self.result = tcfl.result_c()
+
+
+
+    # FIXME: make argument
+    work_processes = 2
+
 
     def axes_permutation_filter_register(self, name, fn):
         """Register an axes permutation filter function that can be
@@ -313,20 +420,206 @@ class executor_c(contextlib.AbstractContextManager):
 
 
 
-    def start(self):
-        # creates all the threads/daemons the executor needs to run
-        # and starts them
-        m = multiprocessing.Manager()
-        self.allocator_queue = m.JoinableQueue()
-        self.work_queue = m.JoinableQueue()
+    def _testcase_axes_iterate(self, testcase):
+        """Iterate over permutations of values for the testcase and its
+        target's roles.
 
-        for cnt in range(self.work_processes):
-            proc = multiprocessing.Process(target = self._worker_dispatcher)
-            proc.daemon = True
-            proc.start()
-            self.work_process[cnt] = proc
-        self.allocator_thread = multiprocessing.Process(target = self._worker_allocator)
-        self.allocator_thread.start()
+        **Internal API for testcase/target pairing**
+
+        This function provides iteration in sequential or random
+        orders so that the iteration sequence can be repeated over
+        executions if needed.
+
+        The randomization can be controlled with :attr:`axes_randomizer`.
+
+        For example, for a testcase with no targets and initialized
+        with
+
+        >>> testcase = tcfl.tc_c(
+        >>>     axes = {
+        >>>         'axisB': [ 'valB0', 'valB1' ],
+        >>>         'axisA': [ 'valA1', 'valA0', 'valA2' ],
+        >>> })
+
+        The axes will, internally, be sorted alphabetically or
+        numerically to
+
+        >>> {
+        >>>     'axisA': [ 'valA0', 'valA1', 'valA2' ],
+        >>>     'axisB': [ 'valB0', 'valB1' ],
+        >>> }
+
+        and the iteration
+
+        >>> for axes_permutation_id, axes_permutation in testcase.axes_iterate():
+        >>>     print(axes_permutation_id, axes_permutation)
+
+        produces::
+
+          0 ['valA0', 'valB0']
+          1 ['valA0', 'valB1']
+          2 ['valA1', 'valB0']
+          3 ['valA1', 'valB1']
+          4 ['valA2', 'valB0']
+          5 ['valA2', 'valB1']
+
+        while using a random generator would give a pseudorandom sequence.
+
+        If a target role is added to the testcase, any axes asociated
+        to that role get taken into account.
+
+        :return: iterator that yields tuples *( AXIS_PERMUTATION_ID,
+          [ VALUE0, VALUE1 ... ] )*.
+
+          The axis permutation ID is an integer.
+
+          Each item in the list matches the list of axes names
+          returned by :meth:`tcfl.orchestrate.executor_c._tc_axes_names`.
+
+          For axes that correspond to target roles', the name is tuple
+          *( ROLENAME, AXISNAME )*. The roles are described by a
+          :class:`tcfl.target_c`
+
+        """
+        testcase.log.info("iterating over tc+role axes %s",
+                          commonl.format_dict_as_str(testcase._axes_all))
+        max_integer = testcase._axes_all_mr.max_integer()
+        for i in range(max_integer):
+            if testcase._axes_randomizer_impl:
+                # FIXME: use an FFE/FPE pseudoranzomizer?
+                i = testcase._axes_randomizer_impl.randrange(max_integer)
+            axes = testcase._axes_all_mr.from_integer(i)
+
+            # use this, not _axes_permutation_filter, so we can just
+            # create a method.
+            fn = testcase._axes_permutation_filter
+
+            if fn != None:
+                if isinstance(fn, types.MethodType):
+                    if fn.__self__ == None:
+                        r = fn(testcase, i, axes)
+                    else:
+                        # this was a function that was made a method
+                        # (not sure why), undo that
+                        r = fn.__func__(i, axes)
+                else:
+                    r = fn(i, axes)
+                if r == False:
+                    continue
+            # note the Axes Permutation ID here is i; because we
+            # always sort the testcase._axes_all dictionary by axis name
+            # and axis value, the ordering is always the same
+            # execution after execution as long as the axes are the
+            # same.
+            # Thus, every possible permutation has a unique natural
+            # number associated to it (in the range [0, max_integer)).
+            yield i, axes
+
+
+
+    def _run_testcase_axes_discover(self, tci: tcfl.tc_info_c):
+        #
+        # Given all the axes a testcase needs to iterate over, go over
+        # all their possible permutations (applying limits as needed)
+        #
+        ap_count = 0
+        for axes_permutation_id, axes_permutation in self._testcase_axes_iterate(tci):
+            if tci.axes_permutations > 0 and ap_count >= tci.axes_permutations:
+                tci.log.error(f"stoping after {ap_count} permutations"
+                              " due to knob *axes_permutations*")
+                break
+
+            # make a name out of this
+            #
+            # axes_permutation is a list of axis values (which come
+            # from come from values in the inventory or fed in by the
+            # user as a parameter) - they come from the axes name, so
+            # let's create a dict of axis name / value
+            axes_permutation_dict = collections.OrderedDict(zip(
+                self._tc_axes_names(tci), axes_permutation))
+
+            tci.log.info(
+                f"APID {axes_permutation_id}:"
+                f" FIXME scheduling run on axes {commonl.format_dict_as_str(axes_permutation_dict)}")
+            # FIXME: now we have an axes permutation -- tell the
+            # testcase server to spawn on this APID and then run
+            # static
+            # - how do we reach the server?
+            # - this is APID/static execution; once APID execution is done,
+            #   we can go dynamic
+            # - FIXME: start allocation before APID/static is done
+            #   controlling via variable
+            tci_run_apid = tc_run_c(
+                tci, axes_permutation_id, axes_permutation_dict)
+            # FIXME: set this in some sort of static per APID so we
+            # can easily tell when we can start dybamic?
+            self._tc_pending(tci_run_apid)
+            ap_count += 1
+        return ap_count
+
+
+    def run(self):
+        """Run all the testcases, allocating any targets they might need
+
+        This is a single thread process that mainly takes care of
+        allocating targets and telling the sub-processes executing the
+        testcases what to do.
+
+        The testcase discovery process has spawned those subprocesses
+        and they are all waiting for instructions on what to do.
+
+        """
+        # current list of allocations per server (pending, active)
+        self.allocation_map = collections.defaultdict(dict)
+        logger = self.log.getChild("run")
+
+        ts0 = time.time()
+        period_keepalive = 5
+
+        # filter testcases that can be run
+        #
+        # - those what are alredy considered done will be skipped
+        #   (normally during discovery something happened and thus they
+        #   are considered *completed*).
+        #
+        # - remember a single filename might have yielded more than
+        #   one test-case-infos
+        for filename, tcis in self.testcases.items():
+            for tci in tcis:
+                if tci.result:
+                    self._tc_completed(tci)
+                    continue
+                self.testcases_pending[filename].append(tci)
+
+        # take snapshot of what happened when we discovered testcases,
+        # we'll need it later to compute final result
+        self.result_discovery = copy.copy(self.result)
+
+        # for each queued testcase, let's discover what axes
+        # permutations they need, since a testcase might declare which
+        # fields it needs to spin on
+        #
+        # FIXME: we do this linearly for clarity, might parallelize later
+        for _filename, tcis in self.testcases_pending.items():
+            for tci in tcis:
+                self._run_testcase_axes_discover(tci)
+
+        while True:
+            ts = time.time()
+            if not self.testcases_pending and not self.testcases_running:
+                logger.error(f"no testcases pending nor running; done")
+                break
+
+
+            # first send the keepalives, it's way more critical
+            logger.error(f"INFO pulsing at +{ts-ts0:.1f}s, period {period_keepalive}s")
+            if ts - ts0 > period_keepalive:
+                self._execute_keepalive()
+                ts0 = ts
+
+            time.sleep(period_keepalive/5)
+
+        self._execute_exit()
 
 
 
@@ -372,8 +665,12 @@ class executor_c(contextlib.AbstractContextManager):
             valid_values.add(value)
         return sorted(list(valid_values))
 
+    #
+    # Testcase subapi (private)
+    # -------------------------
+    #
+    #
 
-    
     def _tc_info_randomizer_make(self, testcase, r, what):
         if isinstance(r, str):
             if r == 'sequential':
@@ -438,6 +735,24 @@ class executor_c(contextlib.AbstractContextManager):
             role.axes_from_inventory = role.axes.keys() \
                 & self.target_discovery_agent.inventory_keys.keys()
 
+        # now expand the testcase axes
+        # FIXME: should be able to do this without this dummy
+        dummy = tcfl.target_role_c("dummy")
+        for field, values in testcase.axes.items():
+            if values != None:
+                # this axis has values, we don't need to find them
+                continue
+            values = self._axes_expand_field(testcase, dummy, field)
+            testcase.report_info(
+                f"axis '{field}' expanded to"
+                f" '{values}' because it was given value *None*",
+                level = 3)
+            testcase.axes[field] = values
+
+        testcase.axes_from_inventory = testcase.axes.keys() \
+            & self.target_discovery_agent.inventory_keys.keys()
+
+
         # Now we update the unified list of axes [testcase + target roles's]
         #
         # Note we always have keep this as an ordered dictionary and
@@ -460,111 +775,38 @@ class executor_c(contextlib.AbstractContextManager):
         testcase._axes_all_mr = tcfl.mrn.mrn_c(*testcase._axes_all.values())
 
 
-        
+
     def _tc_info_setup_all(self):
         #
         # Expand the axes for all testcases
         #
         # The testcases, with tcfl.axes() might have declared axes
         # which values need to be extracted from the inventory
+        #
+        # At this point, we assume we have the full inventory loaded
+        # in self.target_discovery_agent, which means we also have all
+        # the keys found and possible values in
+        # self.target_discovery_agent.inventory_keys.
         for filename, tcis in self.testcase_discovery_agent.tcis.items():
             for testcase in tcis:
                 self._tc_info_setup(testcase)
 
 
 
-    def axes_iterate(self, testcase):
-        """Iterate over permutations of values for the testcase and its
-        target's roles.
+    def _tc_completed(self, tci: tcfl.tc):
+        tci.log.info(f"complete: result {tci.result}")
+        filename = tci.file_path
+        self.testcases_completed[filename].append(tci)
+        if tci in self.testcases_pending.get(filename, []):
+            # it might not be in here if it was "completed" during
+            # discovery
+            self.testcases_pending[filename].remove(tci)
+        self.result += tci.result
 
-        **Internal API for testcase/target pairing**
 
-        This function provides iteration in sequential or random
-        orders so that the iteration sequence can be repeated over
-        executions if needed.
+    def _tc_pending(self, tci: tcfl.tc_info_c):
+        tci.log.info(f"marked pending for APID ")
 
-        The randomization can be controlled with :attr:`axes_randomizer`.
-
-        For example, for a testcase with no targets and initialized
-        with
-
-        >>> testcase = tcfl.tc_c(
-        >>>     axes = {
-        >>>         'axisB': [ 'valB0', 'valB1' ],
-        >>>         'axisA': [ 'valA1', 'valA0', 'valA2' ],
-        >>> })
-
-        The axes will, internally, be sorted alphabetically or
-        numerically to
-
-        >>> {
-        >>>     'axisA': [ 'valA0', 'valA1', 'valA2' ],
-        >>>     'axisB': [ 'valB0', 'valB1' ],
-        >>> }
-
-        and the iteration
-
-        >>> for axes_permutation_id, axes_permutation in testcase.axes_iterate():
-        >>>     print(axes_permutation_id, axes_permutation)
-
-        produces::
-
-          0 ['valA0', 'valB0']
-          1 ['valA0', 'valB1']
-          2 ['valA1', 'valB0']
-          3 ['valA1', 'valB1']
-          4 ['valA2', 'valB0']
-          5 ['valA2', 'valB1']
-
-        while using a random generator would give a pseudorandom sequence.
-
-        If a target role is added to the testcase, any axes asociated
-        to that role get taken into account.
-
-        :return: iterator that yields tuples *( AXIS_PERMUTATION_ID,
-          [ VALUE0, VALUE1 ... ] )*.
-
-          The axis permutation ID is an integer.
-
-          Each item in the list matches the list of axes names
-          returned by :meth:`tcfl.orchestrate.executor_c._tc_axes_names`.
-
-          For axes that correspond to target roles', the name is tuple
-          *( ROLENAME, AXISNAME )*. The roles are described by a
-          :class:`tcfl.target_c`
-
-        """
-        max_integer = testcase._axes_all_mr.max_integer()
-        for i in range(max_integer):
-            if testcase._axes_randomizer_impl:
-                # FIXME: use an FFE/FPE pseudoranzomizer?
-                i = testcase._axes_randomizer_impl.randrange(max_integer)
-            axes = testcase._axes_all_mr.from_integer(i)
-
-            # use this, not _axes_permutation_filter, so we can just
-            # create a method.
-            fn = testcase._axes_permutation_filter
-
-            if fn != None:
-                if isinstance(fn, types.MethodType):
-                    if fn.__self__ == None:
-                        r = fn(testcase, i, axes)
-                    else:
-                        # this was a function that was made a method
-                        # (not sure why), undo that
-                        r = fn.__func__(i, axes)
-                else:
-                    r = fn(i, axes)
-                if r == False:
-                    continue
-            # note the Axes Permutation ID here is i; because we
-            # always sort the testcase._axes_all dictionary by axis name
-            # and axis value, the ordering is always the same
-            # execution after execution as long as the axes are the
-            # same.
-            # Thus, every possible permutation has a unique natural
-            # number associated to it (in the range [0, max_integer)).
-            yield i, axes
 
 
     #
@@ -1198,7 +1440,7 @@ class executor_c(contextlib.AbstractContextManager):
             _testcase_ap.id += "-" + str(axes_permutation_id)
             _testcase_ap.report_info(
                 f"APID {axes_permutation_id}:"
-                f" scheduling run on axes {axes_permutation}")
+                f" scheduling run on axes {commonl.format_dict_as_str(axes_permutation_dict)}")
 
             self.work_queue.put((
                 "_worker_tc_run_static", _testcase_ap,
@@ -1478,7 +1720,7 @@ class executor_c(contextlib.AbstractContextManager):
                            f" {testcase._allocations_pending[group_allocated]}")
             return False
 
-        # well, all allocations are done, so now we can clone this
+        # well, all allocations are done, so now we can tell this
         # testcase and ask the work queues to run it
         if testcase.target_group_permutations > 0 \
            and testcase._target_groups_launched >= testcase.target_group_permutations:
@@ -1698,7 +1940,38 @@ class executor_c(contextlib.AbstractContextManager):
                 self._allocation_map_remove(rtb, allocid)
 
 
-    def _worker_alloc_keepalive(self):
+    def _alloc_exit_rtb(self, rtb, allocids):
+        self._alloc_delete_allocids(self, rtb, allocids, source = "exit_rtb")
+
+    def _execute_exit(self):
+        if not self.allocation_map:
+            return
+        with concurrent.futures.ThreadPoolExecutor(len(self.allocation_map)) \
+             as executor:
+            executor.map(lambda x: self._alloc_exit_rtb(x[0], x[1]),
+                         self.allocation_map.items())
+
+    def _worker_allocator(self):
+        self.pid = os.getpid()
+
+
+
+    # Executor public API
+    def testcase_execute(self, testcase):
+        self.work_queue.put(( "_worker_axes_discover", testcase ))
+
+    def wait_for_done(self):
+        # FIXME: how to tell all work is done correctly? -- this is missing
+        # counting which allocations are pending, etc -- we need to count how
+        # many TCs have been started and how many have finished
+
+        # FIXME: this will do the same as _execute_exit(), so call it
+        # if need it -- this shall help make an order exit of the
+        # executor_c, telling all subprocesses to exit
+        self.log.error(f"FIXME: wait_for_done not implemented")
+
+
+    def _execute_keepalive(self):
 
         # Run the keepalive process in all the servers we have
         # reservations for; this is used to
@@ -1762,7 +2035,7 @@ class executor_c(contextlib.AbstractContextManager):
             return rtb, changes
 
         if not self.allocation_map: 	# there are no active allocations,
-            self.log_alloc("keepalive skipping, no active allocations")
+            self.log.info("keepalive: skipping, no active allocations")
             return
 
         ts0 = time.time()
@@ -1804,87 +2077,10 @@ class executor_c(contextlib.AbstractContextManager):
         self.log_alloc(f"keepalive done in {time.time() - ts0:.1f}s")
 
 
-    def _alloc_exit_rtb(self, rtb, allocids):
-        self._alloc_delete_allocids(self, rtb, allocids, source = "exit_rtb")
-
-    def _worker_alloc_exit(self):
-        if not self.allocation_map:
-            return
-        with concurrent.futures.ThreadPoolExecutor(len(self.allocation_map)) \
-             as executor:
-            executor.map(lambda x: self._alloc_exit_rtb(x[0], x[1]),
-                         self.allocation_map.items())
-
-    def _worker_allocator(self):
-        self.pid = os.getpid()
-
-        # current list of allocations per server (pending, active)
-        #
-        self.allocation_map = collections.defaultdict(dict)
-
-        ts0 = time.time()
-        period_keepalive = 5
-        while True:
-            ts = time.time()
-            try:
-                entry = self.allocator_queue.get(True, period_keepalive)
-                self.log_alloc(f"allocator run @{ts}: {entry}")
-            except queue.Empty:
-                entry = None
-                self.log_alloc(f"allocator run @{ts}: no entries")
-
-            # first keepalive, it's way more critical
-            if ts - ts0 > period_keepalive:
-                self._worker_alloc_keepalive()
-                ts0 = ts
-
-            if entry:
-                # I like unrolled loops -- make the code easier to
-                # follow and maintain.
-                origin = entry[0]
-                command = entry[1]
-                if command == "EXIT":
-                    self.log_alloc("exiting")
-                    self._worker_alloc_exit()
-                    #self.allocator_queue.task_done()	# yup, twice
-                    self.allocator_queue.task_done()
-                    return
-                elif command == "_worker_alloc_create":
-                    self._worker_alloc_create(entry[2], entry[3])
-                elif command == "_worker_allocs_remove":
-                    self._worker_allocs_remove(entry[2])
-                else:
-                    self.log_alloc(f"ERROR: unknown dispatch {entry}")
-                self.allocator_queue.task_done()
-
-
-    # Executor public API
-    def testcase_execute(self, testcase):
-        self.work_queue.put(( "_worker_axes_discover", testcase ))
-
-    def wait_for_done(self):
-        # FIXME: how to tell all work is done correctly? -- this is missing
-        # counting which allocations are pending, etc -- we need to count how
-        # many TCs have been started and how many have finished
-
-        print(f"DEBUG queue sizes {self.work_queue.qsize()} allocator {self.allocator_queue.qsize()}")
-        while not self.work_queue.empty() and not self.allocator_queue.empty():
-            print(f"DEBUG waiting for all to finish work {self.work_queue.qsize()} allocator {self.allocator_queue.qsize()}")
-            time.sleep(1)
-        print("DEBUG all work done")
-
 
     def shutdown(self):
-        if self.allocator_queue == None:
-            return
-        self.allocator_queue.put(( commonl.origin_get(2), "EXIT" ))
-        for proc in self.work_process.values():
-            self.work_queue.put("EXIT")
-        while not self.work_queue.empty() and not self.allocator_queue.empty():
-            print(f"DEBUG waiting for processes to exit")
-            time.sleep(0.5)
-            # FIXME: do a kill of all the processes after some tim
-
+        self._execute_exit()
+        self.log.error(f"DEBUG shutdown() not properly implemented, unify with wait_for_done")
 
 
     def _debug_run(self, testcase):

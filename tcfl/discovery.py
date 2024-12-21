@@ -4,8 +4,7 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-"""
-Discover testcases in directories or files
+"""Discover testcases in directories or files
 ==========================================
 
 This module contains the logic for different drivers to be able to to
@@ -20,8 +19,8 @@ The discovery process involves enumerating all possible files in the
 paths passed as input and spawning a separate process for each (to
 isolate from crashes, failures to import and other errors). When a
 valid testcase is found, the process will be left as an execution
-server that can launch testcases to execute. See :class:`agent_c` for
-more details.
+server off :meth:`_process_find_in_file` that can launch testcases to
+execute. See :class:`agent_c` for more details.
 
 Quick usage:
 
@@ -32,6 +31,28 @@ Quick usage:
 >>> print(discovery_agent.tcis)
 
 """
+#
+# ROADMAP
+#
+# agent_c.run() gets called from whoever wants to discover testcases;
+# see *Quick Usage* above.
+#
+#  agent_c.run()
+#    agent_c._find_in_path()
+#      agent_c._find_in_directory()
+#        agent_c._find_in_file()
+#      agent_c._find_in_file()
+#    agent_c._process_find_in_file() [SEPARATE PROCESS]
+#      _create_from_file_name()
+#        _is_testcase_call()
+#           is_tcf_testcase()
+#            _classes_enumerate()
+#              _classes_enumerate()
+#           driver.is_testcase()
+#    agent_c.tcis_get_from_queue()
+#
+#
+#
 import atexit
 import collections
 import io
@@ -347,7 +368,7 @@ def _create_from_file_name(tcis, file_name, from_path, subcases_cmdline,
     Given a filename that contains a possible test case, create one or
     more TC structures from it and return them in a list
 
-    :param list tcis: list where to append found test case instances
+    :param dict tcis: list where to append found test case instances
     :param str file_name: path to file to consider
     :param str from_path: original path from which this file was
       scanned (this will be a parent path of this file)
@@ -367,6 +388,7 @@ def _create_from_file_name(tcis, file_name, from_path, subcases_cmdline,
         logger.info("scanning with driver %s", _tc_driver)
         with tcfl.msgid_c(depth = 1) as _msgid:	# FIXME: remove, unneeded here
             try:
+                # FIXME: replce with __name__ when we remove tc_mc from tcfl.tc_c
                 logger_driver = logger.getChild(f"[{_tc_driver}]")
                 logger_driver.info("scanning")
                 testcases += _is_testcase_call(
@@ -399,7 +421,8 @@ def _create_from_file_name(tcis, file_name, from_path, subcases_cmdline,
             # this is so ugly, need to merge better with result_c's handling
             except subprocess.CalledProcessError as e:
                 # no trace here, since we append it to the
-                # formatted_traceback down there that can be seen
+                # formatted_traceback down there that can be
+                # seen
                 logger_driver.info("scanning exception: subprocess %s", e)
                 tcis[file_name].append(tcfl.tc_info_c(
                     tc_name, file_name,
@@ -553,8 +576,9 @@ class agent_c:
 
     def _process_find_in_file(self, path, subcase_spec):
         # RUNS IN A SEPARATE IMAGE
-        # - main image inmune from imports
-        # - main image not susceptible to crashes
+        # - makes main image inmune from random imports
+        # - makes main image not susceptible to crashes from untrusted
+        #   code
         # - OOM killer won't affect main image and we'll be able to
         #   track it
 
@@ -791,8 +815,11 @@ class agent_c:
                 log.warning(f"all {procs} discovery processes done")
                 break
             if running < self.threads and pending_tcs:
-                # Fire up N of them
+                # Fire up N of them; note the ones that are left as
+                # servers don't count or the total max of threads we
+                # can consider
                 log.warning(
+                    # FIXME: this message is complicated, reword
                     f"starting {self.threads - running}"
                     f" discoveries ({len(pending_tcs)},{pending} pending)")
                 for _ in range(self.threads - running):
