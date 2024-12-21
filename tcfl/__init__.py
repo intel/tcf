@@ -2474,10 +2474,10 @@ class tc_info_c:
                  target_roles = None, driver_name = None, tags = None,
                  result = None, output = "",
                  exception = None, formatted_traceback = None):
-        #: Name of this testcase
-        #:
-        #: in most cases, it is going to contain :data:`file_path` in
-        #: the form *FILEPATH[#SUBCASE]*
+        #: Name of this testcase : : in most cases, it is going to
+        #: contain :data:`file_path` in : the form *FILEPATH[#SUBCASE]*
+        #: and it will be UNIQUE within the file_path where it was
+        #: found.
         self.name = name
         #: path of file where this testcase was found
         self.file_path = file_path
@@ -2492,11 +2492,18 @@ class tc_info_c:
             assert_axes_valid(axes)
             self.axes = axes
 
+        # All the axes this testcase has to spin on
+        #
+        # These are gathered from: testcase declaration, target role
+        # declarations and user indication when running the testcase
+        # via the orchestrator
+        #
+        # { AXISNAME: [ VALUE0, VALUE1 ... ], ... }
+        #
         # see tcfl.orchestrate.executor_c._axes_expand_testcase();
         #
-        # these are all the axes (from the testcase and the testcase
-        # roles) and they are always sorted the same so we can
-        # reproduce the pseudo-random sequences.
+        # They are kept alphabetically sorted (the keys and the
+        # values) so we can reproduce the pseudo-random sequences.
         #
         # FIXME: move all .axes to ._axes; move to orchestrator, as
         #        this is orchestrator internal
@@ -2587,6 +2594,48 @@ class tc_info_c:
         if self.output != None:
             d["output"] = self.output
         return d
+
+
+    def merge_from(self, other):
+        """Merge data from another instance
+
+        This happens when we find information in multiple places about
+        the same testcase -- mostly during discovery in
+        tcfl.discovery.
+
+        The merge can only happen tho, in certain circumstances, when
+        we know we are referring to the same testcase, so many things
+        have to match.
+
+        This mostly only matters when we have found an error in one
+        path and not in another, to ensure we don't keep going for
+        that testcase.
+        """
+        if self.driver_name != None \
+           and self.driver_name != other.driver_name:
+            raise AssertionError(
+                "BUG: can't merge tc_info_c from"
+                f" drivers {self.driver_name} @{self.origin}"
+                f" and {other.driver_name} @{other.origin}")
+
+        if self.origin != other.origin:
+            if self.origin == None:
+                self.origin = other.origin
+            else:
+                self.origin += "+" + other.origin
+        self.result += other.result
+
+        if self.output != other.output:
+            if self.output == None:
+                self.output = other.output
+            else:
+                self.output += " + " + other.output
+
+        if self.exception == None and other.exception:
+            # keep the original exception, can't do much about it
+            self.exception = other.exception
+            self.formatted_traceback = other.formatted_traceback
+
 
 
     @property
