@@ -242,14 +242,14 @@ def is_tcf_testcase(path, from_path, tc_name, subcases_cmdline,
         # did, it doesn't end up in sys.modules
         del module
         return []
-    logger.info("%s: found %d classes (%s)",
-                path, len(classes), ",".join([ str(i) for i in classes]))
+    logger.info("found %d classes (%s)",
+                len(classes), ",".join([ str(i) for i in classes]))
 
     # We found stuff
     tcs = []
     for _cls in classes:
         subcase_name = _cls.__name__
-        logger.info("%s: exploring testcase class %s", path, subcase_name)
+        logger.info("exploring testcase class %s", subcase_name)
         if subcase_name != "_driver" \
            and subcase_name != "_test" \
            and subcases_cmdline and subcase_name not in subcases_cmdline:
@@ -699,6 +699,7 @@ class agent_c:
                     continue
                 for msg_k, msg_v in msg.items():
                     if msg_k == "discovery_result":
+                        log.info(f"add from discovery_result {msg_v}")
                         tcis.update(msg_v)
                     else:
                         log.error(
@@ -837,8 +838,8 @@ class agent_c:
             self.tcis.update(self.tcis_get_from_queue())
             log.warning(
                 f"waiting {self.wait_period}s for"
-                f" {pending}/{running}/{completed}"
-                f" out of {procs}")
+                f" {pending=}/{running=}/{completed=}"
+                f" discovery processes (out of {procs})")
             time.sleep(self.wait_period)
 
 
