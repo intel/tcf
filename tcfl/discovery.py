@@ -217,6 +217,7 @@ def is_tcf_testcase(path, from_path, tc_name, subcases_cmdline,
         return [
             tcfl.tc_info_c(
                 path, path,
+                origin = commonl.origin_get() + ":" + path,
                 subcase_spec = subcases_cmdline,
                 result = tcfl.result_c(blocked = 1),
                 # we don't use the original exception, as it might
@@ -349,10 +350,10 @@ def _tc_info_from_tc_c(testcase: tcfl.tc.tc_c):
         target_roles = None
     tc_info = tcfl.tc_info_c(
         testcase.name, testcase.kws['thisfile'],
-        origin = testcase.origin,
+        origin = commonl.origin_get() + ":" + testcase.origin,
         target_roles = target_roles,
         subcase_spec = testcase.subcases,
-        driver_name = str(testcase),
+        driver_name = "tcfl.tc.tc_c",
         tags = testcase._tags,
         result = tcfl.result_c(),
         # original tcfl.tc.tc_c only supports spinning over the type axes
@@ -411,6 +412,7 @@ def _create_from_file_name(tcis, file_name, from_path, subcases_cmdline,
                     else:
                         tcis[file_name].append(tcfl.tc_info_c(
                             file_name, file_name,
+                            origin = commonl.origin_get() + ":" + file_name,
                             subcase_spec = subcases_cmdline,
                             result = tcfl.result_c(blocked = 1),
                             exception = RuntimeError(
@@ -605,7 +607,7 @@ class agent_c:
             logger.error("scanning exception: %s", e, exc_info = True)
             # FIXME: send error code
             if hasattr(e, "origin"):
-                origin = getattr(e, "origin")
+                origin = getattr(e, "origin", None)
             else:
                 # FIXME: get from traceback, last item
                 origin = None
