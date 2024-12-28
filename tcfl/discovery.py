@@ -70,6 +70,18 @@ import tempfile
 import time
 import traceback
 
+
+try:
+    import setproctitle
+except ImportError:
+    logging.warning(
+        "module `setproctitle` not available;"
+        " doing without")
+    class setproctitle:
+        def setproctitle(s: str):
+            pass
+
+
 import commonl
 import tcfl
 import tcfl.tc
@@ -593,6 +605,7 @@ class agent_c:
         # want the PID? add --log-pid-tid
         logger = log.getChild(f"testcase-server|{path}" )
         logger.info("starting")
+        setproctitle.setproctitle(f"testcase-server|{path}")
         while True:
             logger.error("FIXME: waiting for commands from agent_c.queue")
             time.sleep(1)
