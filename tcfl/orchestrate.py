@@ -13,6 +13,8 @@ The following is implemented by this module:
 
 - discovery of testcases to run
 
+  (discovery of the testcases that are in the disk is done in tcfl.discovery)
+
 - discovery of available targets where to run testcases
 
 - pairing of testcase/target-groups
@@ -30,38 +32,143 @@ The following is implemented by this module:
 
 See :class:`executor_c` for execution details
 
+Terminology: FIXME: move to doc/?
+
+- APID: axis permutation ID: a unique ID that identifies a particular
+  set of axis and what values they take
+
+- RTB: old name for server (remote test broker)
+
+
 Code roadmap
 ------------
 
-run()
+executor_c.run()   <- cmdline "tcf run2"
   for each testcase file
     for each testcase in the file
-      _run_testcase_axes_discover()
-        for axis perm in _testcase_axes_iterate()
-          _tc_axes_names()
-          tc_run_c()
-    keep running until done
+      if already completed:
+          executor_c._tc_completed(tci)
+      else:
+          append to executor_c.testcases_pending
 
-executor_c.__init__
+  for each pending testcase
+    executor_c._run_testcase_spawn_static
+      executor_c._testcase_axes_iterate()
+        calculate APIDs
+        for each APID (maybe random)
+          testcase._axes_all_mr.from_integer(APID)
+            get axes values for APID
+          join those with axes keys to get a dict axis/value
+          apply axes permutation filter
+          yield APID, axes permutation dict
+      for APID, axis yielded by executor_c._testcase_axes_iterate()
+        stop if permutations limit is reached
+        create a tc_run_c() for the APID
+        set is as pending
+
+  while not pending:
+    executor_c._execute_keepalive()
+      for every allocation per server
+        executor_c._alloc_keepalive_rtb()
+          for each server, keepalive all allocs
+            API call PUT /ttb-v2/keepalive-v2
+        process changes
+          executor_c._allocation_map_remove()
+          executor_c._worker_allocid_active()
+
+  executor_c._execute_exit()
+    for each server in executor_c.allocation_map
+       executor_c._alloc_exit_rtb()
+         executor_c._alloc_delete_allocids()
+           executor_c._alloc_delete_allocid()
+             API HTTP DELETE /ttb-v2/allocation/ALLLOCID
+
+executor_c.__exit__()  <- cmdline "tcf run2"
+  executor_c.shutdown()  <- cmdline "tcf run2"
+    executor_c._execute_exit()
+
+
+executor_c.__init__   <- cmdline "tcf run2"
+  tcfl.servers.subsystem_setup()      setup servers
+  tcfl.discovery.subsystem_setup()
+
+  executor_c.target_discovery_agent.update_start()
+    starts disconvering targets
+  executor_c.testcase_discovery_agent.run()
+    starts discovering testcases
+
   executor_c._tc_info_setup_all()
-    for each filename
-       for each tci(testcase) in filename
-           executor_c._tc_info_setup(tci)
-             executor_c._tc_info_randomizer_make()
-             for each target role
-               for each axis
+      for each filename
+         for tci (testcase) in filename
+             executor_c._tc_info_setup(tci)
+               executor_c._tc_info_randomizer_make()
+               maybe setup axes permutation filter
+               for each target role
+                 for each axis the target needs
+                   executor_c._axes_expand_field()
+                     executor_c._spec_filter()
+               for each testcase axes:
                  executor_c._axes_expand_field()
-            executor_c._axes_expand_field() [for testcase axes]
+               tcfl.mrn.mrn_c()
+                 generates MRN from testcase and target axes
+
+executor_c.wait_for_done()
+
+
+API
+
+executor_c.axes_permutation_filter_register()
+
+executor_c._run_testcase_spawn_static()
+
+
+OLD ROADMAP?
+-----------
+
+
+executor_c._worker_dispatcher  <- DEAD CODE
+  executor_c._worker_axes_discover
+    executor_c._tc_axes_names()
+    executor_c.axes_iterate() => FIXME missing?
+    for each APID, APdict executor_c.axes_iterate() yielded
+      delayed run of executor_c._worker_tc_run_static()
 
   executor_c._worker_tc_run_static
     executor_c.target_group_iterate_for_axes_permutation
       executor_c.target_group_iterate()
+        executor_c._tc_axes_names()
         for each target role + axes:
           executor_c.targets_valid_list()
             executor_c._spec_filter()
         executor_c._target_group_iterate_random()
         executor_c._target_group_iterate_sorted()
           executor_c._target_group_iterate_sorted_recurse()
+    if TC needss targets to evaluate:
+      deferred call to executor_c._worker_alloc_create()
+
+  executor_c._worker_alloc_create()  allocate targets for a testcase
+   testcase.__init__allocation__()
+   for each list of targets by server
+     executor_c_._alloc_create_rtb()   allocate on one server
+       API HTTP PUT /ttb-v2/allocation
+       executor_c._worker_allocid_active
+       FIXME:WHY? executor.shutdown()
+
+
+  executor_c._worker_tc_run_tg
+    executor_c._allocator_remove_schedule
+      deferred call to executor_c._worker_allocs_remove()
+        for each server
+          executor_c._alloc_delete_allocids
+
+executor_c._worker_allocid_active
+  executor_c._allocator_remove_schedule()
+  executor_c._worker_alloc_launch
+    testcase_tg = testcase._clone()
+    for each target role:
+      testcase_tg.target_role[X]._bind()
+    delayed run of executor_c._worker_tc_run_tg(testcase_tg)
+
 
 FIXME/Pending
 -------------
@@ -562,6 +669,8 @@ class executor_c(contextlib.AbstractContextManager):
             fn = testcase._axes_permutation_filter
 
             if fn != None:
+                # we have a permutation filter function, do we need to
+                # eliminate this permutation?
                 if isinstance(fn, types.MethodType):
                     if fn.__self__ == None:
                         r = fn(testcase, i, axes)
@@ -586,8 +695,8 @@ class executor_c(contextlib.AbstractContextManager):
 
     def _run_testcase_axes_discover(self, tci: tcfl.tc_info_c):
         #
-        # Given all the axes a testcase needs to iterate over, go over
-        # all their possible permutations (applying limits as needed)
+        # This is the part that only cares about knowing the Axis
+        # Permutation it will run on and does need no targets
         #
         ap_count = 0
         for axes_permutation_id, axes_permutation in self._testcase_axes_iterate(tci):
@@ -725,13 +834,19 @@ class executor_c(contextlib.AbstractContextManager):
 
 
     def _axes_expand_field(self, testcase, role, field):
+        # given an inventory field name, calculate the valid values it
+        # might have and return them.
         valid_values = set()
         for fullid in tcfl.rts_fullid_sorted:
             target_rt = tcfl.rts_flat[fullid]
+            # if this target shall be filtered because it does't
+            # match the criteria defined by the testcase when it
+            # specified a role, then do filter it out
             r, _reason = self._spec_filter(testcase, role, role.spec, {},
-                                          role.spec_args, target_rt)
+                                           role.spec_args, target_rt)
             if not r:
                 continue
+            # collect the value this field has for this target
             value = target_rt.get(field, None)
             if value == None:
                 testcase.report_info(
@@ -866,11 +981,13 @@ class executor_c(contextlib.AbstractContextManager):
         #
         # So ensure the order is always the same: sort everything,
         # don't use sets :/ because we don't have the OrderedSet in
-        # the std. Anywhoo, these are short lists, so not a biggie
+        # the std. See tc_info_c._axes_all.
         testcase._axes_all.clear()
-        for k, v in sorted(testcase.axes.items(), key = lambda k: k[0]):
+        for k, v in sorted(testcase.axes.items(),
+                           key = lambda k: k[0]):
             testcase._axes_all[k] = sorted(list(v))
-        for role_name, role in sorted(testcase.target_roles.items(), key = lambda k: k[0]):
+        for role_name, role in sorted(testcase.target_roles.items(),
+                                      key = lambda k: k[0]):
             if role.axes:
                 for axis_name, axis_data in role.axes.items():
                     testcase._axes_all[( role, axis_name )] = sorted(list(axis_data))
@@ -1758,7 +1875,13 @@ class executor_c(contextlib.AbstractContextManager):
         print(f"DEBUG:allocator:{self.pid}: ", *args, **kwargs)
 
     def _worker_alloc_launch(self, testcase, group_allocated, target_group):
+        # this is called when a group of targets has been allocated to
+        # execute a test case in a group of targets.
+        #
         # target_group: { ROLENAME: FULLID }
+
+        # clones the testcase object, rename the cloned ID to include
+        # the name of the allocated group
         testcase_tg = testcase._clone()
         testcase_tg.id += "#" + group_allocated	# FIXME: fugly
         # FIXME: keep a register of only what this testcase copy has,
@@ -1772,6 +1895,7 @@ class executor_c(contextlib.AbstractContextManager):
             allocid_by_rtb_aka[rtb_aka] = allocid
 
         # bind the remote targets to targets roles
+        # rtb -> server (old terminology)
         tgnames = []
         for role_name, target_fullid in target_group.items():
             rtb_aka, target_id = target_fullid.split("/", 1)
@@ -1792,9 +1916,9 @@ class executor_c(contextlib.AbstractContextManager):
         #
         # An allocation in a server has become active
         #
-        # We know which testcase it belongs too and the server also
+        # We know which testcase it belongs to and the server also
         # has told us which group of the N requested for *allocid* was
-        # requestde.
+        # requested.
         #
         # Look in the testcase's list of pending allocations [filled
         # out by _worker_alloc_create()] and see if we have something complete
