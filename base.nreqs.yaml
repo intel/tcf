@@ -94,6 +94,17 @@ rsync:
 
 tabulate: python3-tabulate
 
+setproctitle:
+  reason: |
+    used to set the name of the different subprocesses for ease
+    of debugging
+  # only found in fedora, debian, ubuntu or pip--the code makes it
+  # optional, if not found, it just doesn't rename the processes
+  fedora: python3-setproctitle
+  debian: python3-setproctitle
+  ubuntu: python3-setproctitle
+  pip: setproctitle
+
 setuptools:
   distro: python3-setuptools
 
