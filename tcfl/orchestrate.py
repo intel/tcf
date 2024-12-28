@@ -806,28 +806,6 @@ class executor_c(contextlib.AbstractContextManager):
 
 
 
-    def _targets_discover_json(static_filename):
-        # Load the target inventory
-        # Find out all the keys that we have in the targets
-        tcfl.rts = {}
-        tcfl.rts_flat = {}
-        tcfl.rts_fullid_sorted = []
-        with open(static_filename) as f:
-            for target in json.load(open(f)):
-                fullid = target['fullid']
-                # we update so we have both the flat and nested values
-                rt = dict(target)
-                tcfl.rts[fullid] = rt
-                tcfl.rts_flat[fullid] = dict(rt)
-                # Note the empty_dict!! it's important; we want to
-                # keep empty nested dictionaries, because even if
-                # empty, the presence of the key might be used by
-                # clients to tell things about the remote target
-                tcfl.rts_flat[fullid].update(
-                    commonl.dict_to_flat(rt, empty_dict = True))
-
-
-
     def __exit__(self, exc_type, exc_value, traceback):
         self.shutdown()
 
@@ -2186,8 +2164,6 @@ class executor_c(contextlib.AbstractContextManager):
 
 
     # Executor public API
-    def testcase_execute(self, testcase):
-        self.work_queue.put(( "_worker_axes_discover", testcase ))
 
     def wait_for_done(self):
         # FIXME: how to tell all work is done correctly? -- this is missing
