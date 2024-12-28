@@ -341,7 +341,7 @@ class tc_run_c(tcfl.tc_info_c):
                  apid: int,
                  axes: dict,
                  tgid: int = None,
-                 targets: dict = None):
+                 target_group: dict = None):
 
         # hack shallow copy
         for attr, val in testcase.__dict__.items():
@@ -350,7 +350,7 @@ class tc_run_c(tcfl.tc_info_c):
         self.apid = apid
         self.axes = axes
         self.tgid = tgid
-        self.targets = targets
+        self.target_group = target_group
 
 
 
@@ -594,7 +594,7 @@ class executor_c(contextlib.AbstractContextManager):
 
 
 
-    def _testcase_axes_iterate(self, testcase):
+    def _testcase_axes_iterate(self, testcase, log):
         """Iterate over permutations of values for the testcase and its
         target's roles.
 
@@ -655,14 +655,33 @@ class executor_c(contextlib.AbstractContextManager):
           :class:`tcfl.target_c`
 
         """
-        testcase.log.info("iterating over tc+role axes %s",
-                          commonl.format_dict_as_str(testcase._axes_all))
+        log.info("iterating over tc+role axes %s",
+                 commonl.format_dict_as_str(testcase._axes_all))
+        # FIXME: rename to max_apid
         max_integer = testcase._axes_all_mr.max_integer()
+        if testcase._axes_randomizer_impl:
+            # we are going to randomize APIDs, so first generate them
+            # as a set so we can pick them and not repeat them
+            apids = list(range(max_integer))
+
+        axes_keys = testcase._axes_all.keys()
         for i in range(max_integer):
             if testcase._axes_randomizer_impl:
                 # FIXME: use an FFE/FPE pseudoranzomizer?
-                i = testcase._axes_randomizer_impl.randrange(max_integer)
+                _i = random.choice(apids)
+                apids.remove(_i)
+                log.info("picked random APID %d out of %d left",
+                         _i, len(apids))
+                i = _i
             axes = testcase._axes_all_mr.from_integer(i)
+            # axes -> list of axis values for each axis we are
+            # iterating on, matching in order axes_keys
+
+            # eg: type:SOMETYPE cpu:CPU1
+            ap_dict = dict(zip(axes_keys, axes))
+            # FIXME: use groups_to_str()
+            ap_descr = ' '.join([ f"{k}:{v}" for k, v in ap_dict.items() ])
+            log.info(f"APID#{i}:considering: {ap_descr}")
 
             # use this, not _axes_permutation_filter, so we can just
             # create a method.
@@ -673,14 +692,15 @@ class executor_c(contextlib.AbstractContextManager):
                 # eliminate this permutation?
                 if isinstance(fn, types.MethodType):
                     if fn.__self__ == None:
-                        r = fn(testcase, i, axes)
+                        r = fn(testcase, i, ap_dict)
                     else:
                         # this was a function that was made a method
                         # (not sure why), undo that
-                        r = fn.__func__(i, axes)
+                        r = fn.__func__(i, ap_dict)
                 else:
                     r = fn(i, axes)
                 if r == False:
+                    log.info(f"APID#{i}: {ap_descr}: skipping due to filter {fn}")
                     continue
             # note the Axes Permutation ID here is i; because we
             # always sort the testcase._axes_all dictionary by axis name
@@ -689,34 +709,32 @@ class executor_c(contextlib.AbstractContextManager):
             # same.
             # Thus, every possible permutation has a unique natural
             # number associated to it (in the range [0, max_integer)).
-            yield i, axes
+            yield i, ap_dict
 
 
 
-    def _run_testcase_axes_discover(self, tci: tcfl.tc_info_c):
+    def _run_testcase_spawn_static(self, tci: tcfl.tc_info_c, log):
+        #
+        # Schedule running the static portion of a testcase
         #
         # This is the part that only cares about knowing the Axis
         # Permutation it will run on and does need no targets
         #
+        #
+        log.info(f"discovering axes")
         ap_count = 0
-        for axes_permutation_id, axes_permutation in self._testcase_axes_iterate(tci):
+        for axes_permutation_id, axes_permutation_dict in self._testcase_axes_iterate(tci, log):
+            # axes_permutation_dict is a dictionary of { AXISNAME: VALUE }, which
+            # come from values in the inventory or fed in by the user
+            # as a parameter)
+            ap_descr = commonl.format_dict_as_str(axes_permutation_dict)
+            apid_log = log.getChild(f"APID#{axes_permutation_id}")
             if tci.axes_permutations > 0 and ap_count >= tci.axes_permutations:
-                tci.log.error(f"stoping after {ap_count} permutations"
-                              " due to knob *axes_permutations*")
+                apid_log.error(f"stopping after {ap_count} permutations due"
+                               " to knob *axes_permutations*")
                 break
-
-            # make a name out of this
-            #
-            # axes_permutation is a list of axis values (which come
-            # from come from values in the inventory or fed in by the
-            # user as a parameter) - they come from the axes name, so
-            # let's create a dict of axis name / value
-            axes_permutation_dict = collections.OrderedDict(zip(
-                self._tc_axes_names(tci), axes_permutation))
-
-            tci.log.info(
-                f"APID {axes_permutation_id}:"
-                f" FIXME scheduling run on axes {commonl.format_dict_as_str(axes_permutation_dict)}")
+            apid_log.info(
+                f"scheduling run on axes permutation {ap_descr}")
             # FIXME: now we have an axes permutation -- tell the
             # testcase server to spawn on this APID and then run
             # static
@@ -729,7 +747,7 @@ class executor_c(contextlib.AbstractContextManager):
                 tci, axes_permutation_id, axes_permutation_dict)
             # FIXME: set this in some sort of static per APID so we
             # can easily tell when we can start dybamic?
-            self._tc_pending(tci_run_apid)
+            self._tc_pending(tci_run_apid, apid_log)
             ap_count += 1
         return ap_count
 
@@ -766,11 +784,14 @@ class executor_c(contextlib.AbstractContextManager):
         #
         # - remember a single filename might have yielded more than
         #   one test-case-infos
-        for filename, tcis in self.testcases.items():
-            for tci in tcis:
+        for filename, tcid in self.testcases.items():
+            log_filename = logger.getChild(filename)
+            for _tc_name, tci in tcid.items():
                 if tci.result:
                     self._tc_completed(tci)
+                    log_filename.info("%s: marking as completed", tci)
                     continue
+                log_filename.info("%s: marking as pending", tci)
                 self.testcases_pending[filename].append(tci)
 
         # take snapshot of what happened when we discovered testcases,
@@ -783,8 +804,14 @@ class executor_c(contextlib.AbstractContextManager):
         #
         # FIXME: we do this linearly for clarity, might parallelize later
         for _filename, tcis in self.testcases_pending.items():
+            log_filename = logger.getChild(_filename)
+            log_filename.info("this file expands to %d testcases; iterating",
+                              len(tcis))
             for tci in tcis:
-                self._run_testcase_axes_discover(tci)
+                # tci.name contains the filename also, so we don't get
+                # a child of log_filename because it'd repeat
+                log_tci = logger.getChild(tci.name)
+                self._run_testcase_spawn_static(tci, log_tci)
 
         while True:
             ts = time.time()
@@ -984,9 +1011,9 @@ class executor_c(contextlib.AbstractContextManager):
         # in self.target_discovery_agent, which means we also have all
         # the keys found and possible values in
         # self.target_discovery_agent.inventory_keys.
-        for filename, tcis in self.testcase_discovery_agent.tcis.items():
-            for testcase in tcis:
-                self._tc_info_setup(testcase)
+        for _filename, tcid in self.testcase_discovery_agent.tcis.items():
+            for _tc_name, tci in tcid.items():
+                self._tc_info_setup(tci)
 
 
 
@@ -1001,8 +1028,8 @@ class executor_c(contextlib.AbstractContextManager):
         self.result += tci.result
 
 
-    def _tc_pending(self, tci: tcfl.tc_info_c):
-        tci.log.info(f"marked pending for APID ")
+    def _tc_pending(self, tci: tcfl.tc_info_c, log):
+        log.info(f"marked pending for APID ")
 
 
 
