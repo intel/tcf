@@ -140,6 +140,15 @@ class fork_c(multiprocessing.Process):
         self.kwargs = kwargs
         multiprocessing.Process.__init__(self)
 
+    # FIXME:
+    #
+    # - we need a queue to send commands back and forth -> fork_function_c has it?
+    #
+    # - it needs to capture also stdout/stderr, so if it craps badly,
+    #   it captures it
+    #
+    # - as we are, capture also r, exception, tb for simplicity
+    #
 
     def run(self):
         self.func(*self.args, **self.kwargs)
