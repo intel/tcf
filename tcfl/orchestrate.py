@@ -1,13 +1,12 @@
 #! /usr/bin/env python3
 #
-# Copyright (c) 2022 Intel Corporation
+# Copyright (c) 2022-24 Intel Corporation
 #
 # SPDX-License-Identifier: Apache-2.0
 
 # FIXME: moving this from orch/tcfl/target_ext_run.py
 
-"""
-Execution engine
+"""Execution engine
 ================
 
 The following is implemented by this module:
@@ -31,8 +30,48 @@ The following is implemented by this module:
 
 See :class:`executor_c` for execution details
 
-Pending
--------
+Code roadmap
+------------
+
+run()
+  for each testcase file
+    for each testcase in the file
+      _run_testcase_axes_discover()
+        for axis perm in _testcase_axes_iterate()
+          _tc_axes_names()
+          tc_run_c()
+    keep running until done
+
+executor_c.__init__
+  executor_c._tc_info_setup_all()
+    for each filename
+       for each tci(testcase) in filename
+           executor_c._tc_info_setup(tci)
+             executor_c._tc_info_randomizer_make()
+             for each target role
+               for each axis
+                 executor_c._axes_expand_field()
+            executor_c._axes_expand_field() [for testcase axes]
+
+  executor_c._worker_tc_run_static
+    executor_c.target_group_iterate_for_axes_permutation
+      executor_c.target_group_iterate()
+        for each target role + axes:
+          executor_c.targets_valid_list()
+            executor_c._spec_filter()
+        executor_c._target_group_iterate_random()
+        executor_c._target_group_iterate_sorted()
+          executor_c._target_group_iterate_sorted_recurse()
+
+FIXME/Pending
+-------------
+
+- tc_info_c shall be split to just be an spec of the TC and primitives
+  and reporting -- pretty much tc_c and remove the concept of
+  tc_info_c
+
+- tc_run_c should have the info of the result of execting a TC in a
+  apid/tgid--in a way, tc_run_c is what we should care most
 
 target_c
     def _bind(self, rtb_aka, target_id, target_fullid, allocid):
@@ -40,7 +79,6 @@ target_c
         self.id = target_id
         self.fullid = target_fullid
         self.allocid = allocid
-
 
 """
 
@@ -137,12 +175,21 @@ class cache_c(collections.OrderedDict):
 
 
 
-def groups_to_str(groups):
+def groups_to_str(groups: dict[str]) -> str:
+    """
+    Creates a name out of a list of gropus
+
+    :param list[str]: dictionary keyed by groupname, values being
+      lists of names
+
+    :returns str: formatted string `GROUP:TARGET,TARGET,... GROUP:TARGET,TARGET,...`
+    """
     # FIXME: move to commonl.format_dict_as_str()
     l = []
     for name, target_list in groups.items():
         l.append(f"{name}:{','.join(target_list)}")
     return ' '.join(l)
+
 
 
 class tc_run_c(tcfl.tc_info_c):
@@ -163,7 +210,25 @@ class tc_run_c(tcfl.tc_info_c):
 
     - so pass as argument the "parent", copy its fields
 
+    :param tcfl.tc_info_c testcase: testcase to run
+
+    :param int apid: Axis Permutation ID, from the axes the testcase
+      declares and those specified by the user
+
+    :param dict axes: dictionary keyed by axis name with the values
+      assigned to each for the given axis permutation.
+
+    :param dict target_group: dictionary keyed by target role name of the
+      targets used for this execution.
+
+      Eg: if this testcase needed one interconnect target *ic* and two
+      targets (*target* and *target1*), the orchestrator might have
+      assigned to specific targets after allocating them:
+
+      >>> { "ic": FIXMENETWORK1, "target": MACHINE1, "target1": MACHINE2 }
+
     """
+    # FIXME: move all result info from tc_info_c
     def __init__(self,
                  testcase: tcfl.tc_info_c,
                  apid: int,
@@ -225,7 +290,7 @@ class executor_c(contextlib.AbstractContextManager):
 
     This is done with the following processes:
 
-    - main process (but as instances as needed can be created):
+    - main process (as many instances as needed can be created):
 
       - scans for servers
 
@@ -333,8 +398,10 @@ class executor_c(contextlib.AbstractContextManager):
         import tcfl.servers
 
 
+        # FIXME: a lot of this should be moved to __enter__()?
+
         # FIXME: all the subsystem setups need to be broken up into async
-        # (so far only the trgets one is)
+        # (so far only the trgets one is) and into a discovery agent
         tcfl.servers.subsystem_setup()
 
         self.target_discovery_agent = tcfl.targets.discovery_agent_c(
@@ -558,6 +625,7 @@ class executor_c(contextlib.AbstractContextManager):
         return ap_count
 
 
+
     def run(self):
         """Run all the testcases, allocating any targets they might need
 
@@ -569,6 +637,11 @@ class executor_c(contextlib.AbstractContextManager):
         and they are all waiting for instructions on what to do.
 
         """
+        # this has to
+        # - find all the testcases that still need to run
+        # - for each testcase, figure out their axis
+        # - schedule an static run on each axis permutation
+        #
         # current list of allocations per server (pending, active)
         self.allocation_map = collections.defaultdict(dict)
         logger = self.log.getChild("run")
@@ -610,6 +683,7 @@ class executor_c(contextlib.AbstractContextManager):
                 logger.error(f"no testcases pending nor running; done")
                 break
 
+            logger.error(f"FIXME: not implemented")
 
             # first send the keepalives, it's way more critical
             logger.error(f"INFO pulsing at +{ts-ts0:.1f}s, period {period_keepalive}s")
@@ -648,6 +722,8 @@ class executor_c(contextlib.AbstractContextManager):
     def __exit__(self, exc_type, exc_value, traceback):
         self.shutdown()
 
+
+
     def _axes_expand_field(self, testcase, role, field):
         valid_values = set()
         for fullid in tcfl.rts_fullid_sorted:
@@ -672,6 +748,30 @@ class executor_c(contextlib.AbstractContextManager):
     #
 
     def _tc_info_randomizer_make(self, testcase, r, what):
+        """
+        Create a testcase randomizer
+
+        **Internal API**
+
+        :param tcfl.tc_info_c testcase: testcase for which we are
+          creating the randomizer
+
+        :param r: randomizer to use to sequence axis permutations
+
+          - *sequential* (str): use a sequential randomizer; no
+            randomization is done and elements are listed in their
+            natural order.
+
+          - *random* (str): use a randomizer with
+            :class:`random.Random`.
+
+          - VALUE (str): use a randomizer with
+            :class:`random.Random` and feed it as seed *VALUE*.`q
+
+          - object (:class:`random.Random`): use the randomizer
+            *object*
+
+        """
         if isinstance(r, str):
             if r == 'sequential':
                 return None
@@ -702,11 +802,13 @@ class executor_c(contextlib.AbstractContextManager):
         #
         # initialize tc_info_c specific for executor_c
         #
-        assert isinstance(testcase, tcfl.tc_info_c)
+        assert isinstance(testcase, tcfl.tc_info_c), \
+            f"BUG: testcase: expected tcfl.tc_info_c, got {type(testcase)}"
 
-        # FIXME: hack -- tc_info_c shall have very simple
-        # stuff so it can be piped, so we need to initialize
-        # this when we run
+        # FIXME: hack -- tc_info_c shall have very simple stuff so it
+        # can be piped, so we need to initialize this when we run
+        # FIXME: we need to move all the logging/reporting to tc_run_c
+        # anyway
         testcase.log = logger.getChild(testcase.name)
 
         testcase._axes_randomizer_impl = self._tc_info_randomizer_make(
@@ -817,7 +919,9 @@ class executor_c(contextlib.AbstractContextManager):
     #
     # Code:
     #
-    # - role_add(), target(), interconnect(): add a role to a testcase
+    # - role_add(), target(), interconnect(): add a target role to a
+    #   testcase; this is how you say a testcase needs a target to run
+    #   on (or many)
     #
     # - tc_c.target_axes_iterate(): creates permutations of axes as
     #   specified by the targets
@@ -1171,7 +1275,7 @@ class executor_c(contextlib.AbstractContextManager):
                 # this means we are having a hard time finding a new valid
                 # permutation that has no repeated items, so we just give
                 # up--we are not looking for completeness, but for a fast
-                # algorithm to target groups.
+                # algorithm to group targets.
                 print(f"LOG:WARNING maximum spins {spin_max} reached")
                 return spin_count
         return spin_count
@@ -1449,6 +1553,7 @@ class executor_c(contextlib.AbstractContextManager):
             ap_count += 1
 
 
+    # FIXME:REMOVE:UNUSED
     def _worker_tc_run_static(self, testcase,
                               axes_permutation_id, axes_permutation_dict):
         testcase.report_info(f"running _worker_tc_run_static APID {axes_permutation_id}")
@@ -1610,7 +1715,7 @@ class executor_c(contextlib.AbstractContextManager):
             # pickle the whole executor object between the processes
             # and also forces us to unroll this, which makes the code
             # clearer instead of doing getattr(self, fn)(work_entry[1:])
-            if fn == "_worker_axes_discover":
+            if fn == "_worker_axes_discover":	# FIXME:REMOVE:UNUSED
                 self._worker_axes_discover(work_entry[1])
             elif fn == "_worker_tc_run_static":
                 self._worker_tc_run_static(work_entry[1], work_entry[2],
