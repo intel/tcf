@@ -77,6 +77,7 @@ from . import expr_parser
 # for no good use, so disable that
 logging.getLogger("filelock").setLevel(logging.ERROR)
 
+log = logging.getLogger("commonl")
 
 # Ensure compatibility with python versions before 3.7 since older
 # versions use re._pattern_type instead of re.Pattern
@@ -2360,6 +2361,22 @@ def password_lookup(entry):
     raise RuntimeError(f"can't find a password for entry '{entry}'")
 
 
+#: List of file path regexes where we allow reading passwords from for
+#: :func:`commonl.password_get()` when it uses the *FILE:* prefix for
+#: passwords.
+#:
+#: To add:
+#:
+#: >>> import re
+#: >>> import commonl
+#: >>> commonl.password_get_file_paths_valid[re.compile("/etc/ttbd-production/pwd\..*$")] = commonl.origin_get()
+#:
+password_get_file_paths_valid = {
+    # keyed by compiled regex, value is origin
+    #re.compile("/etc/ttbd-production/pwd\..*$"): commonl.origin_get(),
+    #re.compile("/etc/ttbd-production/pwd\..*$"): commonl.origin_get(),
+}
+
 
 def password_get(domain, user, password):
     """Get the password for a domain and user
@@ -2466,8 +2483,18 @@ def password_get(domain, user, password):
 
     # Load from a file?
     def _file_get(filename):
-        # FIXME: implement verification of acceptable locations this
-        # can read from, otherwise we are opening it for ripe abuse
+        if password_get_file_paths_valid:
+            for path_regex, origin in password_get_file_paths_valid.items():
+                if path_regex.search(filename):
+                    log.info(
+                        f"password_get(): allowing read from {filename}"
+                        f" due to {path_regex.pattern} @{origin}")
+                    break
+            else:
+                raise PermissionError(
+                    f"{filename}: tried to read from location not allowed"
+                    " by commonl.password_get_file_path_valid")
+
         with open(filename) as f:
             return f.read().strip()
 
