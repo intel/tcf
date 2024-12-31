@@ -571,6 +571,7 @@ Power Control Interface
 .. automodule:: ttbl.pc
 .. automodule:: ttbl.ipmi
 .. automodule:: ttbl.raritan_emx
+.. automodule:: ttbl.raritan_px
 .. automodule:: ttbl.apc
 .. automodule:: ttbl.pc_ykush
 .. automodule:: ttbl.router
