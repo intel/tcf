@@ -1,0 +1,24 @@
+# -*- conf -*-
+[flake8]
+extend-ignore =
+   # whitespace after }
+   E202,
+   # whitespace after {
+   E201,
+   # unexpected spaces around keyword / parameter equals
+   E251,
+   # if cond is None -> cond == None
+   E711,
+   # Missing docstring in __init__
+   # We document the class, not __init__
+   D107,
+
+select =
+  # Ensures spaces are around operators.
+  E225,
+  # whitespace after }
+  E202,
+  # whitespace after {
+  E201,
+  # trailing whiteapace
+  W291,
