@@ -2505,7 +2505,7 @@ def password_get(domain, user, password):
 
 
 
-def split_user_pwd_hostname(s):
+def split_user_pwd_hostname(s, expand_password: bool = True):
     """
     Return a tuple decomponsing ``[USER[:PASSWORD]@HOSTNAME``
 
@@ -2528,7 +2528,8 @@ def split_user_pwd_hostname(s):
     else:
         user = user_password
         password = None
-    password = password_get(hostname, user, password)
+    if expand_password:
+        password = password_get(hostname, user, password)
     return user, password, hostname
 
 
