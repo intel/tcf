@@ -257,7 +257,7 @@ def _testcase_parameters_template_print(testcase, mode: str):
         return
 
     if mode == "shell":
-        print("#! /bin/sh")
+        print("#! /bin/sh -eux")
     else:
         print("#! /usr/bin/env python3")
 
@@ -272,8 +272,8 @@ def _testcase_parameters_template_print(testcase, mode: str):
 """)
     if mode == "shell":
         print('''\
-TARGETNAME="TARGET"
-RUNNERNAME="RUNNERNAME"
+TARGETNAME=$1
+RUNNERNAME=$2
 ''')
     elif mode == "ttbd":
         print("runner_name = 'RUNNERNAME'")
