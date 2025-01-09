@@ -365,7 +365,8 @@ class shell(tc.target_extension_c):
             #
             # see note on previous on for the rest of the arguments
             target.console.text(
-                re.compile(r"bash: .*: command not found\.\.\."),
+                # match only "sh:" so it works with all shells
+                re.compile(r"sh: .*: command not found"),
                 name = f"{target.want_name}:{console}: command not available",
                 console = console, timeout = 0, poll_period = 1,
                 raise_on_found = tc.error_e("error detected in shell")),
