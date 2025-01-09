@@ -9,6 +9,21 @@
   =======
 
 
+  HTML> js_runner_start_or_stop()
+    js_runner_jenkins_stop_if_running()
+    js_runner_jenkins_start()
+      js_runner_ui_state_set()
+      js_runner_run_button_disable()
+      js_alloc_guest_add()
+      jenkins_fetch() -> tell jenkins to start build
+      if fail
+        js_runner_ui_state_set()
+        js_runner_run_button_enable()
+        js_ttbd_target_property_set()
+      js_ttbd_target_property_set()
+        _js_runner_build_tbodies_header_tr_make()
+	js_runner_jenkins_state_update()
+
   js_runner_state_update
     js_runner_jenkins_state_update
       js_runner_jenkins_build_state_check
@@ -724,6 +739,7 @@ async function js_runner_jenkins_start(
     const repository = js_runner_field_get(targetid, runner, 'repository');
     const pipeline = js_runner_field_get(targetid, runner, 'pipeline');
     const file_path = js_runner_field_get(targetid, runner, 'file_path');
+    const repo_extras = js_runner_field_get(targetid, runner, 'repo_extras');
 
     /* FIXME: check it is not building */
     let r = null;
@@ -770,16 +786,71 @@ async function js_runner_jenkins_start(
      *
      * Holy cow in a motorbike, this could have been easier
      */
-    r = await jenkins_fetch(
-	pipeline, '/buildWithParameters', 'POST',
-	new URLSearchParams({
+    let url_args = new URLSearchParams({
 	    "param_manifest": `${repository} ${file_path}`,
 	    "param_notify_email": notify,
 	    "param_ttbd_allocid": allocid,
 	    "param_ttbd_servers": `${ttbd_server_url.protocol}//${ttbd_server_url.host}`,
 	    "param_ttbd_targetid": targetid,
-	})
-    );
+    });
+    //console.log(`DEBUG: repo_extras ${repo_extras}`)
+    if (repo_extras != null) {
+	let repo_extras_l = repo_extras.split(' ');
+	/*
+	 * input for the param repos extra is
+	 *
+	 *  REPOA REPOB
+	 *  REPOA REPOC..
+	 *
+	 * So if REPOA is checked out, also checkout REPOB
+	 */
+	url_args.append('param_repo_extras', repo_extras_l.map(
+	    repo_extra => `${repository} ${repo_extra}`).join("\n"));
+    }
+    /*
+     * A testcase can define parameters; we can get those in the UI in
+     * the runner.RUNNERNAME.parameters section; see the doc for
+     * details; the HTML template renders them and this gets the
+     * values and encodes them in the *param_parameters* string we'll
+     * send as arguments for the runner; one parameter per line, name
+     * an value separated by a space:
+     *
+     *   PARAM1 VALUE1
+     *   PARAM2 VALUE2
+     *   PARAM3 VALUE3
+     *   ...
+     */
+    const parameters = js_runner_field_get(targetid, runner, 'parameter');
+    if (parameters != null) {
+	let param_parameters = ""
+	for (let parameter_name in parameters) {
+	    let parameter_type = parameters[parameter_name]['type'];
+	    let value = null;
+	    if (parameter_type == "parameter_username_password_c") {
+		let parameter_el = document.getElementById(`label_id_runner_${runner}_parameter_${parameter_name}_user`);
+		value = parameter_el.value;
+		if (!value)
+		    value = parameter_el.placeholder;
+		// _USER -> expected for -e PARAMETER_<NAME>_USER to 'tcf -e'
+		param_parameters += `${parameter_name}_USER ${value}\n`
+		parameter_el = document.getElementById(`label_id_runner_${runner}_parameter_${parameter_name}_password`);
+		value = parameter_el.value;
+		if (!value)
+		    value = parameter_el.placeholder;
+		// _PASSORD -> expected for -e PARAMETER_<NAME>_PASSWORD to 'tcf -e'
+		param_parameters += `${parameter_name}_PASSWORD ${value}\n`
+	    } else {
+		let parameter_el = document.getElementById(`label_id_runner_${runner}_parameter_${parameter_name}_value`);
+		value = parameter_el.value;
+		if (!value)
+		    value = parameter_el.placeholder;
+		param_parameters += `${parameter_name} ${value}\n`
+	    }
+	}
+	url_args.append('param_parameters', param_parameters);
+    }
+
+    r = await jenkins_fetch(pipeline, '/buildWithParameters', 'POST', url_args);
     if (r == null || !r.ok) {	// it failed, backup
 	js_runner_ui_state_set(runner, "READY");
 	js_runner_run_button_enable(runner, `jenkins ${pipeline} build ${build_id} killed`);
