@@ -198,16 +198,6 @@ def _cmdline_ls(cli_args):
 
     verbosity = cli_args.verbosity - cli_args.quietosity
 
-    if cli_args.project == None:
-        if verbosity >= 1:
-	    # we want verbosity, no fields were specified, so ask for
-            # all fields (None); makes no sense with verbosity <=1, since it
-            # only prints ID, owner
-            cli_args.project = None
-        else:
-            projections_list = []
-            projections_set = { 'id', 'disabled' }
-
     if cli_args.project:
         projections_list = cli_args.project       # respect user's order
         projections_set = set(cli_args.project)   # to help avoid dups
@@ -216,12 +206,15 @@ def _cmdline_ls(cli_args):
         projections_set = set()
 
     # ensure the most basic fields for each verbosity level are queried
-    if cli_args.project and verbosity < 1:
+    if verbosity < 1:      # basic; need only id and disable
         projections_set.add('id')
         projections_set.add('disabled')
-    if cli_args.project and verbosity > 0:
+    if verbosity >= 1:      # need also power, ownership
         projections_set.add('interfaces.power.state')
         projections_set.add('owner')
+        projections_set.add('_alloc.id')
+    if verbosity > 1:       # verbose, get all fields
+        projections_set = None
 
     tcfl.targets.setup_by_spec(
         cli_args.target, verbosity = verbosity,
