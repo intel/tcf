@@ -1,5 +1,10 @@
 "use strict";
 
+/* Global variables for managing terminals life cycle. */
+var TERMINAL_BUFFER = {};
+var TERMINAL_INTERVALS = {};
+var TERMINAL_INTERVAL_REQUEST = {};
+
 /*
 * releases target based on an allocation id
 *
@@ -639,6 +644,10 @@ function toggle(id) {
         return;
     }
     inv.style.display = "none";
+    if (TERMINAL_INTERVALS[id] !== undefined) {
+        clearInterval(TERMINAL_INTERVALS[id]);
+        TERMINAL_INTERVALS[id] = undefined;
+    }
 }
 
 /**
@@ -676,8 +685,6 @@ function show_inventory() {
 }
 
 
-var TERMINAL_BUFFER = {};
-
 /*
  * Create a terminal and make a loop calling `terminal_get_content` every n
  * (200) miliseconds
@@ -689,7 +696,13 @@ var TERMINAL_BUFFER = {};
  * @return {void}
  *
  */
-function terminal_create(div_id, targetid, terminal) {
+function terminal_create(div_id, targetid, terminal, wrapper_id) {
+
+    let wrapper = document.getElementById(wrapper_id);
+    if (wrapper.style.display === "none") {
+        $('#' + div_id).empty();
+        return;
+    }
 
     /* clean div, in case there is already a terminal there*/
     $('#' + div_id).empty();
@@ -729,7 +742,13 @@ function terminal_create(div_id, targetid, terminal) {
      * miliseconds */
     let bytes_read_so_far = 0;
     let terminal_generation = 0;
-    setInterval(async function() {
+    TERMINAL_INTERVALS[wrapper_id] = setInterval(async function() {
+
+        if (TERMINAL_INTERVAL_REQUEST[wrapper_id] === true) {
+            console.log(`console[${terminal}]: request in progress`);
+            return;
+        }
+        TERMINAL_INTERVAL_REQUEST[wrapper_id] = true;
 
         let read_information_d = await terminal_get_content(
             term, targetid, terminal, bytes_read_so_far);
@@ -754,6 +773,7 @@ function terminal_create(div_id, targetid, terminal) {
             terminal_generation = tmp_terminal_generation;
             generation_label.textContent = terminal_generation;
             bytes_read_so_far = 0;
+            TERMINAL_INTERVAL_REQUEST[wrapper_id] = false;
             return
         }
 
@@ -764,6 +784,7 @@ function terminal_create(div_id, targetid, terminal) {
         if(read_information_d['content-length'] == 0) {
             bytes_read_so_far = parseInt(max_bytes_read);
             bytes_label.textContent = bytes_read_so_far;
+            TERMINAL_INTERVAL_REQUEST[wrapper_id] = false;
             return
         }
 
@@ -775,6 +796,8 @@ function terminal_create(div_id, targetid, terminal) {
         bytes_read_so_far = parseInt(bytes_label.textContent);
         bytes_read_so_far += parseInt(read_information_d['content-length']);
         bytes_label.textContent = bytes_read_so_far;
+
+        TERMINAL_INTERVAL_REQUEST[wrapper_id] = false;
 
     }, 400);
 }

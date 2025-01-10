@@ -457,7 +457,7 @@ $ tcf ls -vv {{ targetid}}</code> </pre></p>
         {% for console, console_info in consoles.items() %}
             <div class='console-container'>
                 <div class='console-options'>
-                    <button onclick='toggle("console-wrapper-{{console}}"); terminal_create("console-{{console}}", "{{targetid}}", "{{console}}"); create_or_destroy_terminal_div("console-wrapper-{{console}}", "console-{{console}}");'>
+                    <button onclick='toggle("console-wrapper-{{console}}"); terminal_create("console-{{console}}", "{{targetid}}", "{{console}}", "console-wrapper-{{console}}");'>
                           {{console}} <i class="arrow down"></i>
                     </button>
                     <a class='download-button' href='/ttb-v2/targets/{{targetid}}/console/read?component={{console}}' download='console-{{targetid}}-{{console}}.txt'>download ⇓</a>
