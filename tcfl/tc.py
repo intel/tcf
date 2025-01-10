@@ -4420,7 +4420,8 @@ class tc_c(reporter_c, metaclass=_tc_mc):
     # keyed by phase, function names that trigger
     _start_triggers = collections.defaultdict(set)
     # keyed by phase, defaults to True, since by default we always run
-    # all the stuff from the phase
+    # all the stuff from the phase Note: this is copied in
+    # __init_shallow__() so it is specific to each instance
     _start_triggered = collections.defaultdict(lambda: True)
 
 
@@ -4718,6 +4719,12 @@ class tc_c(reporter_c, metaclass=_tc_mc):
         # for reporter_c
         self.testcase = self
         self.ts_start = time.time()
+        # copy the triggering state so it is individual to this
+        # execution of a testcase--otherwise if we are running two
+        # copies, one would trigger the other too
+        self._start_triggered = copy.deepcopy(self._start_triggered)
+
+
 
     def __thread_init__(self, tls_parent):
         """
