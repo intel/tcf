@@ -714,7 +714,8 @@ class reporter_c:
             # do we have an exception? let's add the trace -- it's always helpful
             e = attachments['exception']
             if isinstance(e, Exception) and 'exception_trace' not in attachments:
-                attachments['exception_trace'] = traceback.format_exception(e)
+                attachments['exception_trace'] = \
+                    traceback.format_exception(type(e), e, e.__traceback__)
 
         testcase = self.testcase
         subl = []
