@@ -44,8 +44,13 @@ class tunnel(tc.target_extension_c):
 
     def _ip_addr_get(self, ip_addr):
         # FIXME: this shall validate the IP address using python-ipaddress
-        if ip_addr:
+        if ip_addr:		# we were passed one, use that
             return ip_addr
+        if self.ip_addr:	# we have a default for the tunnel, use that
+            return self.ip_addr
+
+        # well, we have none, so let's try to get from the boot
+        # interconnect, if there is any
         target = self.target
         interconnects = list(target.rt.get('interconnects', {}).keys())
         boot_ic = target.rt.get('pos_boot_interconnect', None)
