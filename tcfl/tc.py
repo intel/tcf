@@ -710,6 +710,12 @@ class reporter_c:
         ts = time.time()
         delta = ts - self.ts_start
 
+        if isinstance(attachments, dict) and 'exception' in attachments:
+            # do we have an exception? let's add the trace -- it's always helpful
+            e = attachments['exception']
+            if isinstance(e, Exception) and 'exception_trace' not in attachments:
+                attachments['exception_trace'] = traceback.format_exception(e)
+
         testcase = self.testcase
         subl = []
         # If there is no subcase_base, then we take it from the TLS
