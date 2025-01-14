@@ -50,6 +50,8 @@ except ImportError:
     import fdpexpect
     pexpect.fdpexpect = fdpexpect
 
+
+
 class impl_c(ttbl.tt_interface_impl_c):
     """
     Implementation interface for a console driver
@@ -1857,10 +1859,17 @@ class command_output_c(impl_c):
 
     This is useful to report diagnostics that run on the server.
 
-    :params str|list[str] cmdline: Command to execute
+    :param str|list[str] cmdline: Command to execute
 
       Can be a string or list of strings; *%(FIELD)[sd]* are expanded
       from the target's inventory.
+
+    :param bool run_on_enable: (optional; default *False*) run the
+      command only when we enable the console, then disable it.
+
+      By default, everytime we read we run the command; when this is
+      enabled, we run the command then we always read the same data
+      and report disabled, until we enable again.
 
     .. warning:: Make sure publishing the output does not open
                  users to internals from the system's operation
@@ -1878,7 +1887,10 @@ class command_output_c(impl_c):
     >>> )
 
     """
-    def __init__(self, cmdline: list, **kwargs):
+    def __init__(self, cmdline: list,
+                 run_on_enable: bool = False, **kwargs):
+        assert isinstance(run_on_enable, bool), \
+            f"run_on_enable: expected bool, got {type(run_on_enable)}"
         impl_c.__init__(self, **kwargs)
         if isinstance(cmdline, str):
             self.cmdline = cmdline.split()
@@ -1886,9 +1898,11 @@ class command_output_c(impl_c):
             commonl.assert_list_of_strings(cmdline, "cmdline", "args")
             self.cmdline = cmdline
             cmdline = " ".join(cmdline)
+        self.run_on_enable = run_on_enable
         self.upid_set(
             f"console for seeing output of command {cmdline}",
             cmdline = cmdline,
+            run_on_enable = run_on_enable,
         )
 
     # console interface
@@ -1896,11 +1910,25 @@ class command_output_c(impl_c):
     def setup(self, target, component, parameters):
         return
 
+
+    def _stat(self, target, component):
+        try:
+            file_name = os.path.join(
+                target.state_dir, f"console-{component}.read")
+            stat_info = os.stat(file_name)
+            return stat_info.st_size, int(stat_info.st_mtime)
+        except OSError as e:
+            if e.errno != errno.ENOENT:
+                raise
+            # not even existing, so empty
+            return 0, 0
+
     def size(self, target, component):
-        return 0
+        return self._stat(target, component)[0]
 
 
-    def read(self, target, component, _offset):
+
+    def _read(self, target, component):
         kws = target.kws_collect(self)
         kws['component'] = component
         cmdline = []
@@ -1908,7 +1936,9 @@ class command_output_c(impl_c):
             cmdline.append(commonl.kws_expand(i, kws))
         outfile = os.path.join(target.state_dir, f"console-{component}.read")
         with open(outfile, "w") as of:
-            subprocess.run(
+            target.log.info("running command for console %s: %s",
+                            component, cmdline)
+            p = subprocess.run(
                 cmdline,
                 shell = False,
                 timeout = 20,
@@ -1916,29 +1946,48 @@ class command_output_c(impl_c):
                 text = True,
                 stdout = of,
                 stderr = subprocess.STDOUT)
+            target.log.warning("ran command for console %s (%s): %s",
+                               component, cmdline, p)
+            stat_info = os.fstat(of.fileno())
+            return stat_info.st_size, int(stat_info.st_mtime)
+
+
+
+    def read(self, target, component, offset):
+        if self.run_on_enable:	# only run during enable, so get generation
+            size, stream_generation = self._stat(target, component)
+        else:			# run and get generation
+            size, stream_generation = self._read(target, component)
         return dict(
-            stream_file = outfile,
-            # everytime we run this we print a different generation
-            # since the content might have changed, so let's just get
-            # the current time with us precission
-            stream_generation = int(time.time() * 1000000),
-            stream_offset = 0,
+            stream_file = os.path.join(
+                target.state_dir, f"console-{component}.read"),
+            stream_generation = stream_generation,
+            # note we return the offset we read from, because
+            # otherwise we'll keep reading indefinitely
+            stream_offset = offset,
         )
+
 
 
     def write(self, _target, component, _data):
         raise RuntimeError(f"{component}: console is read only")
 
 
+
     # we do nothing when we enable/disable
-    def enable(self, _target, _component):
-        pass
+    def enable(self, target, component):
+        if self.run_on_enable:
+            self._read(target, component)
+
+
 
     def disable(self, target, _component):
         pass
 
 
+
     # power and console interface
     def state(self, target, component):
-        # this is always "enabled"
-        return True
+        # this is always "disabled"; when if self.run_on_enable() is
+        # set, when you try to enable it it runs, otherwise when you read.
+        return False
