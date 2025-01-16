@@ -214,8 +214,6 @@ def _capture(target: tcfl.tc.target_c, cli_args: argparse.Namespace):
     logger = logging.getLogger(f"{target.fullid}/capture")
     tcfl.ui_cli.logger_verbosity_from_cli(logger, cli_args)
 
-    cli_args.verbosity += 2	# default to informational messages
-
     if cli_args.prefix:
         prefix = cli_args.prefix
     else:
@@ -279,6 +277,8 @@ def _capture(target: tcfl.tc.target_c, cli_args: argparse.Namespace):
 
 
 def _cmdline_capture(cli_args: argparse.Namespace):
+    cli_args.verbosity += 2	# default to informational messages
+
     retval, _r = tcfl.ui_cli.run_fn_on_each_targetspec(
         _capture, cli_args, cli_args,
         iface = "capture", extensions_only = [ "capture", "store" ])
