@@ -5,6 +5,14 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 # pylint: disable = missing-docstring
+"""
+Control power with Raritan PX PDUs
+----------------------------------
+
+This interface provides means to power on/off outlets in Raritan PX PDUs
+
+"""
+
 import logging
 import re
 
@@ -156,13 +164,32 @@ class pc(ttbl.power.impl_c):
             self.p = pexpect.spawn(
                 "sshpass",
                 [
+                    # FIXME: move to environment, leaks in logs, etc
                     "-p", self.password,
                     "ssh",
+                    # be verbose (for debugging) and allocate a terminal
                     "-vtt",
+                    # We place the control file for the shared
+                    # connection in /var/cache/ttbd-production/ssh-NAME-HOSTNAME.control;
+                    # this way is shared by all targets that same the
+                    # same PDU and username to it.
+                    "-oControlMaster auto",
+                    f"-oControlPath {ttbl.test_target.files_path}/ssh-{self.user}-{self.hostname}.control",
+                    # old SSH impl in the PDU requires old algorithms
                     "-oPubkeyAcceptedAlgorithms +ssh-rsa,ssh-dss",
                     "-oHostKeyAlgorithms +ssh-rsa,ssh-dss",
+                    # we can't do any of this registering, so we
+                    # disable it so SSH doesn't ask for it
+                    # interactively and makes a mess
+                    "-oUserKnownHostsFile /dev/null",
+                    "-oCheckHostIP no",
+                    "-oStrictHostKeyChecking no",
                     f"{self.user}@{self.hostname}"
-                ], timeout = 5)
+                ],
+                # this timeout seems to overtake the rest we specify
+                # manually, so we set the max, what it takes to get
+                # the Welcome message which is longish
+                timeout = 30)
             # ok, problem--if we have multiple connections from
             # different processes, they will step over each other--in
             # theory only one processes shall open for each
@@ -181,6 +208,8 @@ class pc(ttbl.power.impl_c):
 
         except Exception as e:
             log.info(f"opening connection to {self.user}@{self.hostname} failed: {e}")
+            del self.p	# connection died, so clean it up so it is redone
+            self.p = None
             raise
 
 
@@ -192,6 +221,8 @@ class pc(ttbl.power.impl_c):
             return self.p.match.group(0)
         except pexpect.exceptions.EOF as e:
             log.info(f"didn't find (EOF): {expectation}")
+            del self.p	# connection died, so clean it up so it is redone
+            self.p = None
             raise self.exception(
                 f"{self.user}@{self.hostname}: connection died; is it on?") \
                 from e
