@@ -2436,10 +2436,12 @@ class delay_til_shell_cmd_c(impl_c):
             raise self.power_on_e(message)
         return cmdline, kws
 
-    def _test(self, _target, _component, cmdline):
-        r = subprocess.call(cmdline,
-                            env = self.env, cwd = self.cwd,
-                            stdin = None, stderr = subprocess.STDOUT)
+    def _test(self, target, component, cmdline):
+        outfile = os.path.join(target.state_dir, f"console-{component}.stderr")
+        with open(outfile, "w") as of:
+            r = subprocess.call(cmdline,
+                                env = self.env, cwd = self.cwd,
+                                stdin = of, stderr = subprocess.STDOUT)
         return r == self.expected_retval
 
 
