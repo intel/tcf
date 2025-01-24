@@ -2396,7 +2396,7 @@ class delay_til_shell_cmd_c(impl_c):
 
         impl_c.__init__(self, **kwargs)
         self.cmdline = cmdline
-        cmdline_s = " ".join(self.cmdline)
+        cmdline_s = " ".join(str(i) for i in self.cmdline)
         if condition_msg == None:
             self.condition_msg = "'%s' returns %d" % (
                 cmdline_s, expected_retval)
