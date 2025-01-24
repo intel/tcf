@@ -3348,7 +3348,7 @@ def assert_list_of_strings(l, list_name, item_name):
     count = -1
     for i in l:
         count += 1
-        assert isinstance(i, str), \
+        assert isinstance(i, ( str, collections.UserString )), \
             "items in '%s' needs to be strings (%s); got %s on #%d"  % (
                 list_name, item_name, type(i), count)
 
