@@ -105,11 +105,19 @@ class test_target_logadapter_c(logging.LoggerAdapter):
     """
     def process(self, msg, kwargs):
         target = self.target
-        owner = target.owner_get()
-        if owner:
-            return ( 'target-%s[%s]: %s ' % (target.id, owner, msg), kwargs )
-        else:
-            return ( 'target-%s: %s ' % (target.id, msg), kwargs )
+        try:
+            owner = target.owner_get()
+            if owner:
+                return ( 'target-%s[%s]: %s ' % (target.id, owner, msg), kwargs )
+            else:
+                return ( 'target-%s: %s ' % (target.id, msg), kwargs )
+        except Exception as e:
+            # in early situations before registering we might get this
+            # as a problem
+            logging.error("%s: can't get owner: %s", target.id, e)
+            return  ( 'target-%s[owner:n/a]: %s ' % (target.id, msg), kwargs )
+
+
 
 _who_daemon = None
 
@@ -1726,9 +1734,10 @@ class test_target(object):
         :returns: object describing the owner
         """
         # OLD acquisition method
-        acquirer_owner = self._acquirer.get()
-        if acquirer_owner:
-            return acquirer_owner
+        if self._acquirer:
+            acquirer_owner = self._acquirer.get()
+            if acquirer_owner:
+                return acquirer_owner
         # NEW allocator
         return self.fsdb.get('owner')
 
