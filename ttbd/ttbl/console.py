@@ -928,6 +928,14 @@ class serial_pc(ttbl.power.socat_pc, generic_c):
       to configure. The tty name linked to the target can be set with
       :ref:`udev <usb_tty>`.
 
+    :param int baudrate: (optional, default *115200*) baurdate to use
+      to open the serial port
+
+      FIXME: implement switching it in runtime
+
+    :param int crtscts: (optional, default 0) port implements
+      hardware flow control; valid is 0 or 1 per socat man page (DATA VALUES)
+
     For example, create a serial port recoder power control / console
     driver and insert it into the power rail and the console of a
     target:
@@ -951,7 +959,10 @@ class serial_pc(ttbl.power.socat_pc, generic_c):
 
     """
     def __init__(self, serial_file_name = None, usb_serial_number = None,
+                 baudrate = 115200, crtscts: int = 0,
                  **kwargs):
+        assert isinstance(baudrate, int) and baudrate > 0, \
+            f"baudrate: expected int, got {baudrate}"
         generic_c.__init__(self, **kwargs)
         ttbl.power.socat_pc.__init__(
             self,
@@ -959,7 +970,7 @@ class serial_pc(ttbl.power.socat_pc, generic_c):
             # do the settings; rawer resets to raw state
             "PTY,link=console-%(component)s.write,rawer"
             "!!CREATE:console-%(component)s.read",
-            "%(device)s,creat=0,rawer,b115200,parenb=0,cs8,bs1")
+            "%(device)s,creat=0,rawer,b%(baudrate)d,crtscts=%(crtscts)d,parenb=0,cs8,bs1")
         # pass the device name like this so we can resolve LATE
         if usb_serial_number != None:
             assert serial_file_name == None, \
@@ -967,6 +978,8 @@ class serial_pc(ttbl.power.socat_pc, generic_c):
             self.upid_set("RS-232C over USB serial port @%s" % serial_file_name,
                           name = "RS-232CoUSB",
                           usb_serial_number = usb_serial_number,
+                          baudrate = baudrate,
+                          crtscts = crtscts,
             )
         else:
             # default to a file called /dev/tty-TARGETNAME (udev rules)
@@ -975,9 +988,15 @@ class serial_pc(ttbl.power.socat_pc, generic_c):
             self.upid_set("RS-232C serial port @%s" % serial_file_name,
                           name = "RS-232C",
                           serial_port = serial_file_name,
+                          baudrate = baudrate,
+                          crtscts = crtscts,
+
             )
         self.usb_serial_number = usb_serial_number
         self.serial_file_name = serial_file_name
+        self.baudrate = baudrate
+        self.crtscts = crtscts
+
 
 
     def target_setup(self, target, iface_name, component):
@@ -1003,6 +1022,15 @@ class serial_pc(ttbl.power.socat_pc, generic_c):
             target.log.warning(
                 f"BUG? {component}/on: had to kill -9 pids using"
                 f" {self.kws['device']}: {pids}")
+
+        self.kws['baudrate'] = target.property_get(
+            f"instrumentation.{self.upid_index}.baudrate",
+            self.baudrate)
+        # socat wants 0 or 1; that's it.
+        self.kws['crtscts'] = target.property_get(
+            f"instrumentation.{self.upid_index}.crtscts",
+            self.crtscts)
+
         ttbl.power.socat_pc.on(self, target, component)
         generation_set(target, component)
         generic_c.enable(self, target, component)
