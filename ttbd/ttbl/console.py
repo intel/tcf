@@ -1013,6 +1013,12 @@ class serial_pc(ttbl.power.socat_pc, generic_c):
                 target, self.usb_serial_number,
                 f"instrumentation.{self.upid_index}.usb_serial_number")
             self.kws['device'] = device_resolver.tty_find_by_spec()
+        # this publishes what final device we are using at the system
+        # level, which helps in diagnosing and is also used by other
+        # pieces of code
+        target.property_set(
+            f"instrumentation.{self.upid_index}.device_resolved",
+            self.kws['device'])
         # sometimes there are lingering processes that get stuck and
         # don't release access to our device, so we just slash them
         # out and complain about it
