@@ -838,8 +838,16 @@ class generic_c(impl_c):
     def write(self, target, component, data):
         file_name = os.path.join(target.state_dir,
                                  "console-%s.write" % component)
-        target.log.debug("%s: writing %dB to console (%s)",
-                         component, len(data), data.encode('unicode-escape'))
+        if target.log.getEffectiveLevel() == logging.DEBUG:
+            if isinstance(data, str):
+                data_debug = data.encode('unicode-escape')
+            elif isinstance(data, bytes):
+                data_debug = data.decode('unicode-escape')
+            else:
+                data_debug = str(data).encode('unicode-escape')
+
+                target.log.debug("%s: writing %dB to console (%s)",
+                                 component, len(data), data_debug)
         try:
             stat_info = os.stat(file_name)
         except FileNotFoundError as e:
