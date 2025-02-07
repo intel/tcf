@@ -16,6 +16,7 @@ import codecs
 import contextlib
 import errno
 import fcntl
+import logging
 import numbers
 import os
 import re
@@ -27,6 +28,17 @@ import subprocess
 import sys
 import time
 import tty
+
+
+try:
+    import setproctitle
+except ImportError:
+    logging.warning(
+        "module `setproctitle` not available;"
+        " doing without")
+    class setproctitle:
+        def setproctitle(s: str):
+            pass
 
 
 import commonl
@@ -156,9 +168,39 @@ class impl_c(ttbl.tt_interface_impl_c):
       there is nothing we an do about it (IPMI, looking at you); look at
       :class:`ttbl.ipmi.sol_console_pc` for an example.
 
+    :param int rfc2217_tcp_port: (optional; default *None*) if given,
+      an integer describing which TCP port to use to serve RFC2217
+      serial port protocol.
+
+      When the console is enabled, the port will be open and receive
+      connections from any number of clients to interact with the
+      console; depending on the implementation (eg: if it has a serial
+      port as a backend), serial lines will be available or not.
+
+      *Security considerations:* Note the argument *rfc2217_host*
+       mandates to which network interfaces this binds to; there are no
+       provisions for security in RFC2217, so anyone can connect.
+
+       To properly secure this in a hostile environment, multiple
+       options are available:
+
+       - set *rfc2217_host* to `127.0.0.1` and use the tunneling
+         facilities to creaate a tunnel associated to the target's
+         allocation; this allows clients that know nothing about
+         SSL. However, for it to be properly safe, it need to use
+         tunnels that start inside the client.
+
+       - FIXME: enable creating the socket with SSL wrapping using the
+         cert interface; needs client that speak SSL.
+
+    :param int rfc2217_host: (optional; default *0.0.0.0*) if given,
+      interfaces were to bind.
+
     """
     def __init__(self, command_sequence = None, command_timeout = 5,
-                 crlf = '\r', stderr_restart_regex: re.Pattern = None):
+                 crlf = '\r', stderr_restart_regex: re.Pattern = None,
+                 rfc2217_tcp_port: int = None,
+                 rfc2217_host: str = "0.0.0.0"):
         assert command_sequence == None \
             or isinstance(command_sequence, list), \
             "command_sequence: expected list of tuples; got %s" \
@@ -168,6 +210,14 @@ class impl_c(ttbl.tt_interface_impl_c):
             or isinstance(stderr_restart_regex, re.Pattern), \
             "stderr_restart_regex: expected None or re.Pattern," \
             f" got {type(stderr_restart_regex)}"
+        assert rfc2217_tcp_port == None \
+            or (isinstance(rfc2217_tcp_port, int)
+                and rfc2217_tcp_port > 1), \
+            "rfc2217_tcp_port: expected None or > 1 integer;" \
+            " got '{rfc2217_tcp_port}'"
+        assert isinstance(rfc2217_host, str), \
+            "rfc2217_host: expected str IP address; got '{rfc2217_host}'"
+
         self.command_sequence = command_sequence
         self.command_timeout = command_timeout
         self.parameters = {}
@@ -187,6 +237,8 @@ class impl_c(ttbl.tt_interface_impl_c):
         self.re_enable_if_dead = False
         self.crlf = crlf
         self.stderr_restart_regex = stderr_restart_regex
+        self.rfc2217_tcp_port = rfc2217_tcp_port
+        self.rfc2217_host = rfc2217_host
 
 
 
@@ -229,6 +281,30 @@ class impl_c(ttbl.tt_interface_impl_c):
                 self.disable(target, component)
                 raise
         target.property_set("interfaces.console." + component + ".state", True)
+        if self.rfc2217_tcp_port:
+            # We have specified we want an RFC2217 server; these run
+            # as a separate process listening for connections;
+            #
+            # kill any possible left overs, if any running before and
+            # create a new object that represents the server and run
+            # it; see the class info on why this is an standalone
+            # object.
+
+            # Do we have a real serial port? if a driver provides
+            # access to a real serial port, it did resolve it and
+            # place it in self.kws['device'], then pass it so we can
+            # do modem line control
+            serial_port = self.kws.get('device', None)
+
+            ttbl.console.rfc2217_server_c.server_stop(target, component)
+            rfc2217_server = ttbl.console.rfc2217_server_c(
+                target, component, self,
+                self.rfc2217_host, self.rfc2217_tcp_port,
+                serial_port = serial_port,
+            )
+            # start the server; this forks a separate process1
+            rfc2217_server.server_start()
+
 
     def disable(self, target, component):
         """
@@ -238,6 +314,10 @@ class impl_c(ttbl.tt_interface_impl_c):
           the default one.
         """
         target.property_set("interfaces.console." + component + ".state", False)
+        if self.rfc2217_tcp_port:
+            ttbl.console.rfc2217_server_c.server_stop(target, component)
+
+
 
     def state(self, target, component):
         """
@@ -2045,3 +2125,347 @@ class command_output_c(impl_c):
         # this is always "disabled"; when if self.run_on_enable() is
         # set, when you try to enable it it runs, otherwise when you read.
         return False
+
+
+import serial
+import serial.rfc2217
+import socket
+import threading
+
+class rfc2217_server_c:
+    """An RFC2217 server over the TTBD console drivers
+
+    ***WARNING*** This class is pretty much very internal, used only
+    by the :class:`ttbl.console.impl_c` code and there is not much
+    need for others to use it.
+
+    Each console driver based on :class:`ttbl.console.impl_c' can
+    easily implement an RFC2217 server.
+
+    Since there is always a backing file that contains the *recorded*
+    output from the console, we can easily monitor that and send it to
+    the other side. As well, anything we receive from the other side
+    can be passed to the console implementation using
+    :method:`ttbl.console.impl_c.write`.
+
+    Serial port signals are passed around if the backing behind the
+    console driver is a serial port; otherwise they are ignored.
+
+    :param ttbl.test_target target: target which implements this
+      console
+
+    :param str component: name of the component in the console
+      interface
+
+    :param ttbl.console.impl_c: console object (this is usually
+      *target.console.impls[component]*)
+
+    :param str bind_host: host to bind to; IPv4 or IPv6 address of the
+      interface to bind.
+
+      - *0.0.0.0*: all interfaces
+      - *127.0.0.1*: localhost interfce only
+
+    :param int tcp_port: TCP port to which to bind to
+
+    :param str serial_port: (optional, default *None*) what physical
+      serial port to use; if *None*, no serial line control will be
+      done.
+
+      The :class:`ttbl.console.serial_pc` driver sets the serial port
+      it resolves to in the inventory and
+      :method:`ttbl.console.impl_c.enable` picks it up, if present to
+      pass it here.
+
+    ***Design constraints***
+
+    - this has to be a separate class (vs part of
+      :class:`ttbl.console.impl_c` because
+      :class:`serial.rfc2217.PortManager` requires an object with a
+      :methd:`write` to write the data; :class:`ttbl.console.impl_c`
+      already has that with a different signature.
+
+    - the life cycle: create+start when the console is enabled, spawns
+      process; kills the process when disabled
+
+    - remember this is a multiprocess server, so anything this spawns
+      can't keep state in the python code; the start method just
+      spawns the process and records the PID in the inventory for it to
+      be killed later.
+
+    - the spawned process listens and spawns another process per
+      connection; the spawned per-connection processes handles both input
+      and output in a very simplistic way.
+
+    """
+    def __init__(self,
+                 target: ttbl.test_target,
+                 component: str,
+                 console: impl_c,
+                 bind_host: str, tcp_port: int,
+                 serial_port: str = None):
+
+        assert isinstance(target, ttbl.test_target)
+        assert isinstance(component, str)
+        assert isinstance(console, ttbl.console.impl_c)
+        assert isinstance(bind_host, str )
+        assert isinstance(tcp_port, int ) and tcp_port > 1
+        assert serial_port == None or isinstance(serial_port, str )
+
+        self.target = target
+        self.component = component
+        self.console = console
+        self.serial_port = serial_port
+        self.bind_host = bind_host
+        self.tcp_port = tcp_port
+
+
+
+    def _serve_one_client(self, client_socket, remote_addr, remote_port):
+        # FIXME: rename process to rfc2217 server etc etc
+        self.client_socket = client_socket
+
+        idle_wait_max = 0.25
+        idle_wait_min = 0.01
+        idle_wait = idle_wait_min
+
+        if self.serial_port:
+            setproctitle.setproctitle(
+                f"rfc2217:{self.target.id}:{self.component}:{self.tcp_port}"
+                f" [{self.serial_port}]"
+                f" {remote_addr}:{remote_port}"
+            )
+        else:
+            setproctitle.setproctitle(
+                f"rfc2217:{self.target.id}:{self.component}:{self.tcp_port}"
+                f" {remote_addr}:{remote_port}")
+
+        if self.serial_port:
+            serial_desc = serial.serial_for_url(
+                self.serial_port, baudrate = self.console.baudrate)
+
+            self.rfc2217_manager = serial.rfc2217.PortManager(
+                serial_desc, self,
+                logger = self.target.log)
+            self.target.log.error(
+                'rfc2217:%s:%s[%s]: serving connection for %s',
+                remote_addr, remote_port,  self.component, self.serial_port)
+        else:
+            self.rfc2217_manager = serial.rfc2217.PortManager(
+                "nonexistant serial port", self,
+                logger = self.target.log)
+            self.target.log.error(
+                'rfc2217:%s:%s[%s]: serving connection (no serial port)',
+                remote_addr, remote_port,  self.component)
+
+        client_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+        fcntl.fcntl(client_socket, fcntl.F_SETFL, os.O_NONBLOCK)
+        offset = self.console.size(self.target, self.component)
+        _offset = None
+        generation0 = None
+        while True:
+            # single thread approach
+            if self.serial_port:
+                self.target.log.debug(
+                    'rfc2217:%s:%s[%s]: checking %s modem lines',
+                    remote_addr, remote_port,  self.component, self.serial_port)
+                self.rfc2217_manager.check_modem_lines()
+
+            # is there anything coming from the serial console?
+            r = self.console.read(self.target, self.component, None)
+            file_name = r.get('stream_file', None)
+            generation = r.get('generation', None)
+            if generation != generation0:
+                offset = 0
+                generation0 = generation
+            data_read_from_console = 0
+            data_read_from_remote = 0
+            with open(file_name, "br" ) as f:
+                f.seek(offset)
+                # we read a max of 1K
+                data_from_console = f.read(4096)
+                data_read_from_console = len(data_from_console)
+                if data_read_from_console:
+                    self.target.log.debug(
+                        'rfc2217:%s:%s[%s]: read %dB from console',
+                        remote_addr, remote_port,  self.component, data_read_from_console)
+                offset += data_read_from_console
+                if data_from_console:
+                    data = b''.join(self.rfc2217_manager.escape(data_from_console))
+                    try:
+                        client_socket.sendall(data)
+                        self.target.log.debug(
+                            'rfc2217:%s:%s[%s]: wrote %dB from console to remote',
+                            remote_addr, remote_port,  self.component, len(data))
+                    except ConnectionResetError as e:
+                        # did this socket disconnect, stop this thread
+                        self.target.log.error(
+                            'rfc2217:%s:%s[%s]: remote disconnected while sending; stopping',
+                            remote_addr, remote_port,  self.component)
+                        return
+
+            # is there anything in the network connection to
+            # send to the console?
+            data_from_remote = None
+            try:
+                # we read a max of 4k, and it is non-blocking so we
+                # don't get stuck if there is nothing
+                data_from_remote = client_socket.recv(4096)
+                #if data_read_from_remote:
+                self.target.log.debug(
+                    'rfc2217:%s:%s[%s]: read %dB from remote',
+                    remote_addr, remote_port, self.component, len(data_from_remote))
+
+                data = b''.join(self.rfc2217_manager.filter(data_from_remote))
+                if data:
+                    if len(data) < 20:
+                        data_debug = str(data).encode('unicode-escape')
+                    else:
+                        data_debug = "n/a"
+                    self.console.write(self.target, self.component, data)
+                    self.target.log.debug(
+                        'rfc2217:%s:%s[%s]: wrote %dB from remote to console: %s',
+                        remote_addr, remote_port,  self.component, len(data), data_debug)
+            except ConnectionResetError as e:
+                # did this socket disconnect, stop this thread
+                self.target.log.error(
+                    'rfc2217:%s:%s[%s]: remote disconnected while receiving; stopping',
+                    remote_addr, remote_port,  self.component)
+                return
+            except socket.error as e:
+                self.target.log.debug(
+                    'rfc2217:%s:%s[%s]: read from remote: %s',
+                    remote_addr, remote_port, self.component, e,
+                    exc_info = True)
+                # we leep going until they kill us or disconnect
+
+            except Exception as e:
+                self.target.log.debug(
+                    'rfc2217:%s:%s[%s]: read from remote: %s',
+                    remote_addr, remote_port, self.component, e,
+                    exc_info = True)
+                # we keep going until they kill us or disconnect
+
+            # No data avaialble, so wait -- do adaptative wait,
+            # increase the wait to a max but reset to the min if we
+            # got some data
+            if data_read_from_console == 0 and not data_from_remote:
+                idle_wait += idle_wait
+                if idle_wait > idle_wait_max:
+                    idle_wait = idle_wait_max
+                # simplistic as it gets
+                time.sleep(idle_wait)
+            else:
+                idle_wait = idle_wait_min
+
+
+
+    def serve_one_client(self, client_socket, remote_addr, remote_port):
+        try:
+            self._serve_one_client(client_socket, remote_addr, remote_port)
+        except Exception as e:
+            self.target.log.error(
+                'rfc2217:%s:%s[%s]: BUG? server loop died: %s',
+                remote_addr, remote_port, self.component, e,
+                exc_info = True)
+
+
+
+    def write(self, data):
+        #
+        # Write all the data to the socket
+        #
+        # Required by rfc227_manager so it can use it to write--this
+        # method is the sole reason why this is a separate class
+        self.client_socket.sendall(data)
+
+
+    def _serve(self):
+        #
+        # Serve the main connection, listening for clients and
+        # spawning threads to handle them
+        #
+        try:
+            if self.serial_port:
+                setproctitle.setproctitle(
+                    f"rfc2217:{self.target.id}:{self.component}:{self.tcp_port}"
+                    f" [{self.serial_port}]")
+            else:
+                setproctitle.setproctitle(
+                    f"rfc2217:{self.target.id}:{self.component}:{self.tcp_port}")
+            # Record who this is process is in the inventory, so we
+            # can kill it
+            self.target.property_set(
+                f"interfaces.console.{self.component}.rfc227_pid",
+                os.getpid())
+            self.target.property_set(
+                f"interfaces.console.{self.component}.rfc227_tcp_port",
+                self.tcp_port)
+
+            # Bind the socket, listen and loop waiting for connections
+            server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            server_socket.bind(( self.bind_host, self.tcp_port ))
+            server_socket.listen(1)
+
+            while True:
+                try:
+                    self.target.log.error(
+                        f"rfc2217[%s]: waiting for connections",
+                        self.tcp_port)
+                    client_socket, addr = server_socket.accept()
+                    self.target.log.error(
+                        f"rfc2217[%s]: got connection from %s:%s, spawning",
+                        self.tcp_port, addr[0], addr[1])
+                    # fork vs thread, so we see it as a separate
+                    # process and have better scalability
+                    r = commonl.fork_c(self._serve_one_client, client_socket, addr[0], addr[1])
+                    r.start()
+                except socket.error as e:
+                    self.target.log.error(
+                        f'rfc2217: accept error {remote_addr}:{remote_port}: {e}')
+        except Exception as e:
+            self.target.log.error(
+                f"rfc2217: {self.tcp_port=} _serve exception: {e.args[0]}",
+                exc_info = True)
+
+
+
+    def server_start(self):
+        server_pid = self.target.property_set(
+            f"interfaces.console.{self.component}.rfc227_pid", None)
+        r = commonl.fork_c(self._serve)
+        r.start()
+
+        # test the process started
+        ts0 = ts = time.time()
+        while ts - ts0 < 5:
+            server_pid = self.target.property_get(
+                f"interfaces.console.{self.component}.rfc227_pid")
+            if server_pid:
+                ttbl.daemon_pid_add(server_pid)
+                return
+            time.sleep(1)
+            ts = time.time()
+            continue
+        raise RuntimeError("BUG server didn't start?")
+
+
+    @staticmethod
+    def server_stop(target, component):
+        server_pid = target.property_get(
+            f"interfaces.console.{component}.rfc227_pid")
+        if not server_pid:
+            return
+        try:
+            os.kill(server_pid, signal.SIGTERM)
+            time.sleep(0.2)
+            os.kill(server_pid, signal.SIGKILL)
+        except:
+            pass
+
+        target.property_set(f"interfaces.console.{component}.rfc227_pid", None)
+        try:
+            ttbl.daemon_pid_rm(server_pid)
+        except KeyError as e:
+            pass
