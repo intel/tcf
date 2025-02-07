@@ -1275,6 +1275,12 @@ class ssh_pc(ttbl.power.socat_pc, generic_c):
 
     :param int port: (optional) port to connect to (defaults to 22)
 
+
+    :param str shell_cmd: (optional; default empty, which lets sshd
+      decide) shell to use.
+
+      For windows, use "cmd /D" to force disabling no VT management.
+
     :param dict exta_ports: (optional) dictionary of extra SSH options
       and values to set in the SSH configuration (as described in
       :manpage:`ssh_config(5)`.
@@ -1318,7 +1324,7 @@ class ssh_pc(ttbl.power.socat_pc, generic_c):
 
     """
     def __init__(self, hostname, port = 22, extra_opts = None,
-                 **kwargs):
+                 shell_cmd: str = '', **kwargs):
         assert isinstance(hostname, str)
         assert port > 0
         assert extra_opts == None \
@@ -1338,7 +1344,7 @@ class ssh_pc(ttbl.power.socat_pc, generic_c):
             # controlly TTY
             "EXEC:'sshpass -e ssh -v -F %(component)s-ssh-config -tt"
             # don't use ssh://USER@HOST:PORT, some versions do not grok it
-            "  -p %(port)s %(username)s@%(hostname)s'"
+            f"  -p %(port)s %(username)s@%(hostname)s {shell_cmd}'"
             ",sighup,sigint,sigquit"
         )
         user, password, hostname = commonl.split_user_pwd_hostname(hostname)
