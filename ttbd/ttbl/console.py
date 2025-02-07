@@ -823,9 +823,15 @@ class generic_c(impl_c):
             while left > 0:
                 _chunk_size = min(left, self.chunk_size)
                 os.write(fd, data[itr : itr + _chunk_size])
-                time.sleep(self.interchunk_wait)
                 itr += _chunk_size
                 left -= _chunk_size
+                if left:
+                    # only wait if we have data left -- ideally this
+                    # shall wait if we have sent chunk_size B after
+                    # the last wait we might -- but we need to store
+                    # that in disk
+                    time.sleep(self.interchunk_wait)
+
         else:
             os.write(fd, data)
 
