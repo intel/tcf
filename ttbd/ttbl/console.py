@@ -2096,8 +2096,6 @@ class command_output_c(impl_c):
             stream_file = os.path.join(
                 target.state_dir, f"console-{component}.read"),
             stream_generation = stream_generation,
-            # note we return the offset we read from, because
-            # otherwise we'll keep reading indefinitely
             stream_offset = offset,
         )
 
