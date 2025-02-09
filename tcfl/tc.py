@@ -3210,6 +3210,23 @@ class parameter_username_password_c(parameter_c):
 
     >>> username, password = self.parameter_get("creds")
 
+    To set the secret in the keyring, make sure to set the right *DOMAIN*::
+
+      $ keyring set DOMAIN USERNAME
+
+    for example, for a credential we'd call *cred1* that would be
+    exposed as PARAM_cred1_USER and PARAM_cred1_PASSWORD you can set a
+    default username and password (in the keyring) as:
+
+    >>>    tcfl.tc.parameter_username_password_c(
+    >>>            "cred1",
+    >>>            "username and password to login to service XYZ",
+    >>>            "someusername", "KEYRING:parameter_cred1""),
+
+    and then to prefill in the keyring::
+
+      $ keyring set parameter_cred1 someusername
+      Password for 'someusername' in 'parameter_cred1': <ENTERTHEPASSWORDHER>
     """
 
     def __init__(self, name: str, description: str,
