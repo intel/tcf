@@ -1865,6 +1865,78 @@ class telnet_pc(ttbl.power.socat_pc, generic_c):
         return ttbl.power.socat_pc.get(self, target, component)
 
 
+
+class tcp_raw_pc(ttbl.power.socat_pc, generic_c):
+    """
+    Raw TCP console to interact with a TCP port
+
+    :param str hostname: name or IP of the host to connect to
+    :param int port: TCP port number to connect to
+
+    :param dict socat_pc_kwargs: (optional, default none) more
+      arguments for the :class:`ttbl.power.socat_pc`
+
+    Other arguments as to :class:`ttbl.console.generic_c`
+    """
+    def __init__(self, hostname: str, port: int,
+                 socat_pc_kwargs = None,
+                 **kwargs):
+        assert isinstance(port, int)
+        if socat_pc_kwargs != None:
+            assert isinstance(socat_pc_kwargs, dict)
+        else:
+            socat_pc_kwargs = {}
+        generic_c.__init__(self, **kwargs)
+        username, password, _hostname = commonl.split_user_pwd_hostname(hostname)
+        self.hostname = _hostname
+        ttbl.power.socat_pc.__init__(
+            self,
+            "PTY,link=console-%(component)s.write,rawer"
+            "!!CREATE:console-%(component)s.read",
+            # -a: try automatic login, pullin the user from the USER
+            #     env variable
+            # -c: no ~/.telnetrc
+            # -L -8: 8bit binary path on input and output, no translations
+            # -E: no escape characters
+            "TCP:%(hostname)s:%(port)s",
+            **socat_pc_kwargs
+        )
+        self.upid_set(f"console over raw TCP to {hostname}:{port}",
+                      name = f"TCP:{hostname}:{port}",
+                      hostname = hostname,
+                      port = port)
+
+
+    def target_setup(self, target, iface_name, component):
+        generic_c.target_setup(self, target, iface_name, component)
+        ttbl.power.socat_pc.target_setup(self, target, iface_name, component)
+
+
+    def on(self, target, component):
+        ttbl.power.socat_pc.on(self, target, component)
+        generation_set(target, component)
+        generic_c.enable(self, target, component)
+
+    def off(self, target, component):
+        generic_c.disable(self, target, component)
+        ttbl.power.socat_pc.off(self, target, component)
+
+    def enable(self, target, component):
+        self.on(target, component)
+
+    def disable(self, target, component):
+        return self.off(target, component)
+
+    def state(self, target, component):
+        # we want to use this to gather state, since the generic_c
+        # implementation relies on the console-NAME.write file
+        # existing; this can linger if a process dies or not...
+        # but the ttbl.power.socat_pc.get() implementation checks if
+        # the process is alive looking at the PIDFILE
+        # COMPONENT-socat.pid and verifying that thing is still running
+        return ttbl.power.socat_pc.get(self, target, component)
+
+
 class logfile_c(impl_c):
     """
     A console that streams a logfile in the server
