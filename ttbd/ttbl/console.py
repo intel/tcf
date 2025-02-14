@@ -1361,7 +1361,7 @@ class ssh_pc(ttbl.power.socat_pc, generic_c):
 
       For windows, use "cmd /D" to force disabling no VT management.
 
-    :param dict exta_ports: (optional) dictionary of extra SSH options
+    :param dict exta_opts: (optional) dictionary of extra SSH options
       and values to set in the SSH configuration (as described in
       :manpage:`ssh_config(5)`.
 
@@ -1375,6 +1375,10 @@ class ssh_pc(ttbl.power.socat_pc, generic_c):
       >>>     })
 
       Be careful what is changed, since it can break operation.
+
+      If an option is called *k#something*: *v* it is intrpreted as
+      *k*: *something v*. This allows specifying multiple entries that
+      are using the same config key (like LocalCommand).
 
     See :class:`generic_c` for descriptions on *chunk_size* and
     *interchunk_wait*, :class:`impl_c` for *command_sequence*.
@@ -1470,6 +1474,13 @@ class ssh_pc(ttbl.power.socat_pc, generic_c):
             _extra_opts = ""
             if self.extra_opts:
                 for k, v in list(self.extra_opts.items()):
+                    # if an option is called k#something, change to k:
+                    # something v; this allows specifying multiple
+                    # entries that are using the same config key (like
+                    # LocalCommand)
+                    if '#' in k:
+                        k, prefix = k.split("#", 1)
+                        v = prefix + " " + v
                     _extra_opts += "%s = %s\n" % (k, v)
             # CheckHostIP=no and StrictHostKeyChecking=no are needed
             # because we'll change IPs and reformat a lot, so we dont'
