@@ -3165,6 +3165,7 @@ class parameter_c:
                 val_resolved = commonl.password_get("parameters",
                                                     self.name, val)
             except RuntimeError as e:
+                keyring_name = val.split(":", 1)[1]
                 es = str(e)
                 # if the text looks like
                 #
@@ -3175,9 +3176,10 @@ class parameter_c:
                 if 'keyring: no password for user ' in es:
                     raise tcfl.block_e(
                         f"parameter {self.name}: can't retrieve token from the"
-                        f" keyring {val} for user '{name}' since"
-                        f" it is not set"
-                        " (eg: if using KEYRING:parameters as default, echo TOKEN | keyring set parameters {self.name})") \
+                        f" keyring {val} for user '{self.name}' since"
+                        f" it is not set" \
+                        f" (eg: if using KEYRING:{keyring_name}:"
+                        f" echo TOKEN | keyring set '{keyring_name}' '{self.name}')") \
                         from e
                 raise
         else:
@@ -3314,11 +3316,12 @@ class parameter_username_password_c(parameter_c):
             # this means the password is not set in the keyring, make
             # a more meaningful error
             if 'keyring: no password for user ' in es:
+                keyring_name = password.split(":")[1]
                 raise tcfl.block_e(
                     f"parameter {self.name}: can't retrieve a password from the"
                     f" keyring {password} for user '{username}' since"
                     f" it is not set"
-                    f" (eg: echo PASSWORD | keyring set parameters {username})") \
+                    f" (eg: echo PASSWORD | keyring set '{keyring_name}' '{username}')") \
                  from e
             raise
 
