@@ -1276,6 +1276,8 @@ function js_onload_update_overview(inventory) {
 		console.log(`DEBUG: js_onload_update_fields: ${field} ${field_pretty} -> var ${var_name}`)
 		// get the value from thej inventory
 		let var_value = js_inventory_get_flat(inventory[targetid], var_name);
+		if (!var_value)
+		    var_value = `${var_name}:not_in_inventory`;
 		console.log(`DEBUG: js_onload_update_fields: ${field} ${field_pretty} -> var ${var_name} is ${var_value}`)
 		// now replace it in
 		expanded_template = expanded_template.replace(`%(${var_name})s`, var_value)
