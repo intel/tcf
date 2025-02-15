@@ -575,6 +575,8 @@ $ tcf ls -vv {{ targetid}}</code> </pre></p>
           </tr>
 
         </table>
+        <table id = 'label_id_overview_{{targetid}}' class='display'>
+        </table>
     </div>
 
     {% include 'widget-target-tunnels.html' %}
@@ -628,6 +630,9 @@ $(document).ready( function () {
     });
 
 })
+
+/* update extra stuff in the overview table */
+js_onload_update_overview(inventory);
 </script>
 
 {% endblock %}

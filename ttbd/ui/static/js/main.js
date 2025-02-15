@@ -1233,26 +1233,29 @@ function js_onload_update_overview(inventory) {
 
     // inventory is defined in the main page
     for (const targetid in inventory) {
-	if (targetid == "loc2al")
+	if (targetid == "local")
 	    continue;
 
 	let tbody_el = document.getElementById(`label_id_overview_${targetid}`);
+	// in principle we support multiple targets, getting ready for future
+	if (tbody_el == null)
+	    continue;
 
 	console.log(`DEBUG: js_onload_update_fields: checking targetid ${targetid}`)
 	// get the ui.overview inventory data for this machine,
 	// defaulting for the local target (or user prefs)
 	// FIXME: default override with user prefs from userdb
 	const local_default_value = inventory["local"].ui?.overview ?? {};
-	console.log(`DEBUG: js_onload_update_fields: local_default_value ${local_default_value}`)
-	const target_ui_overview = inventory[targetid].ui?.overview ?? local_default_value;
-	console.log(`DEBUG: js_onload_update_fields: target_ui_overview ${target_ui_overview}`)
-	//debugger;
+	console.log(`DEBUG: js_onload_update_fields: local_default_value ${local_default_value}`);
+	const target_ui_overview = inventory[targetid].ui?.overview ?? {};
+	console.log(`DEBUG: js_onload_update_fields: target_ui_overview ${target_ui_overview}`);
+	// merge dicts, targets's overriding local's
+	const target_ui = Object.assign({}, local_default_value, target_ui_overview);
 
-
-	for (let field in target_ui_overview) {
+	for (let field in target_ui) {
 	    // field
 	    console.log(`DEBUG: js_onload_update_fields: field ${field}`)
-	    let value = target_ui_overview[field]
+	    let value = target_ui[field]
 	    // value -> ##
 	    let field_pretty, template;
 	    if (value.includes('##')) {
