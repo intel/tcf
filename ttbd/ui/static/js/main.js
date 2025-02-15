@@ -1271,19 +1271,28 @@ function js_onload_update_overview(inventory) {
 	    let match;
 	    // note the (), this is so we have a group for match[1]
 	    const field_regex = /%\(([_a-zA-Z0-9\.]+)\)s/g;
+	    let missing_fields = false;
 	    while ((match = field_regex.exec(template)) !== null) {
 		let var_name = match[1]; 	// field[.subfield[.subfield]
 		console.log(`DEBUG: js_onload_update_fields: ${field} ${field_pretty} -> var ${var_name}`)
 		// get the value from thej inventory
 		let var_value = js_inventory_get_flat(inventory[targetid], var_name);
-		if (!var_value)
+		if (var_value == undefined) {
 		    var_value = `${var_name}:not_in_inventory`;
+		    missing_fields = true;
+		}
 		console.log(`DEBUG: js_onload_update_fields: ${field} ${field_pretty} -> var ${var_name} is ${var_value}`)
 		// now replace it in
 		expanded_template = expanded_template.replace(`%(${var_name})s`, var_value)
 		console.log(`DEBUG: js_onload_update_fields: ${field} ${field_pretty} -> var ${var_name} is ${var_value} -> ${expanded_template}`)
 	    }
 
+	    if (missing_fields && field[0] == "_") {
+		// field name starts with _ and have missing fields?
+		// don't render it
+		console.log(`DEBUG: js_onload_update_fields: expanding ${field} had missing variables and marked as _, skipping`);
+		continue;
+	    }
 	    let tr_el = document.createElement('tr');
 
 	    let td_el = document.createElement('td');
