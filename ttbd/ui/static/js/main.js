@@ -1245,9 +1245,9 @@ function js_onload_update_overview(inventory) {
 	// get the ui.overview inventory data for this machine,
 	// defaulting for the local target (or user prefs)
 	// FIXME: default override with user prefs from userdb
-	const local_default_value = inventory["local"].ui?.overview ?? {};
+	const local_default_value = inventory["local"].support?.ui?.overview ?? {};
 	console.log(`DEBUG: js_onload_update_fields: local_default_value ${local_default_value}`);
-	const target_ui_overview = inventory[targetid].ui?.overview ?? {};
+	const target_ui_overview = inventory[targetid].support?.ui?.overview ?? {};
 	console.log(`DEBUG: js_onload_update_fields: target_ui_overview ${target_ui_overview}`);
 	// merge dicts, targets's overriding local's
 	const target_ui = Object.assign({}, local_default_value, target_ui_overview);
@@ -1278,6 +1278,7 @@ function js_onload_update_overview(inventory) {
 		// get the value from thej inventory
 		let var_value = js_inventory_get_flat(inventory[targetid], var_name);
 		if (var_value == undefined) {
+		    console.log(`DEBUG: js_onload_update_fields: ${field} ${field_pretty} -> var ${var_name} not in inventory`)
 		    var_value = `${var_name}:not_in_inventory`;
 		    missing_fields = true;
 		}
