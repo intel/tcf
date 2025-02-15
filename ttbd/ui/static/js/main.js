@@ -5,6 +5,24 @@ var TERMINAL_BUFFER = {};
 var TERMINAL_INTERVALS = {};
 var TERMINAL_INTERVAL_REQUEST = {};
 
+
+
+/*
+ * Get a value from an inventory in flat mode
+ *
+ * @param {inventory} dict -> inventory where to pull from (inventory["SUTNAME"])
+ *          inventory is defined in the main page, is a nested dir keyed by string
+ * @param {key_flat} str -> string with a deep key, eg field1.field2.field3
+ *
+ * returns inventory[field1][field2][field3]
+ */
+function js_inventory_get_flat(inventory, key_flat) {
+    const key_parts = key_flat.split('.');
+    return key_parts.reduce((i, key) => i?.[key], inventory);
+}
+
+
+
 /*
 * releases target based on an allocation id
 *
@@ -908,20 +926,20 @@ async function terminal_send_keystroke(targetid, terminal, keystroke) {
 
 /**
  * Recursive function call to send keystrokes to the terminal.
- * 
+ *
  * This function reads the global variable `TERMINAL_BUFFER` to get the
  * keystrokes to send to the terminal. It will send the complete buffer
  * and then call itself again to send the next available buffer. If the buffer is
  * empty it will set the `sending` flag to false and return.
- * 
+ *
  * @param {div_id} str -> div id where the terminal is
  * @param {targetid} str -> target id from where you want to send the string to
  * @param {terminal} str -> name console you want to send the string to
- * 
+ *
  * @returns {void}
  */
 async function terminal_send_keystroke_buffer(div_id, targetid, terminal) {
-    
+
     if (TERMINAL_BUFFER[div_id].buffer.length == 0) {
         TERMINAL_BUFFER[div_id].sending = false;
         return;
@@ -1180,5 +1198,103 @@ function toggle_type_text_password(event, field_name) {
         field.type = 'text';
     } else {
         field.type = 'password';
+    }
+}
+
+
+/*
+ * Update the overview fields
+ *
+ * This is called from the targets.html field; at the end, a <script>
+ * block calls this function which takes from each target's inventory
+ * the section ui.overview fields as *KEY:VALUE*
+ *
+ * Each VALUE can be a template with %(FIELD)s which are extracted
+ * from the inventory; if the FIELD is a deep field (eg:
+ * field1.field2..) etc it is extracted from the subsets.
+ *
+ * If VALUE starts with "Some pretty name##", *Some pretty name* will
+ * be used as key.
+ *
+ * The KEYs and VALUEs are used to generate an overview table; the
+ * VALUE expanded with fields from the template.
+ *
+ * Eg:
+ *
+ *   support.ui.overview.field_k: "KVM for this##<a href = '%(kvm.location)s'>"
+ *
+ * Means the overview table will add a section with a header "KVM for
+ * this" with a hyperlink to whatever the inventory kvm.location field
+ * reports.
+ */
+function js_onload_update_overview(inventory) {
+    // get list of targets we need to worry about from inventory varialble
+    // get list of fields for the overview
+
+    // inventory is defined in the main page
+    for (const targetid in inventory) {
+	if (targetid == "loc2al")
+	    continue;
+
+	let tbody_el = document.getElementById(`label_id_overview_${targetid}`);
+
+	console.log(`DEBUG: js_onload_update_fields: checking targetid ${targetid}`)
+	// get the ui.overview inventory data for this machine,
+	// defaulting for the local target (or user prefs)
+	// FIXME: default override with user prefs from userdb
+	const local_default_value = inventory["local"].ui?.overview ?? {};
+	console.log(`DEBUG: js_onload_update_fields: local_default_value ${local_default_value}`)
+	const target_ui_overview = inventory[targetid].ui?.overview ?? local_default_value;
+	console.log(`DEBUG: js_onload_update_fields: target_ui_overview ${target_ui_overview}`)
+	//debugger;
+
+
+	for (let field in target_ui_overview) {
+	    // field
+	    console.log(`DEBUG: js_onload_update_fields: field ${field}`)
+	    let value = target_ui_overview[field]
+	    // value -> ##
+	    let field_pretty, template;
+	    if (value.includes('##')) {
+		// do a max of 2 fields...
+		[ field_pretty, template ] = value.split('##', 2);
+	    } else {
+		field_pretty = field;
+		template = value;
+	    }
+	    console.log(`DEBUG: js_onload_update_fields: ${field} (${field_pretty}) -> ${template}`)
+	    let expanded_template = template;
+	    // template is a string full of %(SOMETHING)s, extract them fields
+	    let match;
+	    // note the (), this is so we have a group for match[1]
+	    const field_regex = /%\(([_a-zA-Z0-9\.]+)\)s/g;
+	    while ((match = field_regex.exec(template)) !== null) {
+		let var_name = match[1]; 	// field[.subfield[.subfield]
+		console.log(`DEBUG: js_onload_update_fields: ${field} ${field_pretty} -> var ${var_name}`)
+		// get the value from thej inventory
+		let var_value = js_inventory_get_flat(inventory[targetid], var_name);
+		console.log(`DEBUG: js_onload_update_fields: ${field} ${field_pretty} -> var ${var_name} is ${var_value}`)
+		// now replace it in
+		expanded_template = expanded_template.replace(`%(${var_name})s`, var_value)
+		console.log(`DEBUG: js_onload_update_fields: ${field} ${field_pretty} -> var ${var_name} is ${var_value} -> ${expanded_template}`)
+	    }
+
+	    let tr_el = document.createElement('tr');
+
+	    let td_el = document.createElement('td');
+	    td_el.insertAdjacentHTML(		// FIXME: tooltip with the TC
+		'afterbegin',
+		`${field_pretty}:`);	// count, PASS/FAIL/ERRR/SKIP/BLCK
+	    tr_el.appendChild(td_el);
+
+	    td_el = document.createElement('td');
+	    td_el.insertAdjacentHTML(
+		'afterbegin',
+		`${expanded_template}`
+	    );
+	    tr_el.appendChild(td_el);
+
+	    tbody_el.appendChild(tr_el);
+	}
     }
 }
