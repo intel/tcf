@@ -2363,6 +2363,7 @@ RUN \
         return True
 
 
+
 class delay_til_shell_cmd_c(impl_c):
     """
     Delay until a shell commands returns an specific value
@@ -3272,6 +3273,10 @@ class buttons_released_pc(impl_c):
 def create_pc_from_spec(power_spec, **kwargs):
     # FIXME: this needs to be improved, it assumes raritan now and has
     # to be more generic (take as stanza the driver name, for example)
+    #
+    # Deprecated-by :func:`ttbl.power.factory`
+
+
     if isinstance(power_spec, str):
         pdu_hostname, pdu_port = power_spec.split(":", 1)
         if "pdu_password" not in kwargs:
@@ -3282,6 +3287,97 @@ def create_pc_from_spec(power_spec, **kwargs):
     if isinstance(power_spec, ttbl.power.impl_c):
         return power_spec
     raise RuntimeError(f"power_spec: unknown type {type(power_spec)}")
+
+
+
+def factory(device_spec: str, **kwargs):
+    """
+    :param str device_spec: *CLASSNAME://USER[:PASSWORD]@hostname:OUTLET*
+
+      - CLASSNAME: a class that supports the power interface, eg: ttbl.pc.dlwps7
+
+    :param dict kwargs: other args to the constructor
+
+    **Deprecates** :func:`ttbl.power.create_pc_from_spec`
+
+    FIXME:
+    - eventually we shall move all pc drivers to take
+      USER:PASSWORD@hostname:OUTLET as a common format?
+    - can we ping hostname to guesstimate its class?
+
+    """
+    if isinstance(device_spec, ttbl.power.impl_c):
+        return device_spec
+    assert isinstance(device_spec, str)
+
+    # We'd do
+    #
+    ## parsed = urllib.parse.urlparse(device_spec)
+    #
+    # but urrllib.parse gets thoroughly confused by a spec such as:
+    #
+    ## ttbl.pc.dlwpws://USERNAME:FILE:/etc/ttbd-production/filename@hostname:45
+    #
+    # with the password specification in files or keyrings, so we
+    # do it a wee by hand.
+    try:
+        classname, spec = device_spec.split("://", 1)
+
+        # spec: USERNAME:PASSWORD@HOSTNAME:34
+        username, password, hostname = \
+            commonl.split_user_pwd_hostname(spec, expand_password = False)
+        if not password:
+            # no password was specified, get it from the configured keyring
+            password = commonl.password_lookup(hostname)
+        hostname, outlet = hostname.split(":", 1)
+        port = int(outlet)
+    except Exception as e:
+        raise RuntimeError(
+            "can't parse as"
+            " *CLASSNAME://USER[:PASSWORD]@HOSTNAME:OUTLET* the spec"
+            f" {device_spec}; is it correct?") from e
+
+    # get the driver/class name; if it's a legacy name, translate
+    # it, so we get the full path and we can import the module
+    xlate = {
+        "dlwps7": "ttbl.pc.dlwps7",
+        "raritan_emx": "ttbl.raritan_emx.pci",
+        "raritan_px": "ttbl.raritan_px.pc",
+    }
+    _classname = xlate.get(classname, classname)
+    if '.' in _classname:
+        # ensure the module is imported
+        import importlib
+        # a.b.c.d -> a.b.c
+        modulename, classname_short = _classname.rsplit(".", 1)
+        module = importlib.import_module(modulename)
+    else:
+        import __main__
+        module = __main__
+        classname_short = classname
+    _class = getattr(module, classname_short)
+
+    # legacy classes, still not ported
+    if classname == "raritan_emx":
+        return ttbl.raritan_emx.pci(
+            f"https://{hostname}", outlet, password = password,
+            https_verify = False, **kwargs)
+
+    if classname == "dlwps7":
+        return ttbl.pc.dlwps7(
+            # FIXME: add https_verify
+            f"http://{username}:{password}@{hostname}/{outlet}", **kwargs)
+
+    if classname == "raritan_px":
+        return ttbl.raritan_px.pc(
+            f"{username}:{password}@{hostname}:{outlet}", **kwargs)
+
+    return _class(
+        hostname = hostname,
+        username = username,
+        password = password,
+        outlet = outlet,
+        **kwargs)
 
 
 
