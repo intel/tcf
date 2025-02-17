@@ -43,6 +43,7 @@ would generate a json file like::
 """
 
 
+import commonl
 from . import tc
 
 class driver(tc.report_driver_c):
@@ -69,7 +70,8 @@ class driver(tc.report_driver_c):
             if not doc:		# no data collected, shrug
                 return
             with open(testcase.report_file_prefix + "data.json", "w") as f:
-                tc.json.dump(doc, f, skipkeys = True, indent = 4)
+                tc.json.dump(doc, f, skipkeys = True, indent = 4,
+                             default = commonl.json_serialize)
             del self.docs[hashid]
             return
 

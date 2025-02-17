@@ -209,6 +209,30 @@ class fork_function_c(multiprocessing.Process):
         return None
 
 
+
+def json_serialize(o):
+    """
+    Cheap and dirty JSON serialize helper for types JSON can't encode
+
+    Usage:
+
+    >>> json.dump(something, sys.stdout, default = commonl.json_serialize)
+
+
+    :param o: object
+
+    :returns: same object, but in a format JSON can serialize; for now it just converts:
+      - sets to lists
+      - bytes to strings
+    """
+    if isinstance(o, set):
+        return list(o)
+    elif isinstance(o, bytes):
+        return str(o)
+    return o
+
+
+
 def processes_guess(factor: int):
     """Very simple parallelization count adjuster
 
