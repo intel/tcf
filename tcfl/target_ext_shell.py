@@ -407,6 +407,29 @@ class shell(tc.target_extension_c):
             "TCF-%s:[^>]+>" % self.target.kws['tc_hash'])
         self.run('set prompt=TCF-%s:%%PROMPT%%' % self.target.kws['tc_hash'],
                  console = console)
+        target.testcase.expect_global_append(
+            # add a detector for a shell error, make sure to name it
+            # after the target and console it will monitor so it
+            # doesn't override other targets/consoles we might be
+            # touching in parallel
+            target.console.text(
+                ## 'dit' is not recognized as an internal or external command,
+                ## operable program or batch file.
+                re.compile(
+                    "("
+                    # command not found
+                    "is not recognized as an internal or external command"
+                    # dir of a bad directory
+                    "|The filename, directory name, or volume label syntax is incorrect"
+                    ")"
+                ),
+                name = "%s:%s: shell error" % (target.want_name, console),
+                console = console, timeout = 0, poll_period = 1,
+                raise_on_found = tc.error_e("error detected in shell")),
+            # if we have already added detectors for this, that's
+            # fine, ignore them
+            skip_duplicate = True
+        )
         # I do not know of any way to trap general shell error
         # commands in Windows that can be used to print a message that
         # then raises an exception (see :meth:setup)
