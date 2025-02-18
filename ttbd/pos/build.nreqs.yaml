@@ -1,0 +1,8 @@
+#
+# Install with::
+#
+#   $ tcf.git/nreqs.py install base.nreqs.yaml
+#
+
+setuptools:
+  distro: python3-setuptools

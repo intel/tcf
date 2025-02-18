@@ -15,3 +15,6 @@ sphinx_rtd_theme:
 
 pyusb:
   dnf: python3-pyusb
+
+setuptools:
+  distro: python3-setuptools
