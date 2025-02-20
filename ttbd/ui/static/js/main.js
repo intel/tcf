@@ -655,10 +655,10 @@ async function js_images_upload_from_file(targetid, image_type) {
  *
  * @return {void}
  */
-function toggle(id) {
+function toggle(id, display = "block") {
     let inv  = document.getElementById(id);
     if (inv.style.display === "none") {
-        inv.style.display = "block";
+        inv.style.display = display;
         return;
     }
     inv.style.display = "none";

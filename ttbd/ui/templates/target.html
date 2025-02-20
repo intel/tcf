@@ -69,117 +69,139 @@
 
 <div class='main'>
 <div class='column-main tile'>
-<h2>{{targetid}}</h2>
-<div class='subsection' id='loading'></div>
+
 
 <div class='toolbox'>
-    <div class='subsection'>
-        <h3> control panel</h3>
-    </div>
-    <div class='subsection'>
+  <!-- place the target's name on the div edge -->
 
-    {% if not state.acquired %}
-      <div class = "tooltip">
-        <button class='primary' onclick='acquire(["{{targetid}}"])'>acquire</button>
-        <span class = "tooltiptext">
-          Allocate this target so you can use it.
-          <p>
-            Any operation on the target requires it being acquired by
-            you; you can later add guests in the allocations menu.
-          </p>
-          <p>
-            On the command line, you can use:
-            <pre><code class="language-bash">$ tcf acquire {{ targetid }} </code></pre>
-          </p>
-        </span>
+
+    <div style = "display: flex; justify-content: space-between; align-items: flex-start;">
+
+      <div style = "text-align: left;">
+        <span style="font-size: 24px;"><b>{{targetid}}</b> control panel</span>
+        <div class='subsection' id='loading'></div>
+      </div>
+      <div style = "display: flex; flex-direction: row;">
       </div>
 
-    {% elif state.user_is_guest %}
-      <div class = "tooltip">
-        <button class='warning' onclick='js_alloc_guest_remove("{{state.alloc}}", null)'>remove myself as a guest</button>
-        <span class = "tooltiptext">
-          You ({{ state.user }}) are a <b>guest</b> in this
-          target's allocation.
-          <p>
-            You can remove yourself as a guest but you cannot release
-            the target from the allocation; that can only be done by
-            its owner ({{ state.owner }}), creator ({{ state.creator
-            }}) or an admin.
-          </p>
-          <p>
-            On the command line, you can use:
-            <pre><code class="language-bash">$ tcf guest-rm {{ state.alloc }} {{ state.user }}</code></pre>
-          </p>
-        </span>
-      </div>
+      <!-- div for buttons -->
+      <div style = "display: flex; flex-direction: row;">
 
-    {% else %}
-      <div class = "tooltip">
-       <button class='warning' onclick='js_alloc_remove("{{state.alloc}}")'>release</button>
-        <span class = "tooltiptext">
-          Release this target from its allocation.
-
-          <p><mark>THIS OPERATION CANNOT BE UNDONE.</mark></p>
-          <p>
-              Neither you nor guests will no longer have access to the
-              target and they might be powered off or reinitialized by
-              someone else that allocates them.
-          </p>
-          <p>
-              You can do this because you are either an administrator,
-              the owner or the creator of the allocation.
-          </p>
-          <p>
-            On the command line, you can use:
-            <pre><code class="language-bash">$ tcf release {{ targetid }} </code></pre>
-          </p>
-        </span>
-      </div>
-    {% endif %}
-
-      <div class = "tooltip">
+        <div class = "tooltip" style = "display: flex">
           <button id='get_inventory' onclick='show_inventory()'>get inventory</button>
           <span class = "tooltiptext">
             Display the target's inventory information
             <p>On the command line, you can use:<pre><code class="language-bash">$ tcf get {{ targetid}}
 $ tcf ls -vv {{ targetid}}</code> </pre></p>
           </span>
-      </div>
+        </div>
 
-      {# Adding button to automatically add the user as a guest to the
-         allocation. This option is only available to admins.
+        {# add now buttons for acquire / release / add as guest #}
 
-         If the target is not allocated both user_is_admin and user_is_guest
-         are None so it will not show the button.
+        {% if not state.acquired %}
 
-         Also if user is already guest, no need to display this button.
+        <div class = "tooltip" style = "display: flex">
+          <button class='primary' onclick='acquire(["{{targetid}}"])'>acquire</button>
+          <span class = "tooltiptext">
+            Allocate this target so you can use it.
+            <p>
+              Any operation on the target requires it being acquired
+              by you; you can later add guests in the allocations
+              menu.
+            </p>
+            <p>
+              On the command line, you can use:
+              <pre><code class="language-bash">$ tcf acquire {{ targetid }} </code></pre>
+            </p>
+          </span>
+        </div>
 
-         And finally lets make sure we are not the owner of the system.
-      #}
-      {% if state.user_is_admin == True and state.user_is_guest == False and state.user != state.owner %}
-          <div class = "tooltip">
-            <button class='secondary'
-                    onclick='js_alloc_guest_add_sync("{{state.alloc}}","{{state.user}}")'>
-                add myself as a guest
-           </button>
-            <span class = "tooltiptext">
-              Add yourself as a guest to this allocation.
-              <p>
-                You can do this because you are an <mark>admin</mark>
-              </p>
-              <p>
-                On the command line, you can use:
-                <pre><code class="language-bash">$ tcf guest-add {{ state.alloc }} {{ state.user }} </code></pre>
-              </p>
-            </span>
-          </div>
-      {% endif %}
-    </div>
-    <hr>
+        {% elif state.user_is_guest %}
+
+        <div class = "tooltip" style = "display: flex">
+          <button class='warning' onclick='js_alloc_guest_remove("{{state.alloc}}", null)'>remove myself as a guest</button>
+          <span class = "tooltiptext">
+            You ({{ state.user }}) are a <b>guest</b> in this
+            target's allocation.
+            <p>
+              You can remove yourself as a guest but you cannot release
+              the target from the allocation; that can only be done by its
+              owner ({{ state.owner }}), creator ({{ state.creator }}) or
+              an admin.
+            </p>
+            <p>
+              On the command line, you can use:
+              <pre><code class="language-bash">$ tcf guest-rm {{ state.alloc }} {{ state.user }}</code></pre>
+            </p>
+          </span>
+        </div>
+
+        {% else %}
+
+        <div class = "tooltip" style = "display: flex">
+          <button class='warning' onclick='js_alloc_remove("{{state.alloc}}")'>release</button>
+          <span class = "tooltiptext">
+            Release this target from its allocation.
+
+            <p><mark>THIS OPERATION CANNOT BE UNDONE.</mark></p>
+            <p>
+              Neither you nor guests will no longer have access to the
+              target and they might be powered off or reinitialized by
+              someone else that allocates them.
+            </p>
+            <p>
+              You can do this because you are either an administrator,
+              the owner or the creator of the allocation.
+            </p>
+            <p>
+              On the command line, you can use:
+              <pre><code class="language-bash">$ tcf release {{ targetid }} </code></pre>
+            </p>
+          </span>
+        </div>
+
+        {% endif %}
+
+        {# Adding button to automatically add the user as a guest to the
+           allocation. This option is only available to admins.
+
+           If the target is not allocated both user_is_admin and
+           user_is_guest are None so it will not show the button.
+
+           Also if user is already guest, no need to display this button.
+
+           And finally lets make sure we are not the owner of the system.
+        #}
+
+        {% if state.user_is_admin == True and state.user_is_guest == False and state.user != state.owner %}
+
+        <div class = "tooltip" style = "display: flex">
+          <button class='secondary'
+                  onclick='js_alloc_guest_add_sync("{{state.alloc}}","{{state.user}}")'>
+            add myself as a guest
+          </button>
+          <span class = "tooltiptext">
+            Add yourself as a guest to this allocation.
+            <p>
+              You can do this because you are an <mark>admin</mark>
+            </p>
+            <p>
+              On the command line, you can use:
+              <pre><code class="language-bash">$ tcf guest-add {{ state.alloc }} {{ state.user }} </code></pre>
+            </p>
+          </span>
+        </div>
+
+        {% endif %}
+
+      </div>	   <!-- overview control panel buttons -->
+    </div>         <!-- overview control panel -->
+
+
     {% if state.acquired %}
 
     {% include 'widget-target-power.html' %}
-    <hr>
+
     {% include 'widget-target-button.html' %}
 
         <div class='subsection'>
