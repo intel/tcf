@@ -1,0 +1,149 @@
+<!-- this is the start of file ui/widget-target-power.html -->
+
+<div class = 'subsection'>
+
+  <div class = "tooltip">
+    <button onclick = 'power("{{ targetid }}", "on", "all")'>
+      power on
+    </button>
+    <span class = "tooltiptext">
+      Power on all the components in the power rail
+
+      <p>All the components in the power rail are powered on in order
+        (expand the <i>components</i> section to the right to see the
+        power rail).</p>
+
+      <p>On the command line, you can use:
+        <pre><code class = "language-bash">$ tcf power-on {{targetid }}</code></pre></p>
+    </span>
+  </div>
+
+  <div class = "tooltip">
+    <button onclick = 'power("{{ targetid }}", "off", "all")'>
+      power off
+    </button>
+    <span class = "tooltiptext">
+      Power off all the components in the power rail
+
+      <p>All the components in the power rail are powered off in
+        reverse order (expand the <i>components</i> section to the
+        right to see the power rail).</p>
+
+      <p>On the command line, you can use:
+        <pre><code class = "language-bash">$ tcf power-off {{targetid }}</code></pre></p>
+    </span>
+  </div>
+
+  <div class = "tooltip">
+    <button onclick = 'power("{{ targetid }}", "cycle", "all")'>
+      power cycle
+    </button>
+    <span class = "tooltiptext">
+      Power cycle all the components in the power rail
+
+      <p>All the components in the power rail are powered off in
+        reverse order and then powered on (expand
+        the <i>components</i> section to the right to see the power
+        rail).</p>
+
+      <p>On the command line, you can use:
+        <pre><code class = "language-bash">$ tcf power-cycle {{targetid }}</code></pre></p>
+
+    </span>
+  </div>
+
+  <button class = 'minor' onclick = "toggle('power-ls', 'flex')">components <i class = "arrow down"></i></button>
+</div>
+
+
+<!-- we need to ensure things are aligned to the left-->
+<div class = 'subsection' id = 'power-ls'
+     style = "display: flex; justify-content: flex-start;">
+
+    <table id = 't-powerls' class = 'row-border hover'
+           style = "width: auto; border-collapse: collapse;">
+
+      <thead>
+        <tr>
+          <th>component</th>
+          <th>
+            state
+            <button id = 'reload-button' onclick = 'power_state_update_for_all_components("{{targetid}}");'><span class = reload>&#x21bb;</button>
+          </th>
+          <th>&nbsp;</th>
+        </tr>
+      </thead>
+
+      <tbody>
+        {% if powerls|length != 0 %}
+        <script>
+          /* let us update the power state of the power rail when we load
+             the page for the first time */
+          power_state_update_for_all_components("{{targetid}}");
+        </script>
+        {% endif %}
+        {% for component, description in powerls.items() %}
+
+        <tr>
+
+          <td>
+            {# if no description, don't add a tootip to avoid
+            polluting the interface #}
+            {% if description %}
+            <div class = "tooltip">
+              {{ component }}
+              <span class = "tooltiptext">
+                {{ description }}
+              </span>
+            </div>
+            {% else %}
+            {{ component }}
+            {% endif %}
+          </td>
+
+          <td id = 'table-datacell-{{component}}-state' style = 'color: gray;'>
+            <!-- state will go here -->
+            pending...
+          </td>
+
+          <td>
+            {% if 'detected' in component %}
+            <!-- detector's state can't be changed, so don't
+                 show controls-->
+            {% else %}
+            <div class = 'flex'>
+              <button class = 'power-on-btn' onclick = 'power("{{ targetid }}", "on", "{{component}}")'>
+                on
+              </button>
+              <button class = 'power-off-btn' onclick = 'power("{{ targetid }}", "off", "{{component}}")'>
+                off
+              </button>
+              <button class = 'power-cycle-btn' onclick = 'power("{{ targetid }}", "cycle", "{{component}}")'>
+                cycle
+              </button>
+            </div>
+            {% endif %}
+          </td>
+
+        </tr>
+
+
+        {% endfor %}
+      </tbody>
+
+    </table>
+</div>
+
+<script>
+$(document).ready( function () {
+    $('#t-powerls').DataTable({
+        paging: false,
+        ordering: false,
+        info:   false,
+        searching:   false
+    });
+
+} );
+</script>
+
+<!-- this is the end of file ui/widget-target-power.html -->
