@@ -545,7 +545,10 @@ def _cmdline_console_write_interactive(target, console, crlf,
         windows = False
         windows_use_msvcrt = False
         quit_sequence = "ESC twice in rapid sequence"
-
+        # \x1b]0 escape sequence to set terminal title
+        # \a bell
+        print(f"\x1b]0;{target.id} console\a")
+        sys.stdout.flush()
 
     # Print a warning banner
     if not windows:
