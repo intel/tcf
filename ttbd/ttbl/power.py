@@ -3360,7 +3360,7 @@ def factory(device_spec: str, **kwargs):
     # legacy classes, still not ported
     if classname == "raritan_emx":
         return ttbl.raritan_emx.pci(
-            f"https://{username}:{hostname}", int(outlet), password = password,
+            f"https://{username}@{hostname}", int(outlet), password = password,
             https_verify = False, **kwargs)
 
     if classname == "dlwps7":
