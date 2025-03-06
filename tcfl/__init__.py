@@ -1239,6 +1239,8 @@ class server_c:
             self._cache_set_unlocked("url", self.url)
             self._cache_set_unlocked("ssl_verify", self.ssl_verify)
             self._cache_set_unlocked("origin", self.origin)
+            if self.herds:
+                self._cache_set_unlocked("herds", ":".join(self.herds))
             self._cache_set_unlocked("ca_path", self.ca_path)
             val = self._cache_get_unlocked("last_success", None)
             if val == None:
@@ -1383,6 +1385,11 @@ class server_c:
             self._record_failure()
             return self.url, None, \
                 f"{self.url}/ttb: expected a dictionary, got {type(j)}"
+
+        # What herds does this server consider itself a member of?
+        ## HERD1[:HERD2[:...]]
+        self.herds.update(r.json().get('herd', "").split(":"))
+
         # note it is legal for a server to report no herds if it
         # working alone.
         herds = r.json().get('herds', {})
@@ -1742,13 +1749,16 @@ class server_c:
                     # append that then it was cached, so kinda like add that
                     origin = f"cached @{cls.cache_dir}, " + origin
 
+                herds = fsdb.get(aka + ".herds", "").split(":")
+
                 if url in cls.servers:
                     log_sd.debug(
                         f"ignoring already loaded cached server AKA {aka}"
                         f" [{cls.servers[url].origin}]")
                     continue
                 cls.servers[url] = cls(url, ssl_verify = ssl_verify, aka = aka,
-                                       origin = origin, ca_path = ca_path)
+                                       origin = origin, ca_path = ca_path,
+                                       herds = herds)
             except ValueError as e:
                 log_sd.debug(f"{key}: wiping invalid cache entry ({e})")
                 fsdb.set(aka, None)

@@ -137,13 +137,15 @@ def _cmdline_servers(cli_args: argparse.Namespace):
         table = []
         for server_url, server in servers.items():
             table.append([
-                server.aka, server.url, usernames[server_url]
+                server.aka,
+                server.url, usernames[server_url]
             ])
         print(tabulate.tabulate(table, headers = headers))
     elif verbosity == 1:	# add origin
         import tabulate		# lazy import, only when needed
         headers = [
             "Server",
+            "Herd",
             "URL",
             "UserID",
             "Origin"
@@ -151,7 +153,8 @@ def _cmdline_servers(cli_args: argparse.Namespace):
         table = []
         for server_url, server in servers.items():
             table.append([
-                server.aka, server.url, usernames[server_url], server.origin
+                server.aka, "\n".join(server.herds),
+                server.url, usernames[server_url], server.origin
             ])
         print(tabulate.tabulate(table, headers = headers))
     elif verbosity == 2:	# key/value
@@ -159,6 +162,7 @@ def _cmdline_servers(cli_args: argparse.Namespace):
         for server_url, server in servers.items():
             d[server.aka] = dict(
                 url = server.url,
+                herds = ":".join(server.herds),
                 username = usernames[server_url],
                 origin = server.origin
             )
@@ -168,6 +172,7 @@ def _cmdline_servers(cli_args: argparse.Namespace):
         for server_url, server in servers.items():
             d[server.aka] = dict(
                 url = server.url,
+                herds = ":".join(server.herds),
                 username = usernames[server_url],
                 origin = server.origin
             )
