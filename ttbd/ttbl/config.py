@@ -25,6 +25,18 @@ _count = 0
 state_path = None
 upload_max_size = 16 * 1024 * 1024
 
+#: Herds this server is a member of
+#:
+
+#: Herds are groups of servers that work together and federate; a herd
+#: is a simple name (_a-zA-Z0-9). A server can be a member of more
+#: than one herd.
+#:
+#: If declared, this gets exposed in the local target as *herds*
+#: inventory in the form *HERD1[:HERD2[:HERD3[:...]]]*.
+herds = set()
+
+
 #: Enable (*True*) or disable SSL (*False* or *None*)
 ssl_enabled = None
 ssl_enabled_check_disregard = None

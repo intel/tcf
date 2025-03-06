@@ -66,3 +66,7 @@ target_local.interface_add(
     # specific code
     ttbl.console.interface()
 )
+
+if ttbl.config.herds:
+    commonl.assert_list_of_strings(ttbl.config.herds, "herds", "herd name")
+    target_local.property_set("herd", ":".join(ttbl.config.herds))
