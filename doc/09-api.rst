@@ -283,8 +283,6 @@ Driver / targe type specific metadata
 
 - *linux* (bool): True if this is a target that runs linux
 
-- *quark_se_stub* (bool): FIXME: DEPRECATED
-
 - *qemu_bios_image* (str): [QEMU driver] file name used for the
   target's BIOS (depending on configuration)
 
