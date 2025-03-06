@@ -1388,6 +1388,7 @@ class server_c:
 
         # What herds does this server consider itself a member of?
         ## HERD1[:HERD2[:...]]
+        herd = self.herds.update(r.json().get('herd', ""))
         self.herds.update(r.json().get('herd', "").split(":"))
 
         # note it is legal for a server to report no herds if it
@@ -1545,6 +1546,7 @@ class server_c:
 
     _seed_default = {}
 
+
     @classmethod
     def seed_add(cls, url, aka = None, port = 5000,
                  ssl_verify = False, ca_path = None,
@@ -1563,6 +1565,8 @@ class server_c:
             herd = herd, herds = herds,
             origin = origin if origin else commonl.origin_get(1)
         )
+
+
 
     #: Maximum time we consider a discovered server's data fresh
     #:
@@ -1749,9 +1753,16 @@ class server_c:
                     # append that then it was cached, so kinda like add that
                     origin = f"cached @{cls.cache_dir}, " + origin
 
-                herds = fsdb.get(aka + ".herds", "").split(":")
-
+                herds = set(fsdb.get(aka + ".herds", "").split(":"))
                 if url in cls.servers:
+                    if herds ^ cls.servers[url].herds:
+                        # the herds info we have discovered before for
+                        # this doesn't match what we have loaded, so
+                        # let's update it
+                        log_sd.info(
+                            f"updating herd membership {aka}"
+                            f" [{cls.servers[url].origin}]")
+                        cls.servers[url].herds.update(herds)
                     log_sd.debug(
                         f"ignoring already loaded cached server AKA {aka}"
                         f" [{cls.servers[url].origin}]")
@@ -2239,6 +2250,8 @@ class server_c:
                 # these are needed to later one be able to go from an
                 # rt straight to the server
                 rt['server'] = self.url
+                if self.herds:
+                    rt['herd'] = ":".join(self.herds)
                 rt['server_aka'] = self.aka
                 server_rts[fullid] = rt
                 server_rts_flat[fullid] = dict(rt)
