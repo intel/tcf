@@ -903,6 +903,11 @@ def _ttb_get():
         herds = target_local.to_dict([ "herds" ])
         if herds:
             d.update(herds)
+        # herd membership: what do I consider myself a member of?
+        ## HERD1[:HERD2[:...]]
+        herd = target_local.property_get("herd")
+        if herd:
+            d['herd'] = herd
     return d
 
 _admin_required = [
