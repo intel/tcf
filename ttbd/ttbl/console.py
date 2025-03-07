@@ -760,8 +760,12 @@ class interface(ttbl.tt_interface):
 
 def generation_set(target, console):
     target.fsdb.set("interfaces.console." + console + ".generation",
-                    # trunc the time and make it a string
-                    str(int(time.time())))
+                    # trunc the time and make it a string--keep ms
+                    # precission to avoid someone toggling
+                    # disable/enable in a rapid sequence not catching
+                    # it--since this comes generally via an HTTP call,
+                    # ms shall be enough
+                    str(int(time.time() * 1000)))
 
 
 class generic_c(impl_c):
