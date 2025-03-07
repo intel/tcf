@@ -200,6 +200,14 @@ class interface(ttbl.tt_interface):
         assert protocol in self.valid_protocols, \
             "unsupported protocol '%s' (must be " % protocol \
             + " ".join(self.valid_protocols) + ")"
+
+        # remove 4 from {udp,tcp,sctp}4. Why? because when we add to
+        # allowed_local_ports, we just add an entry for tcp, another
+        # one for tcp6 and good to go; otherwise we need to add also
+        # one for tcp4.
+        if protocol.endswith("4"):
+            protocol = protocol[:-1]
+
         # this format is also used down in get() # COMPAT
         tunnel_id = "%s__%s__%d" % (protocol, ip_addr.replace(".", "_"), port)
         return ( ip_addr, port, protocol, tunnel_id )
