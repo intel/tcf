@@ -2092,7 +2092,8 @@ class target_c(reporter_c):
     def expect(self, regex_or_str, timeout = None, console = None,
                name = None, raise_on_timeout = failed_e,
                previous_max = 4096,
-               origin = None, detect_context = "", report = None):
+               origin = None, detect_context = "", report = None,
+               progress_expectations: dict = None):
         """
         Wait for a particular regex/string to be received on a given
         console of this target before a given timeout.
@@ -2135,6 +2136,45 @@ class target_c(reporter_c):
           gets in the way. The output still will be captured in the
           report files.
 
+        :param dict progress_expectations: (optional, default none)
+          dictonary keyed by string (representing a valid python
+          identifier) of progress expectations (see
+          :class:`expectation_c`, parameter raise_on_found), used to
+          adjust overall timeout when they are found.
+
+          For example, to wait for *login:* for 200s, but then
+          when message such as:
+
+            usb usb2: New USB device found, idVendor=1d6b, idProduct=0003, bcdDevice= 6.09
+            pcieport 0000:00:07.0: PME: Signaling with IRQ 123
+            Started systemd-journald.service - Journal Service.
+
+          are printed we want to consider that as a show of progress
+          so we can wait for login one more second. Would be
+          accomplished as:
+
+          >>> target.expect(
+          >>>     "login:",
+          >>>     progress_expectations = {
+          >>>         # we see messages from the kernel? increase timeout
+          >>>         #
+          >>>         ## ACPI: bus type drm_connector registered
+          >>>         ## usb usb2: New USB device found, idVendor=1d6b, idProduct=0003, bcdDevice= 6.09
+          >>>         ## pcieport 0000:00:07.0: PME: Signaling with IRQ 123
+          >>>         "kernel_subsys": target.console.text(
+          >>>             re.compile(b"(pci|pcieport|usb|ACPI)( [:a-z0-9])?:", re.IGNORECASE),
+          >>>             raise_on_found = +1, timeout = 500),
+          >>>
+          >>>         # we see messages from systemd? increase timeout
+          >>>         #
+          >>>         ## Started systemd-journald.service - Journal Service.
+          >>>         "systemd_started_service": target.console.text(
+          >>>             re.compile(b"Started .*\.service"),
+          >>>             raise_on_found = +1, timeout = 500),
+          >>>     }, timeout = 200
+          >>> )
+
+
         :returns: dictionary with the match information:
 
           >>> target.send("hello")
@@ -2169,14 +2209,25 @@ class target_c(reporter_c):
 
         if origin == None:
             origin = commonl.origin_get(2)
+        if progress_expectations == None:
+            progress_expectations = {}
+
         return self.testcase.expect(
             self.console.text(
                 regex_or_str,
-                console = console, timeout = timeout, name = name,
+                console = console, name = name,
                 raise_on_timeout = raise_on_timeout,
                 previous_max = previous_max,
-                detect_context = detect_context, report = report),
+                detect_context = detect_context, report = report,
+                # Infinity? yeaah, we want this *specific*
+                # expectation to be governed by the overal timeout of
+                # the whole loop, this way it can be adjusted with
+                # progress_expectations
+                timeout = float('inf')),
             origin = origin, timeout = timeout,
+            # these are told apart by self.testcase.expect() because
+            # their raise_on_found is an integer!
+            **progress_expectations
         )
 
     def stub_app_add(self, bsp, _app, app_src, app_src_options = ""):
@@ -3887,9 +3938,12 @@ class expectation_c(object):
     - ...
 
     when what is being expected is found, :meth:`tcfl.tc.tc_c.expect`
-    can return data about it (implementation specific) can be
-    returned to the caller or exceptions can be raised (eg: if we see
-    an error), or if not found, timeout exceptions can be raised.
+    can return data about it (implementation specific) can be returned
+    to the caller or exceptions can be raised (eg: if we see an
+    error), or if not found, timeout exceptions can be raised. It can
+    also raise the general timeout (eg: if we find something we expect
+    to see that means progress is being made towards a general
+    expectation).
 
     See :meth:`tcfl.tc.tc_c.expect` for more details and
     :class:`target.console.text
@@ -3923,9 +3977,10 @@ class expectation_c(object):
       (**not an instance**) to throw when not found before the
       timeout; a subclass of :class:`tcfl.tc.exception`.
 
-    :param tcfl.tc.exception raise_on_found: an *instance* (**not a
-      type**) to throw when found; this is useful to implement errors,
-      such as *if I see this image in the screen, bail out*:
+    :param tcfl.tc.exception|float raise_on_found: an integer (see
+      below) or an *exception instance* (**not a type**) to throw when
+      found; this is useful to implement errors, such as *if I see
+      this image in the screen, bail out*:
 
       >>> self.expect("wait for boot",
       >>>             crash = target.capture.image_on_screenshot(
@@ -3946,6 +4001,15 @@ class expectation_c(object):
 
       The exception's attachments will be updated with the dictionary
       of data returned by the expectation's :meth:`detect`.
+
+      If this is a number, this means this is a *progress* expectation
+      and the number will be used to adjust the top level timeout when
+      this is found; this can be used to check things that mean
+      progress is being observerd and thus the timeout can be
+      incresed (or decreased!).
+
+      If zero (0) it means reset the timeout to as if we started right
+      now when the expectation was found.
 
     :param str origin: (optional) when reporting information about
       this expectation, what origin shall it list, eg:
@@ -3968,8 +4032,9 @@ class expectation_c(object):
             'expected subclass of tcfl.tc.exception, got %s' \
             % type(raise_on_timeout).__name__
         assert raise_on_found == None \
+            or isinstance(raise_on_found, numbers.Number) \
             or isinstance(raise_on_found, exception), \
-            'expected instance of tcfl.tc.exception, got %s' \
+            'expected None, number or instance of tcfl.tc.exception, got %s' \
             % type(raise_on_found).__name__
         assert poll_period > 0
         # FIXME: if too frequent, set some warning
@@ -6436,7 +6501,11 @@ class tc_c(reporter_c, metaclass=_tc_mc):
             raise AssertionError(
                 "an expectation named '%s' is already present" % exp.name)
         exps.append(exp)
-        if exp.timeout > 0:
+        # this is an expectation we require to happen unless
+        # - it has no timeout (it's a hook to catch conditions)
+        # - it is a progress expectation -> exp.raise_on_found is a
+        #   number to adjust the timeout by when found)
+        if not isinstance(exp.raise_on_found, numbers.Number) and exp.timeout > 0:
             expectations_required.add(exp)
         if exp.poll_period < poll_period[exp.poll_name]:
             self.report_info(
@@ -6716,9 +6785,10 @@ class tc_c(reporter_c, metaclass=_tc_mc):
 
         expectations_pending = list(exps)
 
+        timeout0 = timeout	# we might modify timeout, so keep the orig
         time_ts0 = time.time()
         time_ts = time_ts0
-        time_out = time_ts0 + timeout
+        time_out = time_ts0 + timeout	# timestamp at which we finish
         detect_ts = dict()
         if poll_period:
             min_poll_period = min(poll_period.values())
@@ -6819,20 +6889,78 @@ class tc_c(reporter_c, metaclass=_tc_mc):
                         with poll_state.lock:
                             r = exp.detect(self, run_name, poll_state.buffers,
                                            buffers[exp.name])
+
                         if r:
+                            # we found something expected
                             assert r == None or isinstance(r, dict), \
                                 "%s/%s: expect returned an unexpected" \
                                 " type '%s'; expected *None* or dictionary" \
                                 % (run_name, exp.name, r)
-                            # this is done
-                            results[exp.name] = r
-                            expectations_pending.remove(exp)
-                            if exp in expectations_required:
-                                expectations_required.remove(exp)
-                            with poll_state.lock:
-                                exp.on_found(run_name, poll_context,
-                                             poll_state.buffers, buffers,
-                                             ellapsed, timeout, r)
+
+                            if exp.raise_on_found == 0:
+                                # detector found something; but the
+                                # action on found (0) wants us to reset
+                                # the loop's timeout to as if we had
+                                # started detecting now
+                                timeout = timeout0 + ellapsed
+                                if timeout > exp.timeout:
+                                    reporter.report_info(
+                                        "{run_name}/{exp.name}: requests timeout reset"
+                                        " [capped by {exp.name}'s timeout {exp.timeout}]"
+                                        " ({timeout0} -> {timeout})",
+                                        dlevel = 3)
+                                    timeout = exp.timeout
+                                else:
+                                    reporter.report_info(
+                                        '{run_name}/{exp.name}: requests timeout reset'
+                                        ' ({timeout0} -> {timeout}',
+                                        dlevel = 3)
+                                time_out = time_ts0 + timeout
+
+                            elif isinstance(exp.raise_on_found, numbers.Number):
+                                # detector found something; but the
+                                # action on found (N < 0 or N > 0);
+                                # this wants us to cut/extend the
+                                # timeout by N seconds
+                                timeout += exp.raise_on_found
+                                if timeout < 0:
+                                    raise tcfl.tc.blck_e(
+                                        f"BUG! {run_name}/{exp.name}: "
+                                        f"timeout adjustment {r} drops timeout"
+                                        f" below zero ({timeout0=}s; {timeout=}s)")
+                                if timeout > exp.timeout:
+                                    reporter.report_info(
+                                        f"{run_name}/{exp.name}:"
+                                        f" requests timeout delta {exp.raise_on_found}"
+                                        f" [capped by {exp.name}'s timeout {exp.timeout}]"
+                                        f" ({timeout0}s -> {timeout}s)",
+                                        dlevel = 3)
+                                    timeout = exp.timeout
+                                else:
+                                    reporter.report_info(
+                                        f'{run_name}/{exp.name}:'
+                                        f" requests timeout delta {exp.raise_on_found}"
+                                        f' ({timeout0}s -> {timeout}s)',
+                                        dlevel = 3)
+                                time_out = time_ts0 + timeout
+
+                            else:
+                                # Only if this is not a progress
+                                # expectation we consider it done and
+                                # clear it out from the list so we
+                                # don't keep detecting it
+                                results[exp.name] = r
+                                expectations_pending.remove(exp)
+                                if exp in expectations_required:
+                                    expectations_required.remove(exp)
+                                # we need to do something with this
+                                # that is not modifying the timeout,
+                                # so go for it
+                                with poll_state.lock:
+                                    exp.on_found(run_name, poll_context,
+                                                 poll_state.buffers, buffers,
+                                                 ellapsed, timeout, r)
+
                         if exp.timeout > 0 and ellapsed > exp.timeout:
                             # timeout for this specific expectation
                             with poll_state.lock:
@@ -7037,7 +7165,7 @@ class tc_c(reporter_c, metaclass=_tc_mc):
         assert isinstance(re_raise_exceptions, bool)
         assert hasattr(function, "func_dict") \
             and function.func_dict.get("threaded_decorator", False) == True, \
-            "%s: function has to be decorated with @tcfl.tc.tc_c.threaded"
+            f"{function}: function has to be decorated with @tcfl.tc.tc_c.threaded"
 
         if targets == None:
             targets = self.target_group.targets.keys()

@@ -754,7 +754,8 @@ class shell(tc.target_extension_c):
 
     def _run(self, cmd = None, expect = None, prompt_regex = None,
              output = False, output_filter_crlf = True, trim = False,
-             console = None, origin = None):
+             console = None, origin = None,
+             progress_expectations: dict = None):
         if cmd:
             assert isinstance(cmd, str)
         assert expect == None \
@@ -775,6 +776,9 @@ class shell(tc.target_extension_c):
 
         if output:
             offset = self.target.console.size(console = console)
+
+        if progress_expectations == None:
+            progress_expectations = {}
 
         # the protocol needs UTF-8 anyway
         cmd = commonl.str_cast_maybe(cmd)
@@ -806,6 +810,7 @@ class shell(tc.target_extension_c):
                     testcase.expect(
                         testcase.tls.echo_waiter,
                         **self._fixups,
+                        **progress_expectations
                     )
                     if testcase.tls.echo_cmd_leftover == None:
                         break
@@ -826,19 +831,23 @@ class shell(tc.target_extension_c):
                     assert isinstance(expectation, str) \
                         or isinstance(expectation, typing.Pattern)
                     r = target.expect(expectation, name = "command output",
-                                      console = console, origin = origin)
+                                      console = console, origin = origin,
+                                      progress_expectations = progress_expectations)
             else:
                 r = target.expect(expect, name = "command output",
-                                  console = console, origin = origin)
+                                  console = console, origin = origin,
+                                  progress_expectations = progress_expectations)
         else:
             r = None
 
         if prompt_regex == None:
             self.target.expect(self.prompt_regex, name = "shell prompt",
-                               console = console, origin = origin)
+                               console = console, origin = origin,
+                               progress_expectations = progress_expectations)
         else:
             self.target.expect(prompt_regex, name = "shell prompt",
-                               console = console, origin = origin)
+                               console = console, origin = origin,
+                               progress_expectations = progress_expectations)
         if not output:
             return r
 
@@ -868,7 +877,8 @@ class shell(tc.target_extension_c):
 
     def run(self, cmd = None, expect = None, prompt_regex = None,
             output = False, output_filter_crlf = True, timeout = None,
-            trim = False, console = None):
+            trim = False, console = None,
+            progress_expectations: dict = None):
         """Runs *some command* as a shell command and wait for the shell
         prompt to show up.
 
@@ -925,6 +935,12 @@ class shell(tc.target_extension_c):
           or something as:
 
           >>> "somefilename:43"
+
+        :param dict progress_expectations: (optional, default none)
+          dictonary keyed by string representing a valid python
+          identifier of progress expectations (see
+          :class:`expectation_c`, parameter raise_on_found), used to
+          adjust overall timeout.
 
         :returns str:
 
@@ -984,7 +1000,8 @@ class shell(tc.target_extension_c):
                 cmd = cmd, expect = expect,
                 prompt_regex = prompt_regex,
                 output = output, output_filter_crlf = output_filter_crlf,
-                trim = trim, console = console)
+                trim = trim, console = console,
+                progress_expectations = progress_expectations)
         finally:
             if timeout:
                 testcase.tls.expect_timeout = original_timeout

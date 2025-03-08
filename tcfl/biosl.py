@@ -91,6 +91,37 @@ values that are inherit to the BIOS:
       bios.main_level_entries.9: Tls Auth Configuration
 
 
+- *bios.progress.NAME*: entries that describe messages to look for
+  when the BIOS is booting that indicate progress is being made and
+  increase the timeout to find *bios.boot_prompt*:
+
+  - *bios.progress.NAME.pattern*: Python pattern to look for in the
+    console output.
+
+    For example "." would match 'any output', so anything printed
+    would increase the timeout.g
+
+  - *bios.progress.NAME.timeout_delta*: optional (default +10), float
+    *to adjust *bios.boot_timeout*:
+
+     - N > 0: add X seconds to timeout
+     - N < 0: remove X seconds from timeout
+     - N == 0: reset timeout count to start now
+
+  - *bios.progress.NAME.timeout*: optional (default infinity) maximum
+    timeout to cap the global timeout increase caused by this progress
+    expectation.
+
+  - *bios.progress.NAME.description*: (optional) an optional description
+
+  These can be set via the command line::
+
+    $ tcf property-set TARGETNAME bios.progress.prg1.patten "progress code"
+    $ tcf property-set TARGETNAME bios.progress.prg1.timeout_delta f3.2
+
+    $ tcf property-set TARGETNAME bios.progress.prg2.patten "loading [a-z]"
+    $ tcf property-set TARGETNAME bios.progress.prg2.timeout_delta f3.2
+
 - *bios.boot_entry_EFI_SHELL* Python regular expression string;
   defaults to *EFI .* Shell*): name of the boot entry that boots the
   EFI shell in the boot menu.
@@ -1253,17 +1284,85 @@ def bios_boot_expect(target):
         target.report_info("BIOS: not waiting for boot prompt"
                            " (declared empty in bios.boot_prompt)")
         return
+
+    # collect progess expectations from bios.progress; see
+    # documentation in :mod:`tcfl.biosl` for entries
+    progress_expectations = {}
+    for progress_index, progress_data in target.kws.get("bios.progress", {}).items():
+
+        pattern = progress_data.get("pattern", None)
+        if pattern == None:
+            target.report_blck(
+                f"inventory bios.progress.{progress_index} is"
+                " missing *pattern*; skipping")
+            continue
+        if not pattern:	# empty pattern, thjis would match it all
+            target.report_blck(
+                f"bios_boot_expect: inventory bios.progress.{progress_index}"
+                f" uses an empty *pattern*; skipping")
+            continue
+        target.report_info(
+            f"bios_boot_expect: inventory bios.progress.{progress_index}.pattern:"
+            f" using regex '{pattern}'", dlevel = 1)
+
+        if "timeout_delta" in progress_data:
+            timeout_delta = progress_data["timeout_delta"]
+            try:
+                timeout_delta = float(timeout_delta)
+            except ValueError:
+                target.report_blck(
+                    f"bios_boot_expect: inventory bios.progress.{progress_index}.timeout_delta:"
+                    f" expecting int or float; got '{timeout_delta}'; skipping")
+                continue
+            target.report_info(
+                f"bios_boot_expect: inventory bios.progress.{progress_index}.timeout_delta:"
+                f" using {timeout_delta}s", dlevel = 1)
+        else:
+            target.report_info(
+                f"bios_boot_expect: inventory bios.progress.{progress_index}.timeout_delta:"
+                f" using default 10 seconds", dlevel = 1)
+            timeout_delta = 10
+
+        if "timeout" in progress_data:
+            timeout = progress_data["timeout"]
+            try:
+                timeout = float(timeout)
+            except ValueError:
+                target.report_blck(
+                    f"bios_boot_expect: inventory bios.progress.{progress_index}.timeout:"
+                    f" expecting int or float; got '{timeout}'; skipping")
+                continue
+            target.report_info(
+                f"bios_boot_expect: inventory bios.progress.{progress_index}.timeout:"
+                f" using {timeout}s", dlevel = 1)
+        else:
+            target.report_info(
+                f"bios_boot_expect: inventory bios.progress.{progress_index}.timeout:"
+                f" using default infinity seconds", dlevel = 1)
+            timeout = float('inf')
+
+        progress_expectations[progress_index] = target.console.text(
+            re.compile(pattern.encode()),
+            name = progress_index,
+            raise_on_found = timeout_delta,
+            timeout = timeout
+        )
+
+
     target.report_info("BIOS: waiting for main menu after power on"
                        f" (up to {bios_boot_time}s)")
     report_backlog = target.kws.get(
         "bios.boot_prompt_report_backlog", 500)
-    target.expect(re.compile(boot_prompt.encode('utf-8')),
-                  # this prints a lot, so when reporting, report
-                  # only the previous 500 or per spend so much
-                  # time reporting we miss the rest
-                  report = report_backlog,
-                  # can take a long time w/ some BIOSes
-                  timeout = bios_boot_time)
+    target.expect(
+        re.compile(boot_prompt.encode('utf-8')),
+        # this prints a lot, so when reporting, report
+        # only the previous 500 or per spend so much
+        # time reporting we miss the rest
+        report = report_backlog,
+        # can take a long time w/ some BIOSes
+        timeout = bios_boot_time,
+        progress_expectations = progress_expectations
+    )
     target.report_data("Boot statistics %(type)s", "BIOS boot time (s)",
                        time.time() - ts0)
 
