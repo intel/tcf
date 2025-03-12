@@ -503,7 +503,7 @@ def menu_scroll_to_entry(
     # wiggle the cursor so the loop will refresh whichever entry we
     # might be highlighted on -- note this is the opposite of what we
     # do in the loop
-    target.report_info(f"{name}: reverse scrolling")
+    target.report_info(f"{name}: reverse scrolling", dlevel = 1)
     scroll_updown(target, "up" if direction == "down" else "down")
     # WAIT for the scroll to settle; otherwise we'll break havoc on
     # the state machine since it'll half draw and confuse the expectation
@@ -700,7 +700,9 @@ def menu_dig_to(
     assert isinstance(level, str)
 
     if do_flush:
-        target.report_info(f"BIOS/menu_dig_to: flushing console {target.console.default}")
+        target.report_info(
+            f"BIOS/menu_dig_to: flushing console {target.console.default}",
+            dlevel = 2)
         target.console.send_expect_sync(target.console.default)
 
     cnt = 0
