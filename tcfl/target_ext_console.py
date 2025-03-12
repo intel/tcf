@@ -1423,7 +1423,7 @@ class extension(tc.target_extension_c):
                         f"console[{console}].wait_for[{reason}]: no new output"
                         f" ({read_offset0}->{read_offset})"
                         f" after {silenced_for:.2f}s (more than {silence_period:.2f}); done",
-                        level = 2)
+                        level = 3)
                     return
                 else:
                     target.report_info(
