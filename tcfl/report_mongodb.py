@@ -425,8 +425,27 @@ class driver(tcfl.tc.report_driver_c):
             try:
                 # We replace any existing reports for this _id -- if that
                 # is not to happen, provide a different runid...
+
+                # Note pymongo/mongo doesn't support certain types
+                # like sets, so we need to convert them to JSON
+                # Note this will not modify the original objects
+                def _convert_unsupported_types(doc):
+                    if isinstance(doc, set):	# set not supported -> list
+                        return list(doc)
+                    elif isinstance(doc, dict):	# recurse into dict
+                        return {
+                            k: _convert_unsupported_types(v)
+                            for k, v in doc.items()
+                        }
+                    elif isinstance(doc, list):	# recurse in to list
+                        return [ _convert_unsupported_types(i) for i in doc ]
+                    elif isinstance(doc, tuple):# recurse into tuple
+                        return [ _convert_unsupported_types(i) for i in doc ]
+                    return doc
+                doc_json = _convert_unsupported_types(doc)
+
                 self.results.find_one_and_replace({ '_id': doc['_id'] },
-                                                  doc, upsert = True)
+                                                  doc_json, upsert = True)
                 break
             except Exception as e:
                 # broad exception, could be almost anything, but we
