@@ -420,7 +420,7 @@ class driver(tcfl.tc.report_driver_c):
             
         retry_count = 1
         while retry_count <= 3:
-            if not self.results or self.made_in_pid != os.getpid():
+            if self.results == None or self.made_in_pid != os.getpid():
                 self._mongo_setup()
             try:
                 # We replace any existing reports for this _id -- if that
