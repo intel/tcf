@@ -160,11 +160,11 @@ if __name__ == "__main__":
         help = "URL to the test broker (multiple may be specified)")
     arg_parser.add_argument(
         "--servers-discover", action = "store_true", default = True,
-        help = "Do not discover servers, use only those given with --url")
+        help = "Force discovering more servers")
     arg_parser.add_argument(
         "--no-servers-discover", action = "store_false",
         dest = "servers_discover",
-        help = "Force discovering more servers")
+        help = "Do not discover servers, use only those given with --url")
     arg_parser.add_argument(
         "--servers-cache", action = "store_true", default = True,
         dest = "servers_cache",
