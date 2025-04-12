@@ -86,7 +86,8 @@ def ipxe_sanboot_url(target, sanboot_url, dhcp = None,
                      power_cycle: bool = True,
                      assume_in_main_menu: bool = None,
                      precommands: list = None,
-                     mac_addr: str = None):
+                     mac_addr: str = None,
+                     timeout: float = None):
     """Use iPXE to sanboot a given URL
 
     Given a target than can boot iPXE via a PXE boot entry (normally
@@ -254,7 +255,8 @@ def ipxe_sanboot_url(target, sanboot_url, dhcp = None,
         ##   [RXE: 268 x "The socket is not connected (http://ipxe.org/380f6093)"]
         #
         # thus we need to match the one that fits our mac address
-        ifstat = target.shell.run("ifstat", output = True, trim = True)
+        ifstat = target.shell.run("ifstat", output = True, trim = True,
+                                  timeout = timeout)
         regex = re.compile(
             "(?P<ifname>net[0-9]+): %s using" % mac_addr.lower(),
             re.MULTILINE)
@@ -280,13 +282,15 @@ def ipxe_sanboot_url(target, sanboot_url, dhcp = None,
         for disable_ifname in ifnames:
             target.shell.run(
                 f"ifclose {disable_ifname}"
-                "    # disable so we don't get incorrect routing")
+                "    # disable so we don't get incorrect routing",
+                timeout = timeout)
         # wait until we scan to install this
         target.testcase.expect_global_append(expecter_ipxe_error)
 
         if dhcp:
-            target.shell.run("dhcp " + ifname, re.compile("Configuring.*ok"))
-            target.shell.run("show %s/ip" % ifname)
+            target.shell.run("dhcp " + ifname, re.compile("Configuring.*ok"),
+                             timeout = timeout)
+            target.shell.run("show %s/ip" % ifname, timeout = timeout)
         else:
             # static is much faster and we know the IP address already
             # anyway; but then we don't have DNS as it is way more
@@ -304,13 +308,16 @@ def ipxe_sanboot_url(target, sanboot_url, dhcp = None,
             ipv4_addr = target.kws['interconnects'][boot_ic]['ipv4_addr']
             ipv4_prefix_len = target.kws['interconnects'][boot_ic]['ipv4_prefix_len']
 
-            target.shell.run("set %s/ip %s" % (ifname, ipv4_addr))
-            target.shell.run("set %s/netmask %s" % (ifname, commonl.ipv4_len_to_netmask_ascii(ipv4_prefix_len)))
-            target.shell.run("ifopen " + ifname)
+            target.shell.run("set %s/ip %s" % (ifname, ipv4_addr),
+                             timeout = timeout)
+            target.shell.run("set %s/netmask %s" % (ifname, commonl.ipv4_len_to_netmask_ascii(ipv4_prefix_len)),
+                             timeout = timeout)
+            target.shell.run("ifopen " + ifname,
+                             timeout = timeout)
 
         if precommands:
             for precommand in precommands:
-                target.shell.run(precommand)
+                target.shell.run(precommand, timeout = timeout)
 
         if sanboot_url == "skip":
             target.report_skip(
