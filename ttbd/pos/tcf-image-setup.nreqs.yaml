@@ -1,0 +1,61 @@
+btrfs-progs:
+  reason: tools for formatting BTRFS filesystems
+
+coreutils:
+  reason: miscellaneous basic Unix tools
+
+device-mapper:
+  reason: |
+    dmsetup tools to be able to load volumes in images with
+    logical volume mapper configurations
+
+diffutils:
+  reason: tools to compare changes
+
+e2fsprogs:
+  reason: tools for formatting EXT3/EXT4 filesystems
+
+grep:
+  reason: tool to find strings in text
+
+modutils:
+  reason: tools to load Linux kernel modules
+
+openssh:
+  reason: tool ssh-keygen to generate SSH host keys
+
+parted:
+  reason: tool to manipulate partition tables
+
+qemu:
+  reason: |
+    tool to launch virtual machines; qemu-img tool to
+    generate/manipulate QCOW2 hard disk virtual images; qemu-nbd tool
+    to mount QCOW2 hard disk virtual images.
+
+
+sed:
+  reason: tool to manipulate text
+
+squashfs-tools:
+  reason: tools to create SQUASHFS compressed filesystems
+
+sudo:
+  reason: tool to gain admin permissions to mount filesystems
+
+tar:
+  reason: tool to generate/extract .tar archives
+
+util-linux:
+  reason: lsblk tool to find information about block devices
+
+util-linux-core:
+  reason: |
+    losetup tool to manage loopbac devices, used to mount
+    filesystem images
+
+xfsprogs:
+  reason: tools to create XFS filesystems
+
+xz:
+  reason: tool to compress/decompress XZ format
