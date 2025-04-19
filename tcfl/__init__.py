@@ -1070,7 +1070,11 @@ class server_c:
         if herd:
             self.herds.add(herd)
         if herds:
-            self.herds.update(herds)
+            for herd in herds:
+                if herd:
+                    self.herds.add(herd)
+                else:
+                    logging.warning(f"{url}: ignoring empty herd from constructor")
         if origin:
             self.origin = origin
         else:
@@ -1394,6 +1398,11 @@ class server_c:
         # note it is legal for a server to report no herds if it
         # working alone.
         herds = r.json().get('herds', {})
+        for herd in list(herds):
+            if not herd:
+                logging.error(f"{self.url}: ignoring and removing empty"
+                              " herd from server response")
+                herds.remove(herd)
         if not isinstance(herds, dict):
             self._record_failure()
             return self, None, \
@@ -1456,7 +1465,12 @@ class server_c:
                             origin = f"discovered from {self.url}/ttb")
                         new_hosts[server.url] = server
                     else:				# new herd
-                        server.herds.add(herd_name)
+                        if herd_name:
+                            server.herds.add(herd_name)
+                        else:
+                            log_sd.error(
+                                f"{new_server_url}: ignoring empty herd"
+                                " from server's discovery")
                 except Exception as e:
                     log_sd.info(f"#{count}/{loops_max}:"
                                 f" {new_server_url} from {self.url}:"
@@ -1490,6 +1504,8 @@ class server_c:
         new_servers = {}
 
         # Parallelize discovery of each server FIXME: cap it?
+        log_sd.debug("discovering with %d threads",
+                     len(servers) + len(bad_servers))
         with concurrent.futures.ThreadPoolExecutor(
                 len(servers) + len(bad_servers)) as executor:
 
@@ -1755,6 +1771,11 @@ class server_c:
 
                 herds = set(fsdb.get(aka + ".herds", "").split(":"))
                 if url in cls.servers:
+                    for herd in list(herds):
+                        if not herd:
+                            log_sd.warning(f"{url} ignoring and cleaning"
+                                           " up empty herd from cache")
+                            herds.remove(herd)
                     if herds ^ cls.servers[url].herds:
                         # the herds info we have discovered before for
                         # this doesn't match what we have loaded, so
@@ -2250,8 +2271,18 @@ class server_c:
                 # these are needed to later one be able to go from an
                 # rt straight to the server
                 rt['server'] = self.url
-                if self.herds:
-                    rt['herd'] = ":".join(self.herds)
+                rt_herd = rt.get('herd', None)
+                if rt_herd:
+                    herds = set(rt['herd'].split(":"))
+                else:
+                    herds = set()
+                for herd in self.herds:
+                    if herd:
+                        herds.add(herd)
+                    else:
+                        logging.warning(
+                            f"{fullid} ignoring empty herd from server config")
+                rt['herd'] = ":".join(herds)
                 rt['server_aka'] = self.aka
                 server_rts[fullid] = rt
                 server_rts_flat[fullid] = dict(rt)
