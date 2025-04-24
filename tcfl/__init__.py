@@ -2352,7 +2352,12 @@ class server_c:
             else:
                 r = self.send_request("GET", "targets/",
                                       data = data, raw = True,
-                                      timeout = 30)
+                                      # shorter timeout; we usually
+                                      # use this for listing, so if a
+                                      # server is dead we don't want
+                                      # it to hold longer than 10s for
+                                      # interactivity
+                                      timeout = 10)
                 # When asking for multiple targets, we get
                 #
                 ## { TARGETID1: { FIELD: VALUE, ... }, TARGETID2: ... }
