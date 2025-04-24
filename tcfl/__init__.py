@@ -1297,6 +1297,17 @@ class server_c:
                 f" last success was {days:.0} days ago (more than {days_max:.1})")
             self._cache_wipe()
 
+
+
+    # when running _herds_get(), use this as a short cut of what URLs
+    # other threads have seen already and skip processing it;
+    # otherwise, since every server reports about every other server
+    # we end up doing a lot of duplicated work.
+    seen_hosts = set()
+    seen_hosts_lock = threading.Lock()
+
+
+
     def _herds_get(self, count, loops_max):
         """
         Query for a given server the /ttb URL, which provides
@@ -1450,6 +1461,23 @@ class server_c:
                         f" ['herds.{herd_name}.{host_hash}]:"
                         f" no 'url' field; ignoring")
                     continue
+
+                # Quick check--other threads seen this host? skip it
+                # then, to avoid doing a lot of duplicated unnecessary work
+                with self.seen_hosts_lock:
+                    if new_server_url in self.seen_hosts:
+                        log_sd.info(
+                            f"#{count}/{loops_max}: {self.url}/ttb:"
+                            f" skipping {new_server_url}: someone already saw it")
+                        continue
+                    # ok, we are it, take it and add it so none else
+                    # worries about it
+                    self.seen_hosts.add(new_server_url)
+
+                # now that we know none else had done it, do more
+                # processing work on it; we might have a small race
+                # condition, but that's ok because later we'll
+                # coalesce all the data and remove dups.
                 try:
                     # create a server_c object to return -- we create
                     # it here so if in the future we increase the
@@ -1870,13 +1898,20 @@ class server_c:
             return
 
         count = 0
+        seed_servers = dict(new_servers)
         for count in range(1, loops_max + 1):
             # start searching the seed servers, but then only search
             # the new servers found in the previous run
-            new_servers, new_server_count, bad_server_count = \
-                cls._discover_once(new_servers, bad_servers, count, loops_max)
 
-            if new_server_count == 0:
+            new_servers, new_server_count, bad_server_count = \
+                cls._discover_once(seed_servers, bad_servers, count, loops_max)
+
+            seed_servers = dict()
+            for server in new_servers:
+                if server not in cls.servers:
+                    seed_servers[server] = new_servers[server]
+
+            if not seed_servers or new_server_count == 0:
                 zero_strikes += 1
                 if zero_strikes >= zero_strikes_max:
                     log_sd.warning(
