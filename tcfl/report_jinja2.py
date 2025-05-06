@@ -488,6 +488,9 @@ class driver(tc.report_driver_c):
         kws['ts_end_h'] = time.ctime(_tc.ts_end)
         kws['duration_s'] = _tc.ts_end - _tc.ts_start
 
+        kws['pid'] = _tc.kws['pid']
+        kws['host_name'] = _tc.kws['host_name']
+
         for hook in self.hooks:		# call pre-rendeing hooks
             hook(self, _tc, kws)
 
