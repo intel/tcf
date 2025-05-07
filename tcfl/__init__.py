@@ -2517,7 +2517,7 @@ class tc_info_c:
         else:
             self.target_roles = {}
         self.tags = tags
-        self.driver_name =  driver_name
+        self.driver_name = driver_name
         self.result = result
         assert isinstance(output, str), \
             f"output: expected str, got '{type(output)}'"
@@ -2576,6 +2576,17 @@ class tc_info_c:
 
         # initialized by the orchestrator based on self._axes_randomizer
         self._axes_randomizer_impl = None
+
+    def equals(self, other):
+        # not very fond of operator overloading, tbf we only compare
+        # on the key definitionsof this TC
+        #
+        # FIXME: shall we compare also by the axes the testcase spins
+        # on? in theory is not possible to have two TCs with the same
+        # name, filepath and origin that spin on different axes
+        return self.name == other.name \
+            && self.file_path == other.file_path \
+            && self.origin == other.origin
 
 
     def __data_dump__(self):
