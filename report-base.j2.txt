@@ -116,7 +116,7 @@ Other details
 
 This ran in:
 
-  HOST {{ host_name }}
+  HOST {{ host_name }} [ IPs: {{ host_addrs }} ]
   PID {{ pid }}
 
 

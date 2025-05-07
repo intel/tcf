@@ -4517,6 +4517,13 @@ class tc_c(reporter_c, metaclass=_tc_mc):
         # use instead of getfqdn(), since it does a DNS lookup and can
         # slow things a lot
         self.kw_set('host_name', socket.gethostname())
+        try:
+            # this is hacky; we should be getting all the IPs
+            _, _, addrs = socket.gethostbyname_ex(self.kws['host_name'])
+            self.kw_set('host_addrs', ' '.join(addrs))
+        except Exception:
+            self.kw_set('host_addrs', 'n/a')
+
         self.kw_set('tc_name', self.name)
         # top level testcase name is that of the toplevel testcase,
         # with any subcases removed (anything after ##), so
