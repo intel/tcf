@@ -2585,8 +2585,8 @@ class tc_info_c:
         # on? in theory is not possible to have two TCs with the same
         # name, filepath and origin that spin on different axes
         return self.name == other.name \
-            && self.file_path == other.file_path \
-            && self.origin == other.origin
+            and self.file_path == other.file_path \
+            and self.origin == other.origin
 
 
     def __data_dump__(self):
