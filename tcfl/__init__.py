@@ -60,6 +60,12 @@ log_sd = logging.getLogger("server-discovery")
 #: initialized by tcfl.config.subsystem_setup()
 config_path = []
 
+
+# https://osv.dev/vulnerability/GHSA-93xj-8mrv-444m
+import httplib2
+httplib2.USE_WWW_AUTH_STRICT_PARSING = True
+
+
 class result_c:
     def __init__(self, passed = 0, errors = 0, failed = 0,
                  blocked = 0, skipped = 0):

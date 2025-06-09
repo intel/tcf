@@ -56,6 +56,12 @@ logger = logging.root.getChild("ttb")
 
 tls = threading.local()
 
+
+# https://osv.dev/vulnerability/GHSA-93xj-8mrv-444m
+import httplib2
+httplib2.USE_WWW_AUTH_STRICT_PARSING = True
+
+
 class test_target_e(Exception):
     """
     A base for all operations regarding test targets.
