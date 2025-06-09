@@ -1,4 +1,5 @@
-GitPython                # package: centos,fedora=python3-GitPython
+# >= 3.1.41 due to https://osv.dev/vulnerability/GHSA-2mqj-m65w-jghx
+GitPython>=3.1.41        # package: centos,fedora=python3-GitPython
 ansible-lint             # package: fedora=python3-ansible-lint ubuntu=ansible-lint
 gitlint                  # package: fedora,ubuntu=gitlint
 pygithub                 # package: fedora,ubuntu=python3-pygithub
