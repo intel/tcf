@@ -44,8 +44,8 @@ gvnc-tools:
     skip: true
 
 keyring:
-  apt: python3-keyring
-  dnf: python3-keyring
+  # >=0.10 https://osv.dev/vulnerability/GHSA-8867-vpm3-g98g
+  distro: python3-keyring
 
 make:
   skip_platform: win32

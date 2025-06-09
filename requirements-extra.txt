@@ -2,7 +2,8 @@
 # package: fedora,centos,rhel=rpm-build
 asciimatics
 junit_xml               # package: fedora=python3-junit_xml ubuntu=python3-junitxml
-keyring                 # package: fedora,ubuntu=python3-keyring
+# >=0.10 https://osv.dev/vulnerability/GHSA-8867-vpm3-g98g
+keyring>=0.10           # package: fedora,ubuntu=python3-keyring
 mariadb                 # package: fedora,centos=mariadb
 numpy                   # package: python3-numpy
 # Versions bumped due to https://github.com/intel/tcf/security/dependabot/2 CVE-2023-4863 

@@ -26,7 +26,8 @@ flask           # package: python3-flask
 flask-login     # package: python3-flask-login
 flask-principal # package: fedora,ubuntu=python3-flask-principal
 gunicorn        # package: python3-gunicorn
-keyring         # package: fedora,ubuntu=python3-keyring
+# >=0.10 https://osv.dev/vulnerability/GHSA-8867-vpm3-g98g
+keyring>=0.10   # package: fedora,ubuntu=python3-keyring
 netifaces       # package: python3-netifaces
 pexpect         # package: python3-pexpect
 ply             # package: python3-ply

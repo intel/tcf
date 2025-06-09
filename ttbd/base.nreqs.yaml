@@ -20,7 +20,11 @@ python3-flask:
 python3-flask-login:
 python3-flask-principal:
 python3-gunicorn:
-python3-keyring:
+
+keyring:
+  # >=0.10 https://osv.dev/vulnerability/GHSA-8867-vpm3-g98g
+  distro: python3-keyring
+
 python3-ldap:
 python3-netifaces:
 python3-pexpect:
