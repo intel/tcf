@@ -50,7 +50,9 @@ keyring:
 make:
   skip_platform: win32
 
-Jinja2: python3-jinja2
+Jinja2:
+  # # >=2.10.1 due to https://osv.dev/vulnerability/GHSA-462w-v97r-4m45
+  distro: python3-jinja2
 
 imutils:
 
