@@ -19,7 +19,7 @@
 #  $ podman run -v $HOME/.tcf:/home/work/.tcf:O tcf tcf ls
 #
 # don't use fedora-minimal or it'll start pruning things we need
-FROM registry.fedoraproject.org/fedora:34
+FROM registry.fedoraproject.org/fedora:34@sha256:c7398ad5453edb06975b9b2f8e1b52c4f93c437155f3356e4ecf6140b6c69921
 LABEL maintainer https://github.com/intel/tcf
 
 COPY . /home/work/tcf.git
