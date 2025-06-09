@@ -29,7 +29,9 @@ python3-ldap:
 python3-netifaces:
 python3-pexpect:
 python3-ply:
-python3-pymongo:
+pymongo:
+  # >=4.6.3 https://osv.dev/vulnerability/GHSA-m87m-mmvp-v9qm
+  distro: python3-pymongo:
   reason: used to build bridges to mongo Databases
 python3-pyOpenSSL:
 python3-pyroute2:

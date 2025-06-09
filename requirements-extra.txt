@@ -12,6 +12,7 @@ numpy>=1.22            # package: python3-numpy
 # Versions bumped due to https://github.com/intel/tcf/security/dependabot/2 CVE-2023-4863 
 opencv-python==4.8.1.78 # package: fedora,ubuntu=python3-opencv
 pylint                  # package: python3-pylint ubuntu=pylint
-pymongo                 # package: python3-pymongo
+>=4.6.3 https://osv.dev/vulnerability/GHSA-m87m-mmvp-v9qm
+pymongo>=4.6.3          # package: python3-pymongo
 sphinx                  # package: python3-sphinx
 sphinx_rtd_theme        # package: centos,fedora=python3-sphinx_rtd_theme ubuntu=python3-sphinx-rtd-theme

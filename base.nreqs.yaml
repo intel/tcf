@@ -61,6 +61,7 @@ ply: python3-ply
 pykwalify: python3-pykwalify
 
 pymongo:
+  #>=4.6.3 https://osv.dev/vulnerability/GHSA-m87m-mmvp-v9qm
   reason: used to report execution data to MongoDB databases
   distro: python3-pymongo
 
