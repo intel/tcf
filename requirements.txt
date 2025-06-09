@@ -7,7 +7,8 @@ argcomplete         # package: python3-argcomplete
 filelock	    # package: python3-filelock
 # Ubuntu 20.4 -- issue installing 3.x
 # >=2.10.1 due to https://osv.dev/vulnerability/GHSA-462w-v97r-4m45
-Jinja2>=2.10.1      # package: python3-jinja2
+# >=3.1.6 due to https://osv.dev/vulnerability/GHSA-cpwx-vrp4-4pq7
+Jinja2>=3.1.6       # package: python3-jinja2
 PyYAML              # package: centos,fedora,rhel=python3-pyyaml
 imutils
 markupsafe==2.0.1   # package: python3-markupsafe
