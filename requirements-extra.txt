@@ -7,7 +7,8 @@ keyring>=0.10           # package: fedora,ubuntu=python3-keyring
 mariadb                 # package: fedora,centos=mariadb
 # >=1.8.1 https://osv.dev/vulnerability/GHSA-2fc2-6r4j-p65h
 # >=1.19 https://osv.dev/vulnerability/GHSA-5545-2q6w-2gh6
-numpy>=1.19            # package: python3-numpy
+# >=1.22 https://osv.dev/vulnerability/GHSA-fpfv-jqm9-f5jm
+numpy>=1.22            # package: python3-numpy
 # Versions bumped due to https://github.com/intel/tcf/security/dependabot/2 CVE-2023-4863 
 opencv-python==4.8.1.78 # package: fedora,ubuntu=python3-opencv
 pylint                  # package: python3-pylint ubuntu=pylint
