@@ -40,7 +40,8 @@ pysnmp          # package: centos,fedora,rhel=python3-pysnmp ubuntu=python3-pysn
 python_ldap     # package: centos,fedora,rhel=python3-ldap
 pytz            # package: python3-pytz
 pyusb           # package: centos,fedora=python3-pyusb ubuntu=python3-usb
-requests        # package: python3-requests
+# >= 2.3.0 due to https://osv.dev/vulnerability/GHSA-652x-xj99-gmcc
+requests>=2.3.0 # package: python3-requests
 rpyc            # package: fedora=python3-rpyc
 setuptools      # package: python3-setuptools
 systemd-python  # package: python3-systemd

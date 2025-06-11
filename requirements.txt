@@ -25,7 +25,8 @@ python-Levenshtein-wheels; sys_platform == "win32"
 # make it a soft req in CentOS and RHEL, not available as RPM and can
 # be supplied with pip later on
 python-Levenshtein; sys_platform != "win32"  # package: python3-Levenshtein ubuntu=python3-levenshtein centos= rhel=
-requests            # package: python3-requests
+# >= 2.3.0 due to https://osv.dev/vulnerability/GHSA-652x-xj99-gmcc
+requests>=2.3.0     # package: python3-requests
 # make it a soft req in CentOS and RHEL, not available as RPM and can
 # be supplied with pip later on
 rpyc                # package: python3-rpyc centos= rhel=
