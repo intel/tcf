@@ -30,7 +30,8 @@ python-Levenshtein; sys_platform != "win32"  # package: python3-Levenshtein ubun
 requests>=2.32     # package: python3-requests
 # make it a soft req in CentOS and RHEL, not available as RPM and can
 # be supplied with pip later on
-rpyc                # package: python3-rpyc centos= rhel=
+# >= 6.0 due to https://osv.dev/vulnerability/PYSEC-2024-44
+rpyc>=6.0           # package: python3-rpyc centos= rhel=
 setuptools          # package: python3-setuptools
 tabulate            # package: python3-tabulate
 termcolor; sys_platform != "win32"           # package: python3-termcolor

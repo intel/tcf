@@ -43,7 +43,8 @@ pyusb           # package: centos,fedora=python3-pyusb ubuntu=python3-usb
 # >= 2.3.0 due to https://osv.dev/vulnerability/GHSA-652x-xj99-gmcc
 # >= 2.32 due to https://osv.dev/vulnerability/GHSA-9wx4-h78v-vm56
 requests>=2.32 # package: python3-requests
-rpyc            # package: fedora=python3-rpyc
+# >= 6.0 due to https://osv.dev/vulnerability/PYSEC-2024-44
+rpyc>=6.0       # package: fedora=python3-rpyc
 setuptools      # package: python3-setuptools
 systemd-python  # package: python3-systemd
 tornado         # package: python3-tornado

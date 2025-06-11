@@ -44,7 +44,10 @@ requests:
   # >= 2.32 due to https://osv.dev/vulnerability/GHSA-9wx4-h78v-vm56
   distro: python3-requests
 
-python3-rpyc:
+rpyc:
+  # >= 6.0 due to https://osv.dev/vulnerability/PYSEC-2024-44
+  distro: python3-rpyc
+
 python3-setuptools:
 python3-systemd:
 python3-tornado:

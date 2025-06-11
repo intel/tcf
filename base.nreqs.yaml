@@ -99,7 +99,9 @@ requests:
   # >= 2.32 due to https://osv.dev/vulnerability/GHSA-9wx4-h78v-vm56
   distro: python3-requests
 
-rpyc: python3-rpyc
+rpyc:
+  # >= 6.0 due to https://osv.dev/vulnerability/PYSEC-2024-44
+  distro: python3-rpyc
 
 rsync:
   skip_platform: win32
