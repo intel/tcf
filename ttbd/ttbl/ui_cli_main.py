@@ -1,0 +1,2186 @@
+#! /usr/bin/python3
+#
+# Copyright (c) 2017 Intel Corporation
+#
+# SPDX-License-Identifier: Apache-2.0
+#
+
+"""
+Test Target Broker Daemon
+
+.. admonition:: FIXME
+
+   How do we get the help screen auto-extracted?
+
+Authentication
+--------------
+
+FIXME: write up in progress
+
+"""
+
+# FIXME: diagnostics returning can be significant to load in memory; a
+# generator must be put in place; we must log to a temporary file and
+# then stream it see
+# https://blog.al4.co.nz/2016/01/streaming-json-with-flask/
+
+import base64
+import collections
+import contextlib
+import io
+import math
+import pickle
+import pytz
+import socket
+import traceback
+
+import datetime
+import errno
+import fnmatch
+import gzip
+import json
+import numbers
+import signal
+import threading
+import ttbl.user_control
+import os
+import multiprocessing
+import hashlib
+import ssl
+import werkzeug
+import werkzeug.exceptions
+import werkzeug.serving
+import flask
+# Change from flask 0.10 -> 0.11
+try:
+    import flask_login
+    import flask_principal
+except ImportError as e:
+    import flask.ext.login as flask_login
+    import flask.ext.principal as flask_principal
+import argparse
+import re
+import pprint
+import tempfile
+import time
+import commonl
+import requests
+import shutil
+import sys
+
+import urllib.parse
+import glob
+
+import ttbl
+import ttbl.config
+import ttbl.allocation
+import ttbl.power	# used by the maintenance thread
+import ttbl._install
+
+try:
+    import systemd.daemon
+    sd_notify = systemd.daemon
+    systemd_available = True
+except ImportError as e:
+    class fake_SystemdNotifier(object):
+        def notify(self, state):
+            pass
+    sd_notify = fake_SystemdNotifier()
+    systemd_available = False
+
+
+# I bet there is a better way to do this...but we need the symbol to
+# be in the logging module so that it is not included in the "function
+# that called this" by the logging's internals.
+# For debugging, levels are D2: 9, D3: 8, D4:7 ...
+import logging
+# FIXME: trick -- change function.f_code to match logging.root.critical.f_code
+# FIXME: log* functions not working right, no output printed. tf?
+setattr(logging, "logc", logging.root.critical)
+setattr(logging, "logx", logging.root.exception)
+setattr(logging, "loge", logging.root.error)
+setattr(logging, "logw", logging.root.warning)
+setattr(logging, "logi", logging.root.info)
+setattr(logging, "logd", logging.root.debug)
+setattr(logging, "logdl", logging.root.log)
+from logging import logc, loge, logx, logw, logi, logd, logdl
+
+app = flask.Flask(
+    __name__,
+    template_folder = commonl.ttbd_locate_helper(
+        'ui/templates', ttbl._install.share_path),
+    static_folder = commonl.ttbd_locate_helper(
+        'ui/static', ttbl._install.share_path),
+)
+# note down below we are going to modify app.jinja_loader.searchpath
+# so we can customize easily. Search for that...
+
+API_VERSION = 2
+API_PATH = "/ttb-v"
+API_PREFIX = API_PATH + str(API_VERSION) + "/"
+
+def flask_loge_abort(http_code, message, **kwargs):
+    loge(message, **kwargs)
+    response = flask.jsonify({ "_message": message })
+    response.status_code = http_code
+    raise werkzeug.exceptions.HTTPException(response = response)
+
+def flask_logw_abort(http_code, message, **kwargs):
+    logw(message, **kwargs)
+    response = flask.jsonify({ "_message": message })
+    response.status_code = http_code
+    raise werkzeug.exceptions.HTTPException(response = response)
+
+def flask_logi_abort(http_code, message, **kwargs):
+    logi(message, **kwargs)
+    response = flask.jsonify({ "_message": message })
+    response.status_code = http_code
+    raise werkzeug.exceptions.HTTPException(response = response)
+
+def flask_logd_abort(http_code, message, **kwargs):
+    logd(message, **kwargs)
+    response = flask.jsonify({ "_message": message })
+    response.status_code = http_code
+    raise werkzeug.exceptions.HTTPException(response = response)
+
+def flask_log_abort(l, http_code, message, **kwargs):
+    logdl(l, message, **kwargs)
+    response = flask.jsonify({ "_message": message })
+    response.status_code = http_code
+    raise werkzeug.exceptions.HTTPException(response = response)
+
+# FIXME: Can't figure out a way how to just handle all with this one,
+# so I need to link each
+#
+@app.errorhandler(400)
+@app.errorhandler(404)
+#@app.errorhandler(423)
+def _error_handler(error):
+    r = flask.make_response(flask.jsonify({ '_message': error.description }))
+    r.status_code = error.code
+    return r
+
+@app.errorhandler(413)
+def _file_larger_than_max_allowed(error):
+    message = {'_message': f'File larger than max size '
+               f'{ttbl.config.upload_max_size} allowed by server. Contact '
+               f'{ttbl.test_target.get("local").tags["support"]["owner"]} '
+               f'if a limit increase is needed'
+               }
+    r = flask.make_response(flask.jsonify(message))
+    r.status_code = error.code
+    return r
+
+@contextlib.contextmanager
+def log_to_str_too(logger, io):
+    """
+    Context manager to add a handler to a logger and then remove it upon exit
+
+    This is used to add a temporary string handler that makes a copy
+    of the logs generated by an operation in a target and then send it
+    as diagnostics with the HTML response to the client.
+    """
+
+    # logger.logger? Yup, we are passed a logadapter, we want to  the
+    # actual logger object to set handlers
+    lh = logging.StreamHandler(io)
+    try:
+        logger.logger.addHandler(lh)
+        yield
+    finally:
+        logger.logger.removeHandler(lh)
+
+def who_make(ticket = None, user = None):
+    # current user is going to be a ttbl.user_control.User object; the
+    # convention across this daemon (see
+    # ttbl.user_control.who_is_admin) is that we name owners of
+    # resources USERNAME[:TICKET].
+    #
+    # see ttbl.who_split()
+    if user == None:
+        user = flask_login.current_user
+    else:
+        assert isinstance(user, ttbl.user_control.User)
+    return ttbl.who_create(user.get_id(), ticket)
+
+def current_user_is_admin():
+    """
+    Evaluate if the current user, is an admin
+    """
+    user = flask_login.current_user
+    if user:
+        return user.is_admin()
+    return False
+
+
+class audit:
+    """
+    Record audit messages
+
+    These emit messages to one or more auditing mechanisms with a well
+    defined format (key/value based) for each.
+
+    It is used to easily record entry/exit points (with a context
+    manager), eg:
+
+    >>> with audit("some/action", calling_user = "john") as ar:
+    >>    #do some parsing
+    >>>   ar.kws['somevalue'] = somevar
+
+    would log::
+
+      some/action:ENTER calling_user=john somevalue=somevar
+      some/action:EXIT:SUCCESS calling_user=john somevalue=somevar
+
+    plus timestamps in UTC; if there was an exception it'd be
+    EXIT:EXCEPTION and the exception's type and repr.
+
+    Just calling:
+
+    >>> audit("some/action", calling_user = "john")
+
+    emits a record such as::
+
+      some/action:ENTER calling_user=john somevalue=somevar
+
+    (plust timestamp)
+
+    :param str message: main message to display; recommended short
+    :param str,ttbl.user_control.User calling_user: (optional) user
+      who is making the request
+    :param str,ttbl.test_target target: (optional) target on which the
+      request is being made
+    :param flask.request request: (optional) flask request object
+
+    :param **kws: any other key/value (recommended JSON encodeable)
+
+    """
+    def __init__(self, message,
+                 calling_user = None, target = None, request = None,
+                 **kws):
+        self.message = message
+        if isinstance(calling_user, ttbl.user_control.User):
+            self.calling_user = calling_user.get_id()
+        elif isinstance(calling_user, str):
+            self.calling_user = calling_user
+        elif isinstance(calling_user, flask_login.mixins.AnonymousUserMixin):
+            self.calling_user = "anonymous"
+        elif calling_user == None:
+            self.calling_user = None
+        else:
+            raise TypeError(f"calling_user: expected None, str or"
+                            f" ttbl.user_control.User; got {type(calling_user)}")
+        if isinstance(target, ttbl.test_target):
+            self.target = target.id
+        elif isinstance(target, str):
+            self.target = target
+        elif target != None:
+            raise TypeError(
+                f"target: expected None or ttbl.test_target; got {type(target)}")
+        else:
+            self.target = None
+        self.kws = kws
+        self.request = request
+
+    _auditors = {}
+    # note this will be per-process
+    _auditors_exceptions = collections.defaultdict()
+
+    @classmethod
+    def auditor_add(cls, auditor):
+        """
+        Add an auditor driver
+
+        Must match
+        >>> def _audit_logging(message, calling_user, target, **kws):
+        >>>     ...
+
+        and format them appropiately to whichever storage is to be used.
+        """
+        assert callable(auditor), \
+            f"auditor: expected callable, got {type(auditor)}"
+        cls._auditors[auditor] = commonl.origin_get(1)
+
+    #: Messages to not display
+    #:
+    #: key is the prefix of the string; value is the reason why we skip it
+    censored_messages = {
+        "console/read": "very frequent call, returns lots of data",
+        "console/write": "very frequent call, can take in lots of data",
+        "console/size": "very frequent call, no side effects",
+        "console/list": "very frequent call, no side effects",
+    }
+
+    def __call__(self,*args, **kwargs):
+        return self.record(*args, **kwargs)
+
+    def record(self, message,
+               calling_user = None, target = None, request = None, **kws):
+
+        # get a weird KeyError exception when calling this? it migth
+        # be that kws contains keys like the names of the arguments
+        # (eg: calling_user), that breaks havoc
+
+        # note this function is supposed to be almost static; always
+        # take the args except for full defaults--why? because it is
+        # ok to call this function as audit.record(ARGS); but if audit
+        # is used as a context manager, then we use the object to
+        # store the args and then __enter__/__exit__ call record().
+
+        for message_header in self.censored_messages:
+            if message.startswith(message_header):
+                return
+
+        if calling_user != None:
+            if isinstance(calling_user, str):
+                pass
+            elif isinstance(calling_user, ttbl.user_control.User):
+                user = user.get_id()
+            elif isinstance(calling_user, flask_login.mixins.AnonymousUserMixin):
+                self.calling_user = "anonymous"
+            else:
+                raise TypeError(f"calling_user: expected None, str or"
+                                f" ttbl.user_control.User; got {type(calling_user)}")
+        else:
+            calling_user = self.calling_user
+
+        if target:
+            if isinstance(target, ttbl.test_target):
+                target_id = target.id
+            elif isinstance(target, str):
+                target_id = target
+            else:
+                raise TypeError(f"target: expected None, str or"
+                                f" ttbl.test_target; got {type(target)}")
+        elif self.target:
+            target_id = self.target
+        else:
+            target_id = None
+
+        if request:
+
+            @commonl.lru_cache_disk(
+                os.path.realpath(
+                    os.path.join(
+                        # FIXME: ugh, we need a global for daemon
+                        # cache path, then this can be moved up
+                        # outside of here
+                        ttbl.test_target.state_path,
+                        "..", "cache", "socket_gethostbyaddr"
+                    )
+                ),
+                10 * 60,	# age these cached entries after 5min
+                512)
+            def _socket_gethostbyaddr_cached(*args, **kwargs):
+                return socket.gethostbyaddr(*args, **kwargs)
+
+            # try to resolve the name this came from -- why? because
+            # in a dynamic environment, IP addresses will change and
+            # the current name might tell us info on who did what vs
+            # just a dynamic IP who will be reassigned
+            try:
+                remote_name, _, _ = _socket_gethostbyaddr_cached(request.remote_addr)
+                remote_name += ":" + request.remote_addr
+            except socket.herror:
+                remote_name = request.remote_addr
+            kws['remote_addr'] = remote_name
+            # FIXME: how do we get the port?
+
+        # if we are reportin results, censor out things that are kinda
+        # useless and makes no sense to report and would add a lot of
+        # stuff we don't need
+        if 'result' in kws:
+            # reporting results, chop out some fields -- note we can't
+            # remove in the kws['result'] site, otherwise we might be
+            # modifying the caller's
+            if '_diagnostics' in kws['result']:
+                # make a copy, replace and modify
+                kws['result'] = dict(kws['result'])
+                del kws['result']['_diagnostics']
+
+        for auditor, origin in self._auditors.items():
+            try:
+                auditor(message, calling_user = calling_user,
+                        target = target_id, **kws)
+            except Exception as e:
+                # ugly hack: don't print the whole trace all the time?
+                if self._auditors_exceptions[auditor] < 2:
+                    logging.exception(
+                        f"AUDIT: BUG! driver {auditor}@{origin} raised: {e}")
+                    self._auditors_exceptions[auditor] += 1
+                else:
+                    logging.error(
+                        f"AUDIT: BUG! driver {auditor}@{origin} raised: {e}")
+
+
+    def __enter__(self):
+        self.ts0 = time.time()
+        self.ts0_dt = datetime.datetime.fromtimestamp(
+            self.ts0, pytz.timezone("UTC")).strftime('%y-%m-%d %H:%M:%S')
+        self.record(self.message + ":ENTER",
+                    calling_user = self.calling_user, target = self.target,
+                    ts_start = self.ts0_dt,
+                    request = self.request,
+                    **self.kws)
+        return self
+
+
+    def __exit__(self, ex_type, ex_value, tb):
+        ts = time.time()
+        ts_dt = datetime.datetime.fromtimestamp(
+            ts, pytz.timezone("UTC")).strftime('%y-%m-%d %H:%M:%S')
+        delta = math.trunc((ts - self.ts0) * 1000) / 1000
+        if ex_type:
+            self.record(
+                self.message + ":EXIT:EXCEPTION",
+                calling_user = self.calling_user, target = self.target,
+                ts_start = self.ts0_dt, ts_end = ts_dt, delta = delta,
+                request = self.request,
+                exception_type = ex_type.__name__,
+                exception = str(ex_value),
+                **self.kws)
+        else:
+            self.record(
+                self.message + ":EXIT:COMPLETED",
+                calling_user = self.calling_user, target = self.target,
+                ts_start = self.ts0_dt, ts_end = ts_dt, delta = delta,
+                request = self.request,
+                **self.kws)
+
+# HACK: allow the allocation module to access the audit module, see
+# ttbl.allocation.audit; proper fix is to move the audit layer to its
+# own module. pending
+ttbl.allocation.audit = audit
+
+
+#
+# Audit driver with the logging library
+#
+log_audit = logging.getLogger("audit")
+
+def _audit_logging(message, calling_user, target, **kws):
+    # in theory the logging library lets us journal data in the extra
+    # field, but then default driver doesn't print it ... so we just
+    # print a json record -- note this might get long
+    args = dict(message = message)
+    if calling_user:
+        args['calling_user'] = calling_user
+    if target:
+        args['target'] = target
+    if kws:
+        args.update(kws)
+    log_audit.error("AUDIT " + json.dumps(args))
+audit.auditor_add(_audit_logging)
+
+
+
+@app.route(API_PATH + "<int:version>/<path:any_route>",
+           methods = [ 'GET', 'POST', 'PUT', 'PATCH', 'DELETE' ])
+def _bad_version(version, any_route):
+    if version < API_VERSION:
+        action = "upgrade"
+    else:
+        action = "downgrade"
+    # FIXME: make this come only when ttb-vX -- catch ttb-v2 so we say
+    # bad path or bad method
+    return flask.abort(404,
+                       "your client is asking for protocol v%s to call %s;"
+                       " this server supports %d OR you specified the "
+                       "wrong path or method; please %s"
+                       % (version, any_route, API_VERSION, action))
+
+
+# add ui blueprint. If you are not familiar with blueprints brief explanation.
+# They are a way to organize views and functionality of an application. This
+# allows us to split the application into smaller, more manageable pieces,
+# which can be developed and tested separately. Each blueprint has its own set
+# of routes, templates, static files, which can be registered with the main
+# Flask application.
+#
+# more info:
+# https://flask.palletsprojects.com/en/2.2.x/blueprints/
+import ttbl.ui
+app.register_blueprint(ttbl.ui.bp)
+
+
+def _login(audit_record):
+    """
+    Given a User ID token and a password, go over all the
+    authentication mechanisms that we have defined and see who can
+    authenticate it.
+    """
+    while True:
+        username = ttbl.tt_interface.arg_get(
+            flask.request.form, 'username', str, True, None)
+        if username:
+            break
+        # backwards compat
+        username = ttbl.tt_interface.arg_get(
+            flask.request.form, 'email', str, True, None)
+        if username:
+            break
+        return flask.abort(404, "missing user ID 'username' field")
+
+    password = ttbl.tt_interface.arg_get(
+        flask.request.form, 'password', str, True, None)
+    user = flask_login.current_user
+    user_id = user.get_id()
+    audit_record.kws['user'] = user_id
+
+    if user == ttbl.who_daemon():
+        flask.abort(404, "user %s: not allowed (reserved)" % username)
+
+    logd("user %s: trying to authenticate with token '%s'", user_id, username)
+
+    if isinstance(user, ttbl.user_control.User) \
+       and user.get_id() == username \
+       and user.is_authenticated():
+        logi("user %s: authenticated, has a valid session" % user_id)
+        return flask.jsonify({
+            '_message': "user %s: authenticated with roles: %s" \
+            % (username, " ".join(user.role_list()))
+        })
+
+    # Go over all the configured authentication mechanisms and try to
+    # obtain roles that this combination of username/password allows us
+    # Each authenticator might plug us to LDAP, or to a local
+    # database...who knows
+    token_roles = set()
+    authenticator = "n/a"	# just for keeping pylint happy
+    for authenticator in ttbl.config._authenticators:
+        try:
+            logd("user %s: authenticating with %s", username, authenticator)
+            user_data = authenticator.login(
+                username, password,
+                remote_address = flask.request.remote_addr)
+            if isinstance(user_data, dict):
+                # New form
+                if 'roles' in user_data:
+                    _token_roles = user_data['roles']
+                    del user_data['roles']
+                else:
+                    _token_roles = set()
+            elif isinstance(user_data, (list, set)):	# COMPAT
+                _token_roles = user_data
+                user_data = {}
+            else:
+                loge("user %s: auth bug with %s: returned type '%s'; "
+                     "expected dict", username, authenticator, type(user_data))
+                continue
+            logi("user %s: authenticated with %s: roles: %s",
+                 username, authenticator, " ".join(_token_roles))
+            token_roles.update(_token_roles)
+            break
+        except ttbl.authenticator_c.invalid_credentials_e as e:
+            logi("user %s: invalid credentials from %s: %s",
+                 username, authenticator, e)
+            pass
+        except ttbl.authenticator_c.unknown_user_e as e:
+            logi("user %s: unknown user to '%s'", username, authenticator)
+            pass
+        except Exception as e:
+            logi("user %s: auth error with %s: %s", username, authenticator, e)
+            logx(e)
+            pass
+            # Try next authenticator
+
+    if not 'user' in token_roles:
+        message = "user %s: not allowed" % username
+        if token_roles:
+            message += " (no 'user' role; roles: %s)" % ",".join(token_roles)
+        _help = ""
+        local_target = ttbl.test_target.get('local')
+        if local_target:
+            support_auth_help = \
+                local_target.tags.get('support', dict()).get('auth_help', None)
+            support_owner = \
+                local_target.tags.get('support', dict()).get('owner', None)
+            if support_auth_help:
+                # login help is assumed to be more detailed
+                _help += " (login help: " + support_auth_help + ")"
+            elif support_owner:
+                # fall back to the server's owenr
+                _help += " (login help: " + support_owner + ")"
+            if _help == "":
+                _help += " (no login help configured by admin)"
+        message += _help
+        logging.info(message)
+        flask.abort(404, message)
+
+    # Now let's go ahead and make sure there is a user instance that
+    # Flask understands
+    if not user or not isinstance(user, ttbl.user_control.User):
+        user = ttbl.user_control.User(username)
+        flask_login.login_user(user, remember = True)
+        flask_principal.identity_changed.send(
+            flask.current_app._get_current_object(),
+            identity = flask_principal.Identity(user.get_id()))
+    for role in token_roles:
+        user.role_add(role)
+    # set now auth specific data on the user
+    for key, value in user_data.items():
+        assert isinstance(value, ( int, float, str, bool ) ), \
+            "BUG: authenticator '%s' returned user data of" \
+            " invalid type '%s'; only int, float, string, bool allowed" % (
+                authenticator, type(value))
+        user.fsdb.set("data." + key, value)
+    logi("user %s: authenticated with roles: %s",
+         username, " ".join(token_roles))
+    return flask.jsonify({
+        '_message': "user %s: authenticated with roles: %s" \
+        % (username, " ".join(token_roles))
+    })
+
+
+@app.route(API_PREFIX + 'login', methods = ['PUT'])
+def login():
+    with audit("login",
+               calling_user = flask_login.current_user._get_current_object(),
+               request = flask.request) as audit_record:
+        return _login(audit_record)
+
+
+@app.route(API_PREFIX + 'logout', methods = [ 'PUT' ])
+@flask_login.login_required
+def logout():
+    with audit("logout",
+               calling_user = flask_login.current_user._get_current_object(),
+               request = flask.request) as audit_record:
+        # FIXME: _user_delete() has to do the same as this, doing the
+        # logout_user() and the popping of IDs
+        flask_login.current_user.wipe()
+        flask_login.logout_user()
+        for key in ('identity.name', 'identity.auth_type'):
+            flask.session.pop(key, None)
+            flask_principal.identity_changed.send(
+                flask.current_app._get_current_object(),
+                identity = flask_principal.AnonymousIdentity())
+        return flask.jsonify({'_message': "Session closed"})
+
+@app.route(API_PREFIX + '/ui/login', methods = ['GET', 'POST'])
+def _login_ui():
+    if flask.request.method == 'POST':
+
+        # If the user tries to see a route when he is not logged in. He will
+        # be redirected to the login page.
+        # We store the route he was trying to visit in the session. Here we can
+        # get that route and once he logged in successfully redirect him back
+        # to it. So the workflow is not interrupted.
+        previous_route = None
+        if 'route' in flask.session:
+            previous_route = flask.session['route']
+
+        user = flask.request.form['username']
+        password = flask.request.form['password']
+        flask.session.clear()
+        flask.session['user'] = user
+        with audit(
+            "login",
+            calling_user = flask_login.current_user._get_current_object(),
+            request = flask.request
+        ) as audit_record:
+            try:
+                _ = _login(audit_record)
+            except werkzeug.exceptions.HTTPException as e:
+                # _login func will abort with exception if the user is not
+                # allowed or not found
+                return flask.render_template(
+                    'login.html',
+                    bad_login = True, # print msg in template for bad login
+                    servers_info = ttbl.ui.servers_info_get()
+                )
+
+        if previous_route:
+            return flask.redirect(previous_route)
+        return flask.redirect(API_PREFIX + '/ui')
+
+    return flask.render_template(
+        'login.html',
+        servers_info = ttbl.ui.servers_info_get()
+    )
+
+@app.route(API_PREFIX + '/ui/logout', methods = [ 'GET' ])
+def _logout_ui():
+    with audit("logout",
+               calling_user = flask_login.current_user._get_current_object(),
+               request = flask.request) as audit_record:
+        if hasattr(flask_login.current_user, "wipe"):
+            # if this is an anynymous user, we can't wipe it, because
+            # it doesn't know how to
+            flask_login.current_user.wipe()
+        flask_login.logout_user()
+        for key in ('identity.name', 'identity.auth_type'):
+            flask.session.pop(key, None)
+            flask_principal.identity_changed.send(
+                flask.current_app._get_current_object(),
+                identity = flask_principal.AnonymousIdentity())
+        flask.session.clear()
+        return flask.redirect(API_PREFIX + '/ui')
+
+
+@app.route(API_PREFIX + "validate_session", methods = ['GET'])
+@flask_login.login_required
+def validate_session():
+    return flask.jsonify({'status': "You have a valid session"})
+
+
+@app.route(API_PREFIX + 'users/', methods = [ 'GET' ])
+@app.route(API_PREFIX + 'users/<userid>', methods = [ 'GET' ])
+@flask_login.login_required
+def _users(userid = None):
+    # no need to audit: doesn't have side effects
+    r = dict()
+    calling_user = flask_login.current_user._get_current_object()
+    if userid == "self":
+        # this is used as a reflector, to know who are we logged in as
+        calling_id = calling_user.get_id()
+        userl = [ calling_id ]
+    elif calling_user.is_admin():
+        if userid == None:
+            userl = ttbl.user_control.known_user_list()
+        else:
+            userl = [ userid ]
+    else:
+        calling_id = calling_user.get_id()
+        if userid == None:
+            userl = [ calling_id ]
+        elif userid != calling_id:
+            flask_logi_abort(
+                403,
+                "user '%s' needs admin role to query"
+                " users other than themselves" % calling_user.userid)
+        else:
+            userl = [ calling_user.userid ]
+
+    for userid in userl:
+        try:
+            user = ttbl.user_control.User(userid, fail_if_new = True)
+            r[user.userid] = user.to_dict()
+        except ttbl.user_control.User.user_not_existant_e as e:
+            # when the caller was querying about an specific user,
+            # complain about if not found; otherwise just skip since
+            # it might mean a user that dropped/logged out since we
+            # called for the known_user_list()
+            if userid:
+                flask_logi_abort(404, "user '%s' does not exist" % userid)
+
+    return flask.jsonify(r)
+
+
+@app.route(API_PREFIX + 'users/', methods = [ 'DELETE' ])
+@app.route(API_PREFIX + 'users/<userid>', methods = [ 'DELETE' ])
+@flask_login.login_required
+def _user_delete(userid = None):
+    with audit("user/delete",
+               calling_user = flask_login.current_user._get_current_object(),
+               userid = userid,
+               request = flask.request) as audit_record:
+        if userid == None:	# remove current user
+            user = flask_login.current_user._get_current_object()
+        elif userid == flask_login.current_user.get_id():
+            # if specified and it is the current user, proceed
+            user = flask_login.current_user._get_current_object()
+        elif flask_login.current_user.is_admin():
+            # if it is admin, can remove any existing user ID
+            try:
+                user = ttbl.user_control.User(userid, fail_if_new = True)
+            except ttbl.user_control.User.user_not_existant_e as e:
+                flask_logi_abort(
+                    403, "user '%s' does not exist: %s" % (userid, e))
+        else:
+            flask_logi_abort(
+                403, "not enough privilege to remove user %s" % userid)
+        # FIXME: this has to do the same as logout()
+        user.wipe()
+        return flask.jsonify({'_message': "session closed"})
+
+
+@app.route(
+    API_PREFIX + 'users/<userid>/<any("drop","gain"):action>/<string:role>',
+    methods = [ 'PUT' ])
+@flask_login.login_required
+def _user_role(userid, action, role):
+    with audit("user_role",
+               calling_user = flask_login.current_user._get_current_object(),
+               action = action, userid = userid,
+               request = flask.request) as audit_record:
+        if userid == "self":
+            # if specified and it is the current user, proceed
+            user = flask_login.current_user._get_current_object()
+            userid = user.userid
+        elif userid == flask_login.current_user.get_id():
+            # if specified and it is the current user, proceed
+            user = flask_login.current_user._get_current_object()
+        elif flask_login.current_user.is_admin():
+            # if it is admin, can toggle roles for any existing user ID
+            try:
+                user = ttbl.user_control.User(userid, fail_if_new = True)
+            except ttbl.user_control.User.user_not_existant_e as e:
+                flask_logi_abort(
+                    403, "user '%s' does not exist: %s" % (userid, e))
+        else:
+            flask_logi_abort(
+                403, "not enough privilege to change roles for user %s" % userid)
+        if action == "drop":
+            if not user.role_present(role):
+                flask_logi_abort(
+                    403, "user '%s' has no access to role %s" % (userid, role))
+            user.role_drop(role)
+            r = { "_message": "user '%s' dropped role '%s'" % (userid, role) }
+        elif action == "gain":
+            if not user.role_present(role):
+                flask_logi_abort(
+                    403, "user '%s' has no access to role %s" % (userid, role))
+            user.role_gain(role)
+            r = { "_message": "user '%s' gained role '%s'" % (userid, role) }
+        else:
+            r = { "_message": "user '%s' role '%s' invalid action %s"
+                            % (userid, role, action) }
+        return flask.jsonify(r)
+
+
+
+@app.route(API_PREFIX + 'targets/', methods = ['GET'])
+@app.route(API_PREFIX + 'targets/<string:target_id>', methods = ['GET'])
+@flask_login.login_required
+def _targets_gets(target_id: str = None):
+    # no audit: no side effects and very frequent
+    args = flask.request.get_json(silent = True)	# passed as JSON body?
+    if args == None:
+        args = flask.request.form	# as form?
+    projections = ttbl.tt_interface.arg_get(
+        args, 'projections', list, True, list())
+    result = dict()
+    calling_user = flask_login.current_user._get_current_object()
+    if target_id != None:
+        targets = [ ttbl.test_target.get(target_id) ]
+    else:
+        targets = ttbl.test_target.known_targets()
+    d = None	# keep this out of for for scope, see after for
+    for target in targets:
+        if not target.check_user_allowed(calling_user):
+            continue
+        d = target.to_dict(projections)
+        if d:
+            # list it only if the projections yielded a non empty
+            # set of data
+            d['id'] = target.id
+            result[target.id] = d
+    if target_id and len(result) == 1:
+        # we asked for info about a SINGLE target and we found it, so
+        # we return only the info for that single target
+        #
+        ## { FIELD: VALUE, ... }
+        #
+        # vs the thing we'd return if we asked for all targets
+        #
+        ## { TARGETID1: { FIELD: VALUE, ... }, TARGETID2: ... }
+        result = d
+    # Compress if gzip is accepted encoding
+    if flask.request.accept_encodings['gzip']:
+        content = gzip.compress(json.dumps(result).encode('utf-8'))
+        response = flask.make_response(content)
+        response.headers['Content-length'] = len(content)
+        response.headers['Content-Encoding'] = 'gzip'
+        return response
+    else:
+        return flask.jsonify(result)
+
+
+
+@app.route('/ttb', methods = ['GET'])
+def _ttb_get():
+    # no audit: no side effects and very frequent
+    d = {
+        'protocol.major': API_VERSION,
+        'protocol.minor': 0, # TODO currently no value in source
+        'server.version': commonl.version_get(ttbl, 'ttbd'),
+    }
+    target_local = ttbl.test_target.get("local")
+    if target_local:
+        # if the configuration did create a local target,
+        # publish extra information about herds/servers
+        herds = target_local.to_dict([ "herds" ])
+        if herds:
+            d.update(herds)
+        # herd membership: what do I consider myself a member of?
+        ## HERD1[:HERD2[:...]]
+        herd = target_local.property_get("herd")
+        if herd:
+            d['herd'] = herd
+    return d
+
+_admin_required = [
+    'disabled',
+    'instrumentation',
+    'instrumentation.*',
+    'interfaces',
+    'interconnects',
+    'interconnects.*',
+    'pos_capable',
+    'pos_capable.*',
+    'pos_partsizes',
+    'pos_boot_*',
+    'fixture_*',
+    'fixture_*',
+    'support',
+    'support.*',
+    'versions',
+    'versions.*',
+]
+
+def _target_property_set_policy_check(target, props, user_is_admin):
+    for prop in props:
+        for check_prop in _admin_required:
+            if fnmatch.fnmatchcase(prop, check_prop) and not user_is_admin:
+                flask_logi_abort(
+                    403, "not enough privilege to change property %s" % prop)
+
+def _target_property_set(target, prop, value, user_is_admin, ticket):
+    if value != None \
+       and not isinstance(value, ( str, int, float, bool)):
+        flask_logi_abort(
+            400, "property %s: invalid data type %s;"
+            " only null/string/number/boolean allowed"
+            % (prop, type(value).__name__))
+    if user_is_admin:
+        target.property_set(prop, value)
+    else:
+        # A non-admin must own the target before setting anything
+        target.property_set_locked(who_make(ticket), prop, value)
+
+
+def _target_properties_flat_set(target, props, user_is_admin, ticket):
+    for prop, value in props:
+        if value != None \
+           and not isinstance(value, ( str, int, float, bool)):
+            flask_logi_abort(
+                400, "property %s: invalid data type %s;"
+                " only null/string/number/boolean allowed"
+                % (prop, type(value).__name__))
+    # FIXME: this needs to fix if the user is not an admin that the
+    # user is not overiding properties they should not
+    if user_is_admin:
+        target.properties_flat_set(props)
+    else:
+        # A non-admin must own the target before setting anything
+        target.properties_flat_set_locked(who_make(ticket), props)
+
+
+@app.route(API_PREFIX + 'targets/<string:target_id>',
+           methods = [ 'PATCH', 'PUT' ])
+@flask_login.login_required
+def _target_patch(target_id):
+    with audit("target/patch",
+               calling_user = flask_login.current_user._get_current_object(),
+               target = target_id,
+               request = flask.request) as audit_record:
+        calling_user = flask_login.current_user._get_current_object()
+        target = ttbl.test_target.get_for_user(target_id, calling_user)
+        if target == None:
+            flask.abort(404, "%s: unknown target" % target_id)
+        ticket = ttbl.tt_interface.arg_get(
+            flask.request.form, 'ticket', str, True, "")
+        user_is_admin = current_user_is_admin()
+        try:
+            # check policy setting first
+            _target_property_set_policy_check(
+                target, list(flask.request.form.keys()), user_is_admin)
+            data = flask.request.get_json()
+            if data:
+                if 'ticket' in data:
+                    if not ticket:
+                        ticket = data.pop('ticket', "")
+                    else:
+                        data.pop('ticket')
+                data_flat = commonl.dict_to_flat(data, add_dict = False)
+                # Set parameter via form parameters -- just the keys, it can be long
+                audit_record.kws['data_flat_keys'] = [ i[0] for i in data_flat ]
+                _target_property_set_policy_check(
+                    target, [ x[0] for x in data_flat ],
+                    user_is_admin)
+
+            # Set parameter via form parameters -- just the keys, --
+            # since it might not be many, we can do individual
+            audit_record.kws['form_keys'] = [ i for i in flask.request.form.keys() ]
+            for prop in list(flask.request.form.keys()):
+                # we pop 'ticket' because we don't want to allow it as a
+                # parameter, since we use it as a descriptor until we move away
+                # from it
+                if prop == 'ticket':
+                    continue
+                value = ttbl.tt_interface.arg_get(flask.request.form, prop, None)
+                _target_property_set(target, prop, value, user_is_admin, ticket)
+
+            if data:			# Set parameter via JSON data body
+                _target_properties_flat_set(target, data_flat,
+                                            user_is_admin, ticket)
+        except ttbl.test_target_e as e:
+            flask_logi_abort(400, "%s" % e, exc_info = True)
+        except Exception as e:
+            flask_logi_abort(400, "%s: %s" % (target_id, e), exc_info = True)
+        return flask.jsonify({ })
+
+
+@app.route(API_PREFIX + 'targets/<string:target_id>/active', methods = ['PUT'])
+@flask_login.login_required
+def _target_active(target_id):
+    """
+    If this target is owned by the caller, mark it as active
+    """
+    # no audit: very frequent and only side effect is keeping the target active
+    calling_user = flask_login.current_user._get_current_object()
+    target = ttbl.test_target.get_for_user(target_id, calling_user)
+    if target == None:
+        flask.abort(404, "%s: unknown target" % target_id)
+    ticket = ttbl.tt_interface.arg_get(
+        flask.request.form, 'ticket', str, True, "")
+    try:
+        if who_make(ticket) == target.owner_get():
+            # when this is the owner, this marks the target as active
+            target.timestamp()
+    except ttbl.test_target_e as e:
+        flask_logi_abort(400, "%s" % e, exc_info = True)
+    except Exception as e:
+        flask_logi_abort(400, "%s: %s" % (target_id, e), exc_info = True)
+    return flask.jsonify(dict())
+
+
+@app.route(API_PREFIX + 'targets/<string:target_id>/release', methods = ['PUT'])
+@flask_login.login_required
+def _target_release(target_id):
+    with audit("target/release",
+               calling_user = flask_login.current_user._get_current_object(),
+               request = flask.request,
+               target_id = target_id) as ao:
+        calling_user = flask_login.current_user._get_current_object()
+        target = ttbl.test_target.get_for_user(target_id, calling_user)
+        if target == None:
+            flask.abort(404, "%s: unknown target" % target_id)
+        force = ttbl.tt_interface.arg_get(
+            flask.request.form, 'force', bool, True, False)
+        ticket = ttbl.tt_interface.arg_get(
+            flask.request.form, 'ticket', str, True, "")
+        try:
+            who = who_make(ticket)
+            if force and not current_user_is_admin():
+                # FIXME: this won't be needed later on
+                raise ttbl.test_target_not_admin_e(target)
+            target.release(flask_login.current_user._get_current_object(), force,
+                           ticket = ticket)
+        except ttbl.test_target_e as e:
+            flask_logi_abort(400, "%s" % e, exc_info = True)
+        except Exception as e:
+            flask_logi_abort(400, "%s: %s" % (target_id, e), exc_info = True)
+        return flask.jsonify(dict())
+
+
+@app.route(API_PREFIX + 'allocation', methods = [ 'PUT' ])
+@flask_login.login_required
+def _put_allocation():
+    # {
+    #    "obo": USERNAME,
+    #    "priority": int(PRIO),
+    #    "guests": [ "guest1", "guest2"... ]
+    #    "preempt": bool(PREEMPT),
+    #    "queue": bool(QUEUE),
+    #    "reason": string,
+    #    "groups": {
+    #        "group1" : [ target1, target2, target3 ... ],
+    #        "group2" : [ target3, target4, target1 ... ],
+    #        "group3" : [ target1, target2, target5, target6 ... ],
+    #    },
+    #    "endtime": "static",
+    #    "endtime": None,
+    #    "endtime": "YYYYmmddHHMMSS",
+    # }
+    #
+    # return {
+    #    "state": { 'busy', 'queued', 'allocated', 'rejected' },
+    #    "allocid": ID,    # if queued; derived from OWNER's cookie
+    #    "message": {
+    #      "not allowed on TARGETNAMEs",	# when rejected
+    #      "targets TARGETNAMEs are busy",	# when not queued
+    #    }
+    # }
+
+    data = flask.request.get_json()
+    if data == None:
+        # get from form encoding
+        data = dict()
+        for key in flask.request.form.keys():
+            data[key] = ttbl.tt_interface.arg_get(flask.request.form,
+                                                          key, None)
+    assert isinstance(data, dict), \
+        "need a dictionary of data parameters to make a request;" \
+        " got %s (%s)" % (data, type(data))
+
+    obo_user = data.get('obo', None)
+    if obo_user == None:
+        obo_user = flask_login.current_user.get_id()
+    guests = data.get('guests', list())
+    priority = data.get('priority', None)
+    preempt = data.get('preempt', False)
+    queue = data.get('queue', False)
+    reason = data.get('reason', None)
+    extra_data = data.get('extra_data', None)
+    endtime = data.get('endtime', None)
+
+    with audit(
+            "allocation/create",
+            calling_user = flask_login.current_user.get_id(),
+            obo_user = obo_user,
+            guests = guests,
+            priority = priority,
+            preempt = preempt,
+            queue = queue,
+            reason = reason,
+            groups = data['groups'],
+            extra_data = extra_data,
+            endtime = endtime,
+            request = flask.request) as ao:
+        try:
+
+            result = ttbl.allocation.request(
+                data['groups'],
+                calling_user = flask_login.current_user._get_current_object(),
+                obo_user = obo_user,
+                guests = guests,
+                priority = priority,
+                preempt = preempt,
+                queue = queue,
+                reason = reason,
+                extra_data = extra_data,
+                endtime = endtime,
+            )
+            if 'allocid' in result:
+                ao.kws['allocid'] = result['allocid']
+            ao.kws['result'] = result
+        except Exception as e:
+            flask_logi_abort(400, "%s" % e, exc_info = True)
+        return flask.jsonify(result)
+
+
+@app.route(API_PREFIX + 'allocation/<string:allocid>',
+           methods = [ 'GET' ])
+@flask_login.login_required
+def _get_allocation(allocid):
+    with audit("allocation/get",
+               calling_user = flask_login.current_user._get_current_object(),
+               request = flask.request,
+               allocid = allocid) as ao:
+        try:
+            result = ttbl.allocation.get(
+                allocid,
+                flask_login.current_user._get_current_object())
+            # don't add ao.kws['result'] = result, no need
+        except Exception as e:
+            flask_logi_abort(400, "%s" % e, exc_info = True)
+        return flask.jsonify(result)
+
+
+@app.route(API_PREFIX + 'allocation/',
+           methods = [ 'GET' ])
+@flask_login.login_required
+def _query_allocation():
+    with audit("allocation/query",
+               calling_user = flask_login.current_user._get_current_object(),
+               request = flask.request) as ao:
+        try:
+            result = ttbl.allocation.query(
+                flask_login.current_user._get_current_object())
+        except Exception as e:
+            flask_logi_abort(400, "%s" % e, exc_info = True)
+        return flask.jsonify(result)
+
+
+@app.route(API_PREFIX + 'allocation/<string:allocid>',
+           methods = [ 'DELETE' ])
+@flask_login.login_required	# release the allocation
+def _delete_allocation(allocid):
+    with audit("allocation/delete",
+               calling_user = flask_login.current_user._get_current_object(),
+               request = flask.request,
+               allocid = allocid) as ao:
+        try:
+            result = ttbl.allocation.delete(
+                allocid,
+                flask_login.current_user._get_current_object())
+        except Exception as e:
+            flask_logi_abort(400, "%s" % e, exc_info = True)
+        return flask.jsonify(result)
+
+
+# v2 changed the return format to be a dictionary per allocid (which
+# allows for easier future expansion if needed) containing the new
+# state and the allocated group (if any)
+@app.route(API_PREFIX + 'keepalive-v<int:version>', methods = [ 'PUT' ])
+# first versiont: returns a string w/ state per allocid that changed state
+@app.route(API_PREFIX + 'keepalive', methods = [ 'PUT' ])
+@flask_login.login_required
+def _put_keepalive(version = 1):
+    if version > 2:
+        return flask.abort(
+            404, f"keepalive: unsupported method version v{version}")
+
+    # {
+    #     'pressure': N,
+    #     'ALLOCID1': 'KNOWNSTATE1',
+    #     'ALLOCID2': 'KNOWNSTATE2',
+    #     ....
+    #     'ALLOCIDn': 'KNOWNSTATEn',
+    # }
+    #
+    # Return only ALLOCIDs that changed state
+    #
+    # {
+    #     ...
+    #     'ALLOCID1': { 'state': 'NEWSTATE1' },
+    #     'ALLOCID2': { 'state': 'NEWSTATE2', 'message' : '...this happened' },
+    #     ....
+    # }
+    #
+    with audit("allocation/keepalive",
+               calling_user = flask_login.current_user._get_current_object(),
+               request = flask.request) as ao:
+        try:
+            data = flask.request.get_json()
+            if data == None:
+                # get from from encoding
+                data = dict()
+                for key in flask.request.form.keys():
+                    #logging.error("DEBUG args key %s value %s", key, value)
+                    data[key] = ttbl.tt_interface.arg_get(flask.request.form,
+                                                          key, None)
+            assert isinstance(data, dict), \
+                "need a dictionary of data parameters to make a request;" \
+                " got %s (%s)" % (data, type(data))
+            if 'pressure' in data:
+                pressure = json.loads(data.pop('pressure'))
+                assert isinstance(pressure, numbers.Integral), \
+                    "pressure needs to be an number" # FIXME: range?
+            else:
+                pressure = 0
+            result = dict()
+            # FIXME: parallelize
+            ao.kws['args'] = data
+            for allocid, expected_state in data.items():
+                r = ttbl.allocation.keepalive(
+                    allocid, expected_state, pressure,
+                    flask_login.current_user._get_current_object())
+                if r['state'] == expected_state:
+                    continue		# nothing to return
+                if version == 2:
+                    # for v2 we return data in a dictionary, so we
+                    # can expand it more easily. We also add the group
+                    # that was allocated
+                    result[allocid] = dict(
+                        state = r['state'],
+                        group_allocated_name = r['group_allocated']
+                    )
+                else:
+                    result[allocid] = { "state": r['state'] }
+            ao.kws['result'] = result
+        except Exception as e:
+            flask_logi_abort(400, "%s" % e, exc_info = True)
+        return flask.jsonify(dict(result))
+
+
+@app.route(API_PREFIX + 'allocation/<string:allocid>/<string:guestname>',
+           methods = [ 'PATCH' ])
+@flask_login.login_required
+def _patch_guest(allocid, guestname):
+    with audit("guest/patch",
+               calling_user = flask_login.current_user._get_current_object(),
+               allocid = allocid, guestname = guestname,
+               request = flask.request) as ao:
+        try:
+            user = flask_login.current_user._get_current_object()
+            result = ttbl.allocation.guest_add(allocid, user, guestname)
+        except Exception as e:
+            flask_logi_abort(400, "%s" % e, exc_info = True)
+        return flask.jsonify(result)
+
+@app.route(API_PREFIX + 'allocation/<string:allocid>/<string:guestname>',
+           methods = [ 'DELETE' ])
+@flask_login.login_required
+def _delete_guest(allocid, guestname):
+    with audit("guest/delete",
+               calling_user = flask_login.current_user._get_current_object(),
+               allocid = allocid, guestname = guestname,
+               request = flask.request) as ao:
+        try:
+            user = flask_login.current_user._get_current_object()
+            if guestname == "self":
+                guestname = user.get_id()
+            result = ttbl.allocation.guest_remove(allocid, user, guestname)
+        except Exception as e:
+            flask_logi_abort(400, "%s" % e, exc_info = True)
+        return flask.jsonify(result)
+
+
+
+def tb_file_local_path_get(username, filepath):
+    """
+    Verify the *image_name* is available in the target broker's
+    storage for the current *username* and return it's local file
+    path.
+    """
+    local_filepath = os.path.normpath("%s/%s/%s" % (
+        ttbl.test_target.files_path, username, filepath))
+    if not os.path.isfile(local_filepath):
+        return None
+    else:
+        return local_filepath
+
+@app.route(API_PREFIX + 'targets/<string:target_id>/' \
+           + '<string:interface>/<string:call>',
+           methods = [ 'PUT', 'POST', 'DELETE', 'GET' ])
+@flask_login.login_required
+def _target_interface(target_id, interface, call):
+    calling_user = flask_login.current_user._get_current_object()
+    target = ttbl.test_target.get_for_user(target_id, calling_user)
+    if target == None:
+        flask.abort(404, "%s: unknown target" % target_id)
+    ticket = ttbl.tt_interface.arg_get(
+        flask.request.form, 'ticket', str, True, "")
+    iostr = io.StringIO()
+    with audit(f"{interface}/{call}",
+               calling_user = calling_user,
+               target = target,
+               request = flask.request) as audit_record:
+        try:
+            if not interface in target.tags['interfaces']:
+                flask_logi_abort(400, "%s: unavailable interface" % interface)
+            iface = getattr(target, interface, None)
+            if iface == None:
+                flask_logi_abort(400, "%s: interface broken" % interface)
+            assert isinstance(iface, ttbl.tt_interface)
+            # set for the benefit of the current method call what is
+            # the name of the interface being called and it's
+            # implementation; this is done like this because when we
+            # did the initial implementation we never guessed we'd
+            # have interface code shared between different interfce
+            # names. Since this is a Thread-Local-Storage call and our
+            # code has to be mp safe, it is good enough
+            ttbl.tls.interface = interface
+            ttbl.tls.iface = iface
+            username = flask_login.current_user.get_id()
+            user_path = os.path.join(ttbl.test_target.files_path, username)
+            # make sure the directory exists
+            commonl.makedirs_p(user_path)
+            with log_to_str_too(target.log, iostr):
+                method_name = flask.request.method.lower() + "_" + call
+                method = getattr(iface, method_name, None)
+                # we support getting arguments both from the URL and a
+                # form, with URL taking precendence
+                args = {}
+                args.update(flask.request.form.items())    # FORM
+                args.update(flask.request.args.items())    # URL
+                component = args.get('component', None)
+                audit_record.kws.update(args)
+                audit_record.kws['files'] = [ i for i in flask.request.files.keys() ]
+                if method:
+                    result = method(
+                        target, who_make(ticket),
+                        # https://flask.palletsprojects.com/en/1.1.x/patterns/fileuploads/
+                        args, flask.request.files,
+                        user_path)
+                    iface.assert_return_type(
+                        result, dict, target,
+                        ttbl.tt_interface.arg_get(
+                            args, 'component', str, True, None),
+                        method_name, none_ok = False)
+                else:
+                    result = iface.request_process(
+                        target, who_make(ticket),
+                        flask.request.method,
+                        call,
+                        # https://flask.palletsprojects.com/en/1.1.x/patterns/fileuploads/
+                        args, flask.request.files,
+                        user_path)
+            assert isinstance(result, dict), \
+                "BUG: %s: request_process() did not return a dictionary" \
+                " but a %s" \
+                % (interface, type(result).__name__)
+            if '_diagnostics' in result:
+                target.log.error("BUG: %s: request_process() added a "
+                                 "'_diagnostics' field that will be overriden"
+                                 % interface)
+
+            if calling_user.is_admin():
+                # only admins get diagnostics, since this might include
+                # stuff we don't want you to know because of internals of
+                # the server.
+                # FIXME: maybe add a 'diagnostics' role?
+                result['_diagnostics'] = iostr.getvalue()
+        except ttbl.test_target_e as e:
+            flask_logi_abort(400, "%s" % e, exc_info = True)
+        except Exception as e:
+            flask_logi_abort(400, "%s: %s" % (target_id, e), exc_info = True)
+        finally:
+            ttbl.tls.interface = None
+            ttbl.tls.iface = None
+        if 'stream_file' in result:
+            filepath = result['stream_file']
+            generation = result.get('stream_generation', 0)
+            offset = result.get('stream_offset', 0)
+            try:
+                fd = open(filepath, 'rb')	# flask.Response closes it
+                s = os.fstat(fd.fileno())
+                if offset >= s.st_size:	# cap offset to max size so when...
+                    offset = s.st_size	# ...we report it it goes right
+                if offset >= 0:
+                    fd.seek(offset)
+                else:
+                    fd.seek(offset, os.SEEK_END)
+                response = flask.Response(fd, direct_passthrough = True)
+                # attach a header indicating the offset; this allows
+                # the client to calculate how big the stream is at
+                # precisely the time the last byte was sent, by adding
+                # the data length (from the Content-Length or data
+                # length after dechunking it). This is used for
+                # example, by the console code, to know the offset at
+                # which to read the next time.  stream-size =
+                # X-stream-offset + data-length
+                response.headers['X-stream-gen-offset'] = \
+                    str(generation) + " " + str(offset)
+                return response
+            except Exception as e:
+                flask_logi_abort(400, "%s: can't stream file: %s" % (filepath, e),
+                                 exc_info = True)
+        else:
+            audit_record.kws['result'] = result
+            return flask.jsonify(result)
+
+
+def cleanup_files():
+    for f in glob.iglob(ttbl.test_target.files_path + "/*/*"):
+        if (time.time() - os.stat(f).st_mtime ) > ttbl.config.cleanup_files_maxage:
+            try:
+                os.remove(f)
+            except IsADirectoryError:
+                continue
+
+# Notify systemd we are alive
+#
+# Note we do this from two places: the beginning of the cleanup
+# process in _cleanup_process_fn() and then inside _do_cleanup() for
+# each thread.
+#
+# Why? because querying each target might be lengthy as we have to
+# access the hardware and it might take time. So on each iteration, we
+# do a keepalive if we have to.
+
+_systemd_watchdog_period = None
+
+def _systemd_keepalive():
+    global _systemd_watchdog_period
+    if _systemd_watchdog_period == None:
+        return
+    # We keepalive whenever we can
+    sd_notify.notify("WATCHDOG=1")
+
+# initialized later, when we have other parts up and running
+daemon_user = None
+
+# Another kludge: disable security warnings from request's urllib3
+# vendored version. We know, we know. And probably there is a way to
+# extract the ad-hoc SSL certificate info from within the Flask app.
+from requests.packages.urllib3.exceptions import InsecureRequestWarning
+requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
+
+
+
+# This is one of the dirtiest kludges ever done
+def cleanup_process_fn():
+    global _systemd_watchdog_period
+    # Cleanup tasks we can run in a separate process
+    #
+    # We also run a systemd watchdog (if systemd available and
+    # configured) so systemd will restart the service if the cleanup
+    # thread dies--happens sometimes, we don't know why
+    # http://0pointer.de/blog/projects/watchdog.html
+    if systemd_available and 'WATCHDOG_USEC' in os.environ:
+        _systemd_watchdog_period =  float(os.environ['WATCHDOG_USEC']) / 1000000
+        sleep_period = min(_systemd_watchdog_period / 2,
+                           ttbl.config.target_max_idle / 2)
+    else:
+        _systemd_watchdog_period =  None
+        sleep_period = ttbl.config.target_max_idle / 2
+
+    # execute tasks that have to be done only once when starting the
+    # daemon; for now this is only for things we want to power on/off
+    # FIXME: if there is an exeception here, what do we do? do we
+    # ignore it? if so we need to force soft_failure
+
+    ttbl.power.execute_defer_list(ttbl.power._startup_defer_list, "startup",
+                                  keepalive_fn = _systemd_keepalive)
+
+    logi("Clean up process [period %.2fs]" % sleep_period)
+    ts_now = datetime.datetime.now()
+    cleanup_files_last = ts_now
+    while True:
+        time.sleep(sleep_period)
+        ts_now = datetime.datetime.now()
+        logdl(8, "Scanning for idle targets")
+        try:
+            ttbl.allocation.maintenance(ts_now, daemon_user,
+                                        _systemd_keepalive)
+            cleanup_elapsed = (ts_now - cleanup_files_last).seconds
+            if cleanup_elapsed > ttbl.config.cleanup_files_period:
+                cleanup_files()
+                cleanup_files_last = ts_now
+
+            # refresh server discovery; this function is cached, so it
+            # will only actually do the discovery when it's old.
+            ttbl.ui.servers_info_get()
+        except Exception as e:
+            loge("Exception in cleanup thread: %s\n"
+                 % e + traceback.format_exc())
+
+main_pid = os.getpid()
+
+# Define the login manager
+login_manager = flask_login.LoginManager()
+
+#! List of addresses to be considered local when they show in the
+# remote_addr field of a request.
+_local_addresses = set()
+# Support for local users without having to go through local
+# login--this is intended for running on single user workstations
+# Start the daemon with --local-auth and just work as anonymous with
+# full privilege.
+#
+# See https://flask-login.readthedocs.org/en/latest/#anonymous-users for
+# the Flask details, but basically when flask needs to identify an
+# Anonymous user, if the connection comes from one of the local ones,
+# we just create an special anonymous user that has full privilege.
+def _create_anonymous_user():
+    local_auth_disabled_runtime = os.path.exists(
+        os.path.join(args.var_state_path, "local_auth_disabled"))
+    if not local_auth_disabled_runtime \
+       and flask.request.remote_addr in _local_addresses:
+        return ttbl.user_control.User('local', roles = [ "admin" ])
+    return flask_login.AnonymousUserMixin()
+
+login_manager.anonymous_user = _create_anonymous_user
+
+#    Connect *login_manager*'s operations to the implementations of the
+#    user database defined here in :class:`User`.
+@login_manager.user_loader
+def load_user(userid):
+    """
+    Called by the login manager when looking for information about
+    a given user ID
+    """
+    return ttbl.user_control.User.search_user(userid)
+
+@login_manager.request_loader
+def load_user_from_request(request):
+    """
+    Iterate between each authtenticator to see if we can auth a user with
+    the headers of the request. (token, cookies, etc.)
+    """
+    headers = request.headers
+    for authenticator in ttbl.config._authenticators:
+        try:
+            user = authenticator.auth_with_headers(headers)
+            if user:
+                return user
+        except ttbl.authenticator_c.invalid_credentials_e as e:
+            logi("user cannot validate with header credentials")
+            pass
+        except ttbl.authenticator_c.unknown_user_e as e:
+            logi("unkown user from header credentials")
+            pass
+        except Exception as e:
+            logi("authentication error, when trying to use header credentials")
+            logx(e)
+            pass
+        # try next auth
+    return None
+
+
+@login_manager.unauthorized_handler
+def unauthorized():
+    """
+    Called by the login manager when a user is no authorized to
+    do an operation
+    """
+    if flask.request.blueprint == 'ui':
+        # store the route the user was trying to visit, so we can redirect him
+        # back to it when he login successfully
+        flask.session['route'] = flask.request.path
+        return flask.redirect(API_PREFIX + '/ui/login')
+    flask_logi_abort(401, "User unauthorized; please login")
+
+def auth_init(app):
+    principals = flask_principal.Principal()
+    principals.init_app(app)
+    # The login manager provides session management for the Flask web
+    # framework, handling login, logout and remembering user sessions
+    # over extended periods of time (from
+    # https://flask-login.readthedocs.org/en/latest/).
+    global login_manager
+    login_manager.init_app(app)
+    # None means that the cookie will not contain information about
+    # the IP address where the login came from. We want to be able to
+    # carry our login information while the machine changes IP
+    # address.
+    # https://flask-login.readthedocs.io/en/latest/#session-protection
+    login_manager.session_protection = None
+
+    # Define this function here to connect FIXME how? This is kinda
+    # confusing
+    @flask_principal.identity_loaded.connect_via(app)
+    def on_identity_loaded(sender, identity):
+        """
+        An identity has been loaded, add the information about the
+        current user to the *identity* object
+        """
+        identity.user = flask_login.current_user
+
+        # FIXME: we can do without the hasattr()? -- let's force
+        # current_user to be at least a descentant of a certain base
+        # class which enforces having those arguments
+        if hasattr(flask_login.current_user, 'get_id'):
+            identity.provides.add(flask_principal.UserNeed(
+                flask_login.current_user.get_id()))
+
+        if hasattr(flask_login.current_user, 'roles'):
+            for role in flask_login.current_user.roles:
+                identity.provides.add(flask_principal.RoleNeed(role))
+
+local_auth = list()
+
+#
+# Main
+#
+# Protect like this so this file can be easilly imported by the
+# documentation generator with no side effects.
+#
+def __main__():
+    # we need this here, not sure why -- it doesn't pick up the one we
+    # did above
+    import ttbl
+
+    # Drop the capabilities we don't really need but that we enabled
+    # in the Ambient set so our helpers can inherit them. I might be
+    # doing something wrong here, but I can't figure out how to
+    # specify in systemd an inheritable set different than the ambient
+    # set
+
+    # Actually can't drop this -- I am definitely doing something
+    # wrong and not sure what. If we drop this, then we can't read
+    # /proc/PID/exe, which we need in commonl.process_alive() to
+    # determine if the daemons have started properly -- instead it
+    # will fail where 'Usually this means it has died while we
+    # checked', which it shouldn't -- because we are running with the
+    # same user/gid. Puzzled.
+    #prctl.cap_effective.dac_read_search = False
+
+    # Defaults
+    # We want them here because we want these defaults to be overriden
+    # by configuration to be overriden by command line options.
+    host = "127.0.0.1"
+    port = 5000
+
+    arg_parser = argparse.ArgumentParser()
+    commonl.cmdline_log_options(arg_parser)
+    # Do it like this insead of adding a version to the main parser
+    # because it will by default add adds -v as shortcut (when everyone and their grandma
+    # knows -V is vor --version, -v for --verbose)
+    arg_parser.add_argument(
+        '-V', '--version',
+        action = 'version', default = argparse.SUPPRESS,
+        version = commonl.version_get(ttbl, "ttbd"),
+        help= "show program's version number and exit")
+    arg_parser.add_argument(
+        "--config-path",
+        action = "store", dest = "config_path",
+        default = "~/.ttbd",
+        help = "Path from where to load conf_*.py "
+        "configuration files (in alphabetic order)")
+    arg_parser.add_argument(
+        "--server",
+        action = "store", choices = [ "gunicorn", "tornado", "flask" ],
+        default = "tornado",
+        help = "Server implementation to use [%(default)s]")
+    arg_parser.add_argument(
+        "--config-file", "-c",
+        action = "append", dest = "config_files", metavar = "CONFIG-FILE.py",
+        # FIXME: s|/etc|system prefix from installation
+        default = [ ],
+        help = "Files to parse as configuration (this is used for testing, "
+        "along with --config-path \"\"")
+    arg_parser.add_argument(
+        "--files-path", action = "store", default = "~/.ttbd/files",
+        help = "directory where to store uploaded files [%(default)s]")
+    arg_parser.add_argument(
+        "--state-path", dest = "var_state_path",
+        action = "store", default = "~/.ttbd",
+        help = "Directory where to save peristent state")
+    arg_parser.add_argument(
+        "--upload-max-size", action = "store", type = int,
+        default = ttbl.config.upload_max_size,
+        help = "Maximum (upload) file size (in bytes) [%(default)d]")
+    arg_parser.add_argument(
+        "--host", action = "store", default = None,
+        help = "Hostname on which to listen [%(default)s]")
+    arg_parser.add_argument(
+        "--port", action = "store", type = int, default = None,
+        help = "Port on which to listen [%d]" % port)
+    arg_parser.add_argument(
+        "--local-auth", metavar = "IP-ADDR", nargs = "?",
+        action = "append", default = list(),
+        help = "Allow users as admins from the given IP "
+        "addresses without caring; if no IP address is given, "
+        "127.0.0.1 is assumed. Can be given multiple times with "
+        "different addresses--no regexp or masks supported")
+    arg_parser.add_argument(
+        "--ssl-crt", default = None,
+        help = "SSL certificate for HTTPS connections; if either "
+        "(--ssl-key) not specified, it will use ad-hoc mode where "
+        "it will be automatically generated")
+    arg_parser.add_argument(
+        "--ssl-key", default = None,
+        help = "SSL key for HTTPS connections; see --ssl-crt")
+    arg_parser.add_argument(
+        "--ssl-key-password", default = None,
+        help = "Password for the SSL key; can be a string or"
+        " FILE:<ABSOLUTEFILENAME> to read the password form a file")
+    arg_parser.add_argument(
+        "--no-ssl", dest = "ssl", action = "store_false", default = True,
+        help = "Disable SSL support")
+    arg_parser.add_argument(
+        "--ssl", dest = "ssl", action = "store_true",
+        help = "Disable SSL support")
+    arg_parser.add_argument(
+        "--ssl-enabled-check-disregard", action = "store_true",
+        default = False,
+        help = "Do not check if SSL is enabled for certain things"
+        "that shall be used only with it enabled, like LDAP")
+    arg_parser.add_argument(
+        "--target-max-idle", type = float, metavar = "SECONDS",
+        action = "store", default = ttbl.config.target_max_idle,
+        help = "What is the maximum amount of seconds a target can "
+        "be idle before is auto-powered off (%(default).fs)")
+    arg_parser.add_argument(
+        "--system-wide", "-w", metavar = "NAME", action = "store",
+        nargs = "?", type = str,
+        const = "",	# If no arg, set to ""
+        default = None,
+        help = "Run in system wide mode, with an instance name (none by "
+        "default, sets the config, state and file storage to "
+        "{/etc/,/var/run,/var/cache}ttbd[-NAME]/")
+    arg_parser.add_argument(
+        "-d", "--debug", action = "store_true", default = True,
+        help = "Enable internal debug prints and checks and"
+        " extra logging info -- especially needed to print"
+        " debug info on bad config files")
+
+    args = arg_parser.parse_args()
+
+    if args.host != None:
+        host = args.host
+    if args.port != None:
+        port = args.port
+
+    if args.debug:
+        # I mean, this is ugly, but simple
+        commonl.debug_traces = True
+    else:
+        commonl.debug_traces = False
+
+    log_format = "%(levelname)s %(module)s.%(funcName)s():%(lineno)d: %(message)s"
+    log_format = commonl.log_format_compose(log_format, True)
+    # wipe any existing config, reinitialize our way
+    for handler in logging.root.handlers[:]:
+        logging.root.removeHandler(handler)
+    logging.basicConfig(format = log_format, level = args.level)
+
+    # Cut down on verbosity from different packages
+    logging.getLogger("requests").setLevel(logging.ERROR)
+    logging.getLogger("flask").setLevel(logging.WARNING)
+    logging.getLogger("werkzeug").setLevel(logging.WARNING)
+    logging.getLogger("urllib3").setLevel(logging.ERROR)
+
+    ttbl.config.target_max_idle = args.target_max_idle
+
+    jinja_template_searchpath = []
+
+    if args.system_wide == None:
+        ttbl.config.instance_suffix = ""
+        ttbl.config.instance = ""
+    elif args.system_wide == "":
+        ttbl.config.instance_suffix = ""
+        ttbl.config.instance = ""
+        args.config_path = "/etc/ttbd"
+        args.files_path = "/var/cache/ttbd"
+        # State that stays through reboots
+        args.var_state_path = "/var/lib/ttbd"
+        # FIXME: if anytime we support another root, this needs to change
+        jinja_template_searchpath.append("/etc/ttbd/html")
+    else:
+        ttbl.config.instance = args.system_wide
+        ttbl.config.instance_suffix = "-" + args.system_wide
+        args.config_path = "/etc/ttbd" + ttbl.config.instance_suffix
+        args.files_path = "/var/cache/ttbd" + ttbl.config.instance_suffix
+        # State that stays through reboots
+        args.var_state_path = os.path.join("/var/lib/ttbd", args.system_wide)
+        jinja_template_searchpath.append(args.config_path + "/html")
+        # FIXME: if anytime we support another root, this needs to change
+        jinja_template_searchpath.append("/etc/ttbd/html")
+
+    # jinja template dirty hack: change the lookup order of template
+    # files so the installed ones with the package are last and the
+    # search order is:
+    #
+    # - /etc/ttbd-INSTANCE/html
+    # - /etc/ttbd/html
+    # - /usr/share/tcf/ui/templates
+    #
+    # This allows us to drop in customizations in instance or site
+    # specific directories in /etc without altering the system
+    jinja_template_searchpath += app.jinja_loader.searchpath
+    app.jinja_loader.searchpath = jinja_template_searchpath
+
+    # Define things ttbl.config needs for configuring targets
+    args.config_path = os.path.expanduser(args.config_path)
+    args.files_path = os.path.expanduser(args.files_path)
+    args.var_state_path = os.path.expanduser(args.var_state_path)
+    # FIXME: move this to ttbl.allocations.init()
+    ttbl.allocation.path = os.path.join(args.var_state_path, "allocations")
+    ttbl.test_target.state_path = os.path.join(args.var_state_path, "targets")
+    ttbl.test_target.files_path = args.files_path
+    ttbl.user_control.User.state_dir = os.path.join(args.var_state_path, "users")
+    # Admin can configure a secondary user state dir, if not we default to the
+    # primary one.
+    ttbl.user_control.User.state_dir_secondary = os.path.join(args.var_state_path, "users")
+
+
+    os.umask(0o007)		# daemon gives no permissions to others
+
+    commonl.makedirs_p(args.var_state_path, 0o2770,
+                       reason = "storing state")
+    commonl.makedirs_p(ttbl.test_target.state_path, 0o2770,
+                       reason = "storing target state")
+    commonl.makedirs_p(ttbl.test_target.files_path, 0o2770,
+                       reason = "storing user's files")
+    commonl.makedirs_p(ttbl.user_control.User.state_dir, 0o2770,
+                       reason = "storing user state")
+
+
+    # get the key for this instance; we need to do this before we read
+    # the configuration, as we'll use ttbl._who_daemon
+    key_filename = os.path.join(args.var_state_path, "session.key")
+    try:
+        with open(key_filename, 'rb') as f:
+            sk = pickle.load(f)
+            if not isinstance(sk, bytes):
+                raise Exception("Bad type in saved key")
+            if len(sk) != 24:
+                raise Exception("Bad length in saved key")
+            logw("Reloaded key")
+    except Exception as e:
+        sk = os.urandom(24)
+        logi("New key (because %s)" % e)
+        umask_original = os.umask(0)
+        commonl.rm_f(key_filename)
+        try:
+            fd = os.open(key_filename, os.O_WRONLY | os.O_CREAT | os.O_EXCL,
+                         0o600)
+        finally:
+            os.umask(umask_original)
+        with os.fdopen(fd, 'wb') as f:
+            pickle.dump(sk, f, protocol = 2)
+
+    # this is the username we use for internal tasks who always gets a
+    # pass on access checks if the target is unlocked
+    # wee ttbl.with_target_locked_and_acquired()
+    ttbl._who_daemon = "internal-" + commonl.mkid(sk, 6)
+
+    # read the configuration
+    commonl.check_dir(args.config_path, "storing configuration")
+    # FIXME: this has to be done as the options are specified?
+    try:
+        if args.config_path != [ "" ]:
+            commonl.config_import([ args.config_path ], re.compile("^conf[-_].*.py$"))
+        for config_file in args.config_files:
+            commonl.config_import_file(config_file, "__main__")
+        logd("configuration: loaded")
+    except Exception:
+        # config_import* failures mean we cannot read the config files
+        # properly; they have already printed their messages, so just
+        # exit here.
+        sys.exit(1)
+
+    # Allow local users access as admins? [--local-auth]
+    # Command line goes after configuration file
+    local_auth += args.local_auth
+    if local_auth:
+        import ttbl.auth_party
+        # _local_addresses is used by _create_anonymous_user()
+        for i, remote in enumerate(local_auth):
+            if remote == None:
+                _local_addresses.add("127.0.0.1")
+            elif remote == "":	# Override support
+                del _local_address[:]
+            else:
+                _local_addresses.add(remote)
+        # Allow any local login/password to work, so we won't worry
+        # about passwords when calling 'login'
+        ##ttbl.config._authenticators.insert(0, ttbl.auth_party.authenticator_party_c(
+        ##    [ 'user', 'admin' ], local_addresses = _local_addresses))
+
+
+    if ttbl.config.upload_max_size != args.upload_max_size:
+        args.upload_max_size = ttbl.config.upload_max_size
+    # note the Tornado server also needs this setting (below)
+    app.config['MAX_CONTENT_LENGTH'] = args.upload_max_size
+    app.config['REMEMBER_COOKIE_DURATION'] = datetime.timedelta(4)
+    # ensure that when we JSON encode sorted dictionaries, the encode
+    # respects the order of the keys.
+    # JSON/Python don't necessary require ordering dictionaries, but
+    # for our protocol, we do, since it simplifies the data structures
+    app.config["JSON_SORT_KEYS"] = False
+    # Flask > v1.3, per https://stackoverflow.com/a/60780210
+    app.json.sort_keys = False
+    app.secret_key = base64.b64encode(sk)
+
+    # Initialize the SSL CRT/key from ttbl.config if present
+    if args.ssl_crt == None and ttbl.config.ssl_cert:
+        assert isinstance(ttbl.config.ssl_cert, str), \
+            "ttbl.config.ssl_cert has to be a path to a file; got (%s) %s" % (
+                type(ttbl.config.ssl_cert), ttbl.config.ssl_cert)
+        args.ssl_crt = ttbl.config.ssl_cert
+
+    if args.ssl_key == None and ttbl.config.ssl_key:
+        assert isinstance(ttbl.config.ssl_key, str), \
+            "ttbl.config.ssl_key has to be a path to a file; got (%s) %s" % (
+                type(ttbl.config.ssl_key), ttbl.config.ssl_key)
+        args.ssl_key = ttbl.config.ssl_key
+
+    if args.ssl_key_password == None and ttbl.config.ssl_key_password:
+        assert isinstance(ttbl.config.ssl_key_password, str), \
+            "ttbl.config.ssl_key_password has to be a path to a file; got (%s) %s" % (
+                type(ttbl.config.ssl_key_password), ttbl.config.ssl_key_password)
+        args.ssl_key_password = ttbl.config.ssl_key_password
+
+    if args.ssl_key_password:
+        ssl_key_password = commonl.password_get(None, "", args.ssl_key_password)
+    else:
+        ssl_key_password = None
+
+    server = args.server
+    if ttbl.config.server != None:
+        server = ttbl.config.server
+
+    if server == "gunicorn":
+        import gunicorn
+        major, minor, pl = gunicorn.version_info
+        if major < 20 or major == 20 and minor <= 2:
+            # gunicorn >= 20.2 accepts just using the ssl_context
+            # variable we created above, but it's quite new, so
+            # default for now to just do this...
+            if args.ssl_crt and args.ssl_key:
+                logging.error(
+                    "gunicorn: falling back to ad-hoc SSL context,"
+                    " running gunicorn version that can't decrypt keys,"
+                    " need > 20.2")
+                args.ssl_crt = None
+                args.ssl_key = None
+
+    # SSL config: default to at least TLS v1.2
+    ssl_options = ssl.OP_NO_SSLv3 | ssl.OP_NO_SSLv2 | ssl.OP_NO_TLSv1
+    if args.ssl == False:
+        logi("SSL: disabled")
+        ssl_context = None
+    elif args.ssl_crt and args.ssl_key:
+        if os.path.exists(args.ssl_crt) and os.path.exists(args.ssl_key):
+            logw("SSL: using CRT %s, key %s"
+                 % (args.ssl_crt, args.ssl_key))
+        else:
+            raise Exception("(%s,%s): cannot open SSL required files"
+                            % (args.ssl_crt, args.ssl_key))
+        ssl_context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+        ssl_context.options |= ssl_options
+        ssl_context.load_cert_chain(args.ssl_crt, args.ssl_key,
+                                    password = ssl_key_password)
+    elif args.ssl == True:
+        ttbl.config.ssl_enabled = args.ssl
+        ttbl.config.ssl_enabled_check_disregard = \
+                args.ssl_enabled_check_disregard
+        logi("SSL: using adhoc context")
+        ssl_context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+        ssl_context.options |= ssl_options
+        old_umask = os.umask(0o077)	# Create files go=
+        try:
+            cert_fn, pkey_fn = werkzeug.serving.make_ssl_devcert(
+                os.path.join(args.var_state_path, "cert"))
+        finally:
+            os.umask(old_umask)
+        ssl_context.load_cert_chain(cert_fn, pkey_fn)
+        os.chmod(cert_fn, 0o640)	# Make the cert g+w
+    else:
+        raise RuntimeError("can't give --no-ssl and --ssl* options")
+
+    ttbl.allocation.init(args.var_state_path)
+    for target in ttbl.test_target.known_targets():
+        target.fsdb_cleanup()
+
+    #
+    # Make this process a reaper
+    #
+    # Any child, grandchild or other descendant will be held by this
+    # process if its parent dies (rather than init), so it can waitpid
+    # on it and stuff. This is very Linux specific [for now].
+    #
+    # int prctl(int option, unsigned long arg2, unsigned long arg3,
+    #           unsigned long arg4, unsigned long arg5);
+    #
+    # option PR_SET_CHILD_SUBREAPER (36, from linux/prctl.h)
+    # arg2   1
+    # arg*   unused
+    #
+    # prctl(PR_SET_CHILD_SUBREAPER, 1, 0, 0, 0);
+    #
+    import ctypes
+    libc = ctypes.CDLL("libc.so.6")
+    r = libc.prctl(ctypes.c_int(36), ctypes.c_ulong(1), ctypes.c_ulong(0),
+                   ctypes.c_ulong(0), ctypes.c_ulong(0))
+
+
+    # Handle death of children, so they don't become zombies
+    #
+    # Only children that are registered as daemons are reaped (so they
+    # don't become zombies). If we just ignore SIGCHLD, then
+    # subprocess.check_call() and friends fail to catch commands that
+    # fail to execute and return a non-zero exit code.
+    #
+    # Note that this list of daemons is PER-PROCESS; so still haven't
+    # really solved what happens if we reap a daemon from a Python web
+    # framework process that exited.
+    def sigchld_handler(signum, frame):
+        try:
+            si = os.waitid(os.P_ALL, 0, os.WNOHANG | os.WEXITED | os.WNOWAIT)
+            if si == None:
+                return
+        except ChildProcessError:
+            return	# there is none to wait for, so whatever
+        pid = si.si_pid
+        if pid == -1 or pid == 0:
+            return
+        if ttbl.daemon_pid_check(pid):
+            ttbl.daemon_pid_rm(pid)
+            # Reap a daemon so it doesn't zombie
+            r = os.waitpid(pid, os.WNOHANG)
+            return
+        # Not a daemon, don't reap it, let other do it
+        return
+
+    def sigquit_handler(signum, frame):
+        logging.shutdown()
+
+    signal.signal(signal.SIGQUIT, sigquit_handler)
+    signal.signal(signal.SIGCHLD, sigchld_handler)
+
+    # Ensure we are session leaders, so we can kill the whole group
+    try:
+        os.setsid()
+    except OSError as e:
+        if e.errno != errno.EPERM:
+            raise
+        # It is already a session leader...can ignore
+
+    daemon_user = ttbl.user_control.User('local', roles = [ "admin" ])
+    if server == "gunicorn":
+        # gunicorn conflicts with MP and kills cleanup, so just fork
+        # the cleanup thread
+        pid = os.fork()
+        if pid == 0:	# I'm the child
+            cleanup_process_fn()
+            sys.exit()
+    else:	# just invoke using multiprocessing
+        # Cleanup process...now this is quite very ugly...see _cleanup()
+        cleanup_process = multiprocessing.Process(target = cleanup_process_fn)
+        cleanup_process.daemon = True
+        cleanup_process.start()
+
+    # See authentication in the file's doc header
+    auth_init(app)
+
+    # Have flask send HTTP keep alives by implementing 1.1
+    werkzeug.serving.WSGIRequestHandler.protocol_version = "HTTP/1.1"
+
+    if server == "gunicorn":
+        # https://docs.gunicorn.org/en/stable/custom.html
+        logging.error("serving with gunicorn")
+
+        # gunicorn needs this function to provide the SSL context to
+        # use; we'll set it in gunicorn_app_c
+        def _ssl_context_get(_config, default_ssl_context_factory):
+            return ssl_context
+
+        import gunicorn.app.base
+        class gunicorn_app_c(gunicorn.app.base.BaseApplication):
+
+            def __init__(self, app):
+                self.application = app
+                gunicorn.app.base.BaseApplication.__init__(self)
+
+            def load_config(self):
+                self.cfg.set('bind', f'{host}:{port}')
+                self.cfg.set('workers', ttbl.config.processes)
+                self.cfg.set('threads', 1)
+                # FIXME: this is arbitrarily large to accomodate the
+                # arbitratily large wait times we might have on some
+                # sync calls -> maybe get it from there?
+                self.cfg.set('timeout', 1200)
+                # restart process after handling N requests, to avoid
+                # leaks
+                self.cfg.set('max_requests', 50)
+                self.cfg.set('max_requests_jitter', 5)
+                if args.ssl_crt and args.ssl_key:
+                    # this forces gunicorn to enable https
+                    self.cfg.set('certfile', args.ssl_crt)
+                    self.cfg.set('ssl_context', _ssl_context_get)
+                elif args.ssl == True:
+                    # take from generated above
+                    self.cfg.set('certfile', cert_fn)
+                    self.cfg.set('keyfile', pkey_fn)
+                elif args.ssl == False:
+                    pass
+
+            def load(self):
+                return self.application
+
+        sd_notify.notify("READY=1")
+        gunicorn_app_c(app).run()
+
+    elif server == "tornado":
+
+        logging.error("serving with tornado")
+        logging.getLogger("tornado.access").setLevel(logging.ERROR)
+        # Tornado is single threaded, so not good for what we need
+        from tornado.wsgi import WSGIContainer
+        from tornado.httpserver import HTTPServer
+        from tornado.ioloop import IOLoop
+
+        http_server = HTTPServer(
+            WSGIContainer(app), ssl_options = ssl_context,
+            max_buffer_size = app.config['MAX_CONTENT_LENGTH'])
+        http_server.bind(port, address = host)
+        # This might not be the real good way to do this, but our APIs
+        # might block for a long time, so we start a crapload of
+        # servers to be able to service more requests in paralell.
+        http_server.start(ttbl.config.processes)
+        sd_notify.notify("READY=1")
+        IOLoop.instance().start()
+
+    else:
+        logging.error("serving with flask (DEBUG!)")
+
+        app.run(host = host, port = port, debug = True, use_reloader = False,
+                processes = ttbl.config.processes, ssl_context = ssl_context)
