@@ -14,7 +14,7 @@ class fake_report_driver_c(tcfl.tc.report_driver_c):
     sent with in the reporter's field called *level_max*.
     """
 
-    def report(self, reporter, tag, ts, delta,
+    def report(self, reporter, _target, tag, ts, delta,
                level, message, alevel, attachments):
 
         if not hasattr(reporter, "level_max"):
@@ -26,7 +26,16 @@ class fake_report_driver_c(tcfl.tc.report_driver_c):
 
 fake_report_driver = fake_report_driver_c()
 tcfl.tc.report_driver_c.add(fake_report_driver, name = "fake")
-
+@tcfl.tc.tags(
+    "tcf_client",
+    files = {		# if changes in any of these files, run
+        "tcf": "default invoker",
+        "tcfl/tc.py": "defines class tcfl.tc.report_driver_c and reporting code",
+        "tcfl/report_console.py": "default reporter",
+        "tcfl/report_jinja2.py": "default reporter",
+        "tcfl/*.j2.*": "default templates for tcfl/report_jinja2.py",
+    },
+    level = "basic")
 class _test(tcfl.tc.tc_c):
 
     """
