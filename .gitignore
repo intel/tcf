@@ -17,11 +17,7 @@ tags
 ttbd/ttbl/version.py
 repo/
 report-*.txt
-!report-base.j2.txt
-!report.j2.txt
 report-*.html
-!report-base.j2.html
-!report.j2.html
 report-*.xml
 report-*.data.json
 run.log

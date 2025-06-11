@@ -55,7 +55,7 @@
 {{ format_log() }}
 </error>
 {%- endif %}
-{%- block SYSTEM_OUT %}  
+{%- block SYSTEM_OUT %}
 <system-out>
 {%- block TARGET_INFORMATION %}
 {%- if targets %}
@@ -93,7 +93,7 @@ tcfl.report_jinja2.templates['junit'] in any of TCF's conf_*.py
 configuration files).
 
 </system-out>
-{% endblock -%}  
+{% endblock -%}
 </testcase>
 </testsuite>
 </testsuites>
