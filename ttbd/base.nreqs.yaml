@@ -21,7 +21,9 @@ flask:
   distro: python3-flask
 python3-flask-login:
 python3-flask-principal:
-python3-gunicorn:
+gunicorn:
+  # >=23.0.0 due to https://osv.dev/vulnerability/GHSA-hc5x-x2vx-497g
+  distro: python3-gunicorn
 
 keyring:
   # >=0.10 https://osv.dev/vulnerability/GHSA-8867-vpm3-g98g

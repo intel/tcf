@@ -26,7 +26,8 @@ blinker         # package: python3-blinker
 flask>=2.3.2    # package: python3-flask
 flask-login     # package: python3-flask-login
 flask-principal # package: fedora,ubuntu=python3-flask-principal
-gunicorn        # package: python3-gunicorn
+#>=23.0.0 due to https://osv.dev/vulnerability/GHSA-hc5x-x2vx-497g
+gunicorn>=23.0.0 # package: python3-gunicorn
 # >=0.10 https://osv.dev/vulnerability/GHSA-8867-vpm3-g98g
 keyring>=0.10   # package: fedora,ubuntu=python3-keyring
 netifaces       # package: python3-netifaces
