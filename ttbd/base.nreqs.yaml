@@ -29,7 +29,10 @@ keyring:
   # >=0.10 https://osv.dev/vulnerability/GHSA-8867-vpm3-g98g
   distro: python3-keyring
 
-python3-ldap:
+python_ldap:
+  # >=3.4.0 due to https://osv.dev/vulnerability/GHSA-qfr5-wjpw-q4c4
+  distro: python3-ldap
+
 python3-netifaces:
 python3-pexpect:
 python3-ply:

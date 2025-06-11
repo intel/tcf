@@ -40,7 +40,8 @@ python-prctl    # package: ubuntu=python3-prctl
 pyroute2        # package: python3-pyroute2
 pyserial        # package: centos,fedora,rhel=python3-pyserial ubuntu=python3-serial
 pysnmp          # package: centos,fedora,rhel=python3-pysnmp ubuntu=python3-pysnmp4
-python_ldap     # package: centos,fedora,rhel=python3-ldap
+# >=3.4.0 due to https://osv.dev/vulnerability/GHSA-qfr5-wjpw-q4c4
+python_ldap>=3.4.0     # package: centos,fedora,rhel=python3-ldap
 pytz            # package: python3-pytz
 pyusb           # package: centos,fedora=python3-pyusb ubuntu=python3-usb
 # >= 2.3.0 due to https://osv.dev/vulnerability/GHSA-652x-xj99-gmcc
