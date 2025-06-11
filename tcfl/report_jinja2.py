@@ -497,8 +497,12 @@ class driver(tc.report_driver_c):
 
         # Write to report file
         # FIXME: consider compiling the template as we'll keep reusing it
-        template_path = [ i for i in reversed(config.path) ] \
-                        + [ config.share_path ]
+        template_path = [
+            # new code as of 25/06 install in tcfl to
+            # simplify wheel installs
+            os.path.dirname(__file__),
+            config.share_path
+        ] + [ i for i in reversed(config.path) ]
         j2_env = jinja2.Environment(
             loader = jinja2.FileSystemLoader(template_path))
         j2_env.filters['xml_escape'] = jinja2_xml_escape
