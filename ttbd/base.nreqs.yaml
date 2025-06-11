@@ -37,7 +37,11 @@ pymongo:
   # >=4.6.3 https://osv.dev/vulnerability/GHSA-m87m-mmvp-v9qm
   distro: python3-pymongo
   reason: used to build bridges to mongo Databases
-python3-pyOpenSSL:
+
+pyOpenSSL:
+  # >=17.5.0 due to https://osv.dev/vulnerability/GHSA-2rcm-phc9-3945
+  distro: python3-pyOpenSSL
+
 python3-pyroute2:
 python3-pyserial:
 python3-pysnmp:

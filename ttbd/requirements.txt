@@ -34,7 +34,8 @@ netifaces       # package: python3-netifaces
 pexpect         # package: python3-pexpect
 ply             # package: python3-ply
 pymongo         # package: python3-pymongo
-pyOpenSSL       # package: centos,fedora,rhel=python3-pyOpenSSL ubuntu=python3-openssl
+# >=17.5.0 due to https://osv.dev/vulnerability/GHSA-2rcm-phc9-3945
+pyOpenSSL>=17.5.0  # package: centos,fedora,rhel=python3-pyOpenSSL ubuntu=python3-openssl
 python-prctl    # package: ubuntu=python3-prctl
 pyroute2        # package: python3-pyroute2
 pyserial        # package: centos,fedora,rhel=python3-pyserial ubuntu=python3-serial
