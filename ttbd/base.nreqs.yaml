@@ -16,7 +16,9 @@ parted:
 podman:
 python3-blinker:
 python3-devel:
-python3-flask:
+flask:
+  # >=2.3.2 due to https://osv.dev/vulnerability/GHSA-32pc-xphx-q4f6
+  distro: python3-flask
 python3-flask-login:
 python3-flask-principal:
 python3-gunicorn:

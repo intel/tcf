@@ -22,7 +22,8 @@
 # package: fedora,ubuntu=v4l-utils
 
 blinker         # package: python3-blinker
-flask           # package: python3-flask
+# >=2.3.2 due to https://osv.dev/vulnerability/GHSA-32pc-xphx-q4f6
+flask>=2.3.2    # package: python3-flask
 flask-login     # package: python3-flask-login
 flask-principal # package: fedora,ubuntu=python3-flask-principal
 gunicorn        # package: python3-gunicorn
