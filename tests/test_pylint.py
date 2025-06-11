@@ -178,7 +178,6 @@ class _run(tcfl.tc.tc_c, pylint.reporters.BaseReporter):
                     [ commonl_path, tcfl_path ],
                     [
                         _srcdir + '/conf.py', _srcdir + '/setup.py',
-                        _srcdir + '/tcf-run-mk-zephyr-boards-by-toolchain.py'
                     ] + glob.glob(_srcdir + r'/test_*\.py')
                 ),
                 (

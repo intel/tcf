@@ -28,8 +28,7 @@ python3-pylint --rcfile=.pylintrc lint-all.py .lint.*.py
 PYTHONPATH=$PYTHONPATH:$PWD/commonl:$PWD/tcfl \
     pylint --rcfile=$dirname/.pylintrc \
         conf.py \
-        setup.py \
-        tcf-run-mk-zephyr-boards-by-toolchain.py
+        setup.py
 
 # Client
 PYTHONPATH=$PYTHONPATH:$PWD/commonl:$PWD/tcfl \
