@@ -64,7 +64,9 @@ setuptools:
   distro: python3-setuptools
 
 python3-systemd:
-python3-tornado:
+tornado:
+  # >=6.5 due to https://osv.dev/vulnerability/GHSA-7cx3-6m66-7c5m
+  distro: python3-tornado
 qemu:
 socat:
 sshpass:
