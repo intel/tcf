@@ -90,7 +90,9 @@ python-Levenshtein:
   apt: python3-levenshtein
   skip_platform: win32
 
-PyYAML: python3-yaml
+PyYAML:
+    # >=5.4 due to https://osv.dev/vulnerability/GHSA-8q59-q68h-6hv4
+    distro: python3-yaml
 
 requests: python3-requests
 

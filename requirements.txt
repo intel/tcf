@@ -9,7 +9,8 @@ filelock	    # package: python3-filelock
 # >=2.10.1 due to https://osv.dev/vulnerability/GHSA-462w-v97r-4m45
 # >=3.1.6 due to https://osv.dev/vulnerability/GHSA-cpwx-vrp4-4pq7
 Jinja2>=3.1.6       # package: python3-jinja2
-PyYAML              # package: centos,fedora,rhel=python3-pyyaml
+# >=5.4 due to https://osv.dev/vulnerability/GHSA-8q59-q68h-6hv4
+PyYAML>=5.4         # package: centos,fedora,rhel=python3-pyyaml
 imutils
 markupsafe==2.0.1   # package: python3-markupsafe
 packaging           # package: python3-packaging
