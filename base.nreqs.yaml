@@ -96,6 +96,7 @@ PyYAML:
 
 requests:
   # >= 2.3.0 due to https://osv.dev/vulnerability/GHSA-652x-xj99-gmcc
+  # >= 2.32 due to https://osv.dev/vulnerability/GHSA-9wx4-h78v-vm56
   distro: python3-requests
 
 rpyc: python3-rpyc
