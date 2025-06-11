@@ -47,7 +47,7 @@ def join_args_for_make_shell_command(args):
         s += " '" + _arg + "'"
     return s
 
-def _config(_args):
+def _cmdline_config(_args):
     import commonl
     print(f"""\
 tcf: {sys.argv[0]}
@@ -260,7 +260,7 @@ def __main__():
 
     ap = arg_subparsers.add_parser(
         "config", help = "Print information about configuration")
-    ap.set_defaults(func = _config)
+    ap.set_defaults(func = _cmdline_config)
 
     import tcfl.ui_cli_servers
     tcfl.ui_cli_servers.cmdline_setup(arg_subparsers)
