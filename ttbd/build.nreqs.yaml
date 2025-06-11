@@ -32,4 +32,5 @@ pyusb:
   dnf: python3-pyusb
 
 setuptools:
+  # >= 0.7 due to https://osv.dev/vulnerability/GHSA-27x4-j476-jp5f
   distro: python3-setuptools

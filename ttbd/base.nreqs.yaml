@@ -48,7 +48,10 @@ rpyc:
   # >= 6.0 due to https://osv.dev/vulnerability/PYSEC-2024-44
   distro: python3-rpyc
 
-python3-setuptools:
+setuptools:
+  # >= 0.7 due to https://osv.dev/vulnerability/GHSA-27x4-j476-jp5f
+  distro: python3-setuptools
+
 python3-systemd:
 python3-tornado:
 qemu:
