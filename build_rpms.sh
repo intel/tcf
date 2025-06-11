@@ -41,13 +41,16 @@ if [ x"${CONTAINER}" != "x" -a "${CONTAINER}" != "None" ]; then
     BDIST_OPTS="--dist-dir=$topdir/dist/ --bdist-base=$topdir/dist/"
     RUN_SETUP="python3 ./setup.py bdist_rpm ${BDIST_OPTS}"
 
+    if ! [ -z ${REGISTRY:-} ]; then
+        REGISTRY=${REGISTRY}/
+    fi
     # --rm
     podman run \
             -v $HOME/.cache/dnf:/var/cache/dnf -v ${PWD}:${PWD}  \
             --env VERSION="$VERSION" \
             --env HTTP_PROXY=${HTTP_PROXY} --env http_proxy=${http_proxy} \
             --env HTTPS_PROXY=${HTTPS_PROXY} --env https_proxy=${https_proxy} \
-            ${DISTRO}:${DISTROVERSION} \
+            ${REGISTRY:-}${DISTRO}:${DISTROVERSION} \
             /bin/bash -c "dnf install -y python-yaml rpm-build; cd $topdir/${TARGET_DIR}; $topdir/nreqs.py install build.nreqs.yaml; ${RUN_SETUP}"
 
 else
