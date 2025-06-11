@@ -37,6 +37,7 @@ import platform
 import re
 import shutil
 import sys
+import threading
 import tempfile
 
 import argcomplete
@@ -107,6 +108,8 @@ def _cmdline_cache_flush(_args):
     shutil.rmtree(cache_path, ignore_errors = True)
 
 
+# used by __main__._rotator
+_rotator_lock = threading.Lock()
 
 if __name__ == "__main__":
     tcfl.tc.version = commonl.version_get(tcfl, "tcf")
@@ -245,6 +248,30 @@ if __name__ == "__main__":
         " for fresh information (%(default)s); set to zero to force"
         " rediscovery")
 
+    arg_group = arg_parser.add_argument_group('Log control options')
+
+    arg_group.add_argument(
+        "--log-bare-level", action = "store",
+        type = int, default = logging.DEBUG,
+        help = "When logging to a file (see --logfile-maxbyte), minimum"
+        " log level we capture [logging.DEBUG %(default)d]")
+
+    arg_group.add_argument(
+        "--logfile-maxbytes", action = "store",
+        type = int, default = 5 * 1024 * 1204,
+        help = "Maximum size of the log files before we rotate [%(default)dB];"
+        " set to zero to disable logging to a file")
+
+    arg_group.add_argument(
+        "--logfile-backupcount", action = "store",
+        type = int, default = 5,
+        help = "Number of copies of old log files we keep around [%(default)d]")
+
+    arg_group.add_argument(
+        "--logfile-name", action = "store",
+        default = "~/tcf.log",
+        help = "Name of the file where we log details [%(default)s]")
+
     ap = arg_subparsers.add_parser(
         "config", help = "Print information about configuration")
     ap.set_defaults(func = _config)
@@ -347,7 +374,69 @@ if __name__ == "__main__":
     log_format += ": %(message)s"
     log_format = commonl.log_format_compose(log_format, args.log_pid_tid,
                                             args.log_time, args.log_time_delta)
-    logging.basicConfig(format = log_format, level = args.level)
+
+    #
+    # Configure always logging lots of details to a log file
+    #
+    # We always get reports about issues and they never captured, so
+    # we end up crying that we have no info; capture it all, compress
+    # and rotate older stuff
+    #
+    # We need to setup the engine to log to the minimum log level and
+    # then set the console logger to what the user wants in the console
+    #
+    # Credit
+    #
+    # https://docs.python.org/3/howto/logging-cookbook.html#using-a-rotator-and-namer-to-customize-log-rotation-processing
+    # https://docs.python.org/3/library/logging.html#logger-objects
+
+    def _namer(name):
+        return name + ".gz"
+
+    def _rotator(source, dest):
+        import gzip
+        import shutil
+        with _rotator_lock:
+            # don't log here, it'll recurse and splat
+            #print("DEBUG rotating")
+            with open(source, 'rb') as f_in:
+                # this might have been preempted, so do a safety check
+                stat_info = os.fstat(f_in.fileno())
+                if stat_info.st_size < args.logfile_maxbytes:
+                    # another thread got to it before we did
+                    #print("DEBUG not rotating, preempted")
+                    return
+                with gzip.open(dest, 'wb') as f_out:
+                    shutil.copyfileobj(f_in, f_out)
+                    os.remove(source)
+                #print("DEBUG rotated")
+
+    if args.logfile_maxbytes > 0:
+        logging.basicConfig(format = log_format, level = args.log_bare_level)
+    else:
+        logging.basicConfig(format = log_format, level = args.level)
+
+    # set the console logger level
+    root = logging.getLogger()
+    root.handlers[0].setLevel(args.level)
+
+    if args.logfile_maxbytes > 0:
+        # configure the logfile rotator
+        logfile_handler = logging.handlers.RotatingFileHandler(
+            os.path.expanduser(args.logfile_name),
+            maxBytes = args.logfile_maxbytes,
+            backupCount = args.logfile_backupcount)
+        logfile_handler.rotator = _rotator
+        logfile_handler.namer = _namer
+
+        root.addHandler(logfile_handler)
+        logfile_handler.setLevel(logging.DEBUG)
+        logfile_handler.setFormatter(
+            # add hella details so we can track it all
+            logging.Formatter(
+                "%(levelname)s[%(process)d]/%(asctime)s+%(relativeCreated)dms"
+                " %(name)s::%(module)s.%(funcName)s():%(lineno)d: %(message)s"))
+
     for environment in args.environment:
         if '=' in environment:
             key, val = environment.split("=", 1)
