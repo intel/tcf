@@ -46,7 +46,8 @@ pytz            # package: python3-pytz
 pyusb           # package: centos,fedora=python3-pyusb ubuntu=python3-usb
 # >= 2.3.0 due to https://osv.dev/vulnerability/GHSA-652x-xj99-gmcc
 # >= 2.32 due to https://osv.dev/vulnerability/GHSA-9wx4-h78v-vm56
-requests>=2.32 # package: python3-requests
+# >=2.32.4 due to https://osv.dev/vulnerability/GHSA-9hjg-9r4m-mvj7
+requests>=2.32.4 # package: python3-requests
 # >= 6.0 due to https://osv.dev/vulnerability/PYSEC-2024-44
 rpyc>=6.0       # package: fedora=python3-rpyc
 # >= 0.7 due to https://osv.dev/vulnerability/GHSA-27x4-j476-jp5f
