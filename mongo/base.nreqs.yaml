@@ -3,7 +3,9 @@ google-api-python-client: python3-google-api-client
 
 oauth2client: python3-oauth2client
 
-httplib2: python3-httplib2
+httplib2:
+  # >=0.19.0 due to https://osv.dev/vulnerability/GHSA-93xj-8mrv-444m
+  distro: python3-httplib2
 
 pymongo:
   # >=4.6.3 https://osv.dev/vulnerability/GHSA-m87m-mmvp-v9qm
