@@ -33,7 +33,8 @@ keyring>=0.10   # package: fedora,ubuntu=python3-keyring
 netifaces       # package: python3-netifaces
 pexpect         # package: python3-pexpect
 ply             # package: python3-ply
-pymongo         # package: python3-pymongo
+# >=4.6.3 due to https://osv.dev/vulnerability/GHSA-m87m-mmvp-v9qm
+pymongo>=4.6.3  # package: python3-pymongo
 # >=17.5.0 due to https://osv.dev/vulnerability/GHSA-2rcm-phc9-3945
 pyOpenSSL>=17.5.0  # package: centos,fedora,rhel=python3-pyOpenSSL ubuntu=python3-openssl
 python-prctl    # package: ubuntu=python3-prctl
