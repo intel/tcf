@@ -79,10 +79,6 @@ This is the client and meta-testcase runner for the TCF test case framework.
     package_data = {'': ['LICENSE']},
     include_package_data=True,
     data_files = [
-        # No default configuration files; confusing
-        ( os.path.join('@sysconfigdir@', 'tcf'), [
-            'conf_global.py',
-        ]),
         # ('etc/tcf', glob.glob("conf_*.py")),
         ( os.path.join('@prefix@', "share", 'tcf'), [
             os.path.join('tcfl', 'img-metadata.schema.yaml'),
