@@ -2,8 +2,8 @@
 # package: fedora,centos,rhel=rpm-build
 asciimatics
 junit_xml               # package: fedora=python3-junit_xml ubuntu=python3-junitxml
-# >=0.10 https://osv.dev/vulnerability/GHSA-8867-vpm3-g98g
-keyring>=0.10           # package: fedora,ubuntu=python3-keyring
+# >=0.10.1 due to https://osv.dev/PYSEC-2019-182
+keyring>=0.10.1           # package: fedora,ubuntu=python3-keyring
 mariadb                 # package: fedora,centos=mariadb
 # >=1.8.1 https://osv.dev/vulnerability/GHSA-2fc2-6r4j-p65h
 # >=1.19 https://osv.dev/vulnerability/GHSA-5545-2q6w-2gh6
