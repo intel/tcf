@@ -28,6 +28,8 @@ flask-login     # package: python3-flask-login
 flask-principal # package: fedora,ubuntu=python3-flask-principal
 #>=23.0.0 due to https://osv.dev/vulnerability/GHSA-hc5x-x2vx-497g
 gunicorn>=23.0.0 # package: python3-gunicorn
+# >=0.19.0 due to https://osv.dev/vulnerability/GHSA-93xj-8mrv-444m
+httplib2>=0.19.0
 # >=0.10.1 due to https://osv.dev/PYSEC-2019-182
 keyring>=0.10.1           # package: fedora,ubuntu=python3-keyring
 netifaces       # package: python3-netifaces
