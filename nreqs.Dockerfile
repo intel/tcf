@@ -46,7 +46,7 @@ RUN \
         strace && \
     dnf clean all && \
     cd /home/work/tcf.git && \
-    pip3 install . --root=/ --prefix=/ && \
+    python ./setup.py install --root=/ --prefix=/ && \
     sed -i 's|#!python|#! /usr/bin/env python3|' /usr/bin/tcf && \
     rm -rf lib
 
