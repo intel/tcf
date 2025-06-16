@@ -59,7 +59,7 @@ class _install_data(setupl._install_data):
         setupl._install_data.run(self)
         for filename in self.outfiles:
             if filename.endswith("var/lib/ttbd"):
-                os.chmod(filename, 0o2775)
+                os.chmod(filename, 0o2770)
         # add ttbd to supplementalgroups in ttbd@.service
         for filename in self.outfiles:
             if filename.endswith(".ttbd@.service"):
