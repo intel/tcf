@@ -2768,6 +2768,9 @@ RUN \
         for file_name, file_data in self.run_files.items():
             with open(os.path.join(run_dir, file_name), "w") as f:
                 f.write(commonl.kws_expand(file_data, self.kws))
+                # this is going to be avalable inside the container
+                # and we need whichever user to be able to read it, so
+                # these perms are ok
                 os.fchmod(f.fileno(), 0o755)
 
         # hook for subclasses to re-define
