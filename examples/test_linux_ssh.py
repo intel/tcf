@@ -91,10 +91,9 @@ class _test(tcfl.pos.tc_pos0_base):
         # create a tunnel from server_name:server_port -> to target:22
         server_name = target.server.parsed_url.hostname
         server_port = target.tunnel.add(22)
-        output = subprocess.check_output(
-            "/usr/bin/ssh -p %d root@%s echo hello"
-            % (server_port, server_name),
-            shell = True)
+        output = subprocess.check_output([
+            "/usr/bin/ssh", "-p", str(server_port), f"root@{server_name}",
+            "echo", "hello" ])
         # this is done behind the doors of TCF, it doesn't know that
         # it was run, so report about it
         target.report_info("Ran SSH: %s" % output)

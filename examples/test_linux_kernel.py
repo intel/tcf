@@ -117,6 +117,7 @@ Other variables you can set:
 """
 
 import os
+import string
 import subprocess
 
 import commonl
@@ -146,8 +147,8 @@ class _test(tcfl.pos.tc_pos_base):
         if 'LK_BUILD_SKIP' not in os.environ:
             target.report_pass("re/building kernel in %s" % builddir, dlevel = -1)
             output = subprocess.check_output(
-                "${MAKE:-make} -C %s all" % builddir,
-                shell = True, text = True, stderr = subprocess.STDOUT)
+                [ os.getenv("MAKE", "make"), "-C", builddir, "all" ],
+                text = True, stderr = subprocess.STDOUT)
             target.report_pass("re/built kernel in %s" % builddir,
                                dict(output = output),
                                alevel = 0, dlevel = -2)
@@ -182,16 +183,23 @@ class _test(tcfl.pos.tc_pos_base):
         #   files in rootdir/
         commonl.makedirs_p(rootdir + "/boot")
         output = subprocess.check_output(
-            "${MAKE:-make} -C %s INSTALLKERNEL=ignoreme"
-            " INSTALL_PATH=%s/boot INSTALL_MOD_PATH=%s"
-            " install modules_install" % (builddir, rootdir, rootdir),
-            shell = True, text = True, stderr = subprocess.STDOUT)
+            [
+                os.getenv("MAKE", "make"), "-C", builddir,
+                "INSTALLKERNEL=ignoreme",
+                f"INSTALL_PATH={rootdir}/boot",
+                f"INSTALL_MOD_PATH={rootdir}",
+                "install", "modules_install"
+            ],
+            text = True, stderr = subprocess.STDOUT)
         target.report_pass("installed kernel to %s" % rootdir,
                            dict(output = output), dlevel = -1)
 
         target.report_pass("stripping debugging info")
+        commonl.verify_str_safe(
+            rootdir,
+            string.ascii_letters + string.digits + "%_-+./")
         subprocess.check_output(
-            "find %s -iname \*.ko | xargs strip --strip-debug" % rootdir,
+            "find '%s' -iname \*.ko | xargs strip --strip-debug" % rootdir,
             shell = True, stderr = subprocess.STDOUT)
         target.report_pass("stripped debugging info", dlevel = -1)
 
