@@ -131,9 +131,8 @@ class _test(tcfl.tc.tc_c):
         # I lifted the build instructions of the Fedora 29 spec file
         # and simplified to the max, but I only know them to work on
         # this git version; complain otherwise
-        rev = subprocess.check_output(
-            "git -C '%s' rev-parse HEAD" % self.builddir,
-            shell = True)
+        rev = subprocess.check_output([
+            "git", "-C", self.builddir, "rev-parse", "HEAD" ])
         if rev.strip() != "cb5f4f45ce1fca390b99dae5c42b9c4c8b53deea":
             self.report_info(
                 "WARNING!! WARNING!!! These build process only verified to"

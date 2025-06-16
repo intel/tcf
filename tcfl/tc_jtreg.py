@@ -832,9 +832,11 @@ class driver(tcfl.pos.tc_pos0_base):
             commonl.file_name_make_safe(dirname),
             "JTWork-%s" % commonl.file_name_make_safe(java_version))
         output = subprocess.check_output(
-            "java -jar %s/lib/jtreg.jar %s -l -w:'%s' '%s'" % (
-                jtreg_dir, native_cmdline, jtwork_dir, dirname),
-            shell = True, env = _env, stderr = subprocess.STDOUT,
+            [
+                "java", "-jar", f"{jtreg_dir}/lib/jtreg.jar",
+                native_cmdline, "-l", f"-w:'{jtwork_dir}'", f"'{dirname}'"
+            ],
+            env = _env, stderr = subprocess.STDOUT,
             encoding = "UTF-8")
         # So that thing prints
         #

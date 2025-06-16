@@ -6,9 +6,9 @@
 #
 # pylint: disable = missing-docstring
 
+import hashlib
 import os
 import re
-import subprocess
 
 import tcfl.tc
 import tcfl.tl
@@ -72,16 +72,12 @@ class _test(tcfl.tc.tc_c):
         md5_regex = re.compile("^([0-9a-z]+) ", re.MULTILINE)
 
         # get the local MD5 signature
-        output = subprocess.check_output(
-            "md5sum < %(tmpdir)s/root/usr/bin/hello" % self.kws, shell = True)
-        m = md5_regex.search(output)
-        if not m:
-            raise tcfl.tc.error_e("Can't parse local's MD5",
-                                  attachments = dict(output = output))
-        local_md5 = m.groups()[0]
+        with open(self.kws, "rw") as f:
+            local_md5 = hashlib.file_digest(f, hashlib.md5)
 
         # now the remote
         output = target.shell.run("md5sum < /usr/bin/hello", output = True)
+        m = md5_regex.search(output)
         if not m:
             raise tcfl.tc.error_e("Can't parse remote's MD5",
                                   attachments = dict(output = output,

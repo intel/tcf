@@ -243,10 +243,11 @@ class vlan_pci(ttbl.power.impl_c):
                 raise ValueError("Cannot find network interface with MAC '%s'"
                                  % target.property_get('mac_addr'))
             if ifname != bridge_ifname:
-                subprocess.check_call("ip link set %s down" % ifname,
-                                      shell = True)
-                subprocess.check_call("ip link set %s name b%s"
-                                      % (ifname, bridge_ifname), shell = True)
+                subprocess.check_call([ "ip", "link", "set", ifname, "down" ])
+                subprocess.check_call([
+                    "ip", "link", "set", ifname, "name",
+                    "b" + bridge_ifname
+                ])
 
 
 
@@ -290,22 +291,24 @@ class vlan_pci(ttbl.power.impl_c):
                 # will stop operating
                 # This function might be being called to restablish a
                 # half baked operating state.
-                subprocess.check_call(
-                    "/usr/sbin/ip link add"
-                    f" link {ifname} name {bridge_ifname}"
-                    f" type vlan id {vlan_id}",
+                subprocess.check_call([
+                    "/usr/sbin/ip", "link", "add",
+                    "link", "ifname", "name", bridge_ifname,
+                    "type", "vlan", "id", str(vlan_id),
                     #" protocol VLAN_PROTO"
                     #" reorder_hdr on|off"
                     #" gvrp on|off mvrp on|off loose_binding on|off"
-                    shell = True)
-                subprocess.check_call(	# bring lower up
-                    f"/usr/sbin/ip link set dev {ifname} up promisc on",
-                    shell = True)
+                ])
+                subprocess.check_call([	# bring lower up
+                    "/usr/sbin/ip", "link", "set", "dev", ifname,
+                    "up", "promisc", "on"
+                ])
         elif mode == 'physical':
             ifname = commonl.if_find_by_mac(target.property_get('mac_addr'))
-            subprocess.check_call(	# bring lower up
-                f"/usr/sbin/ip link set dev {ifname} up promisc on",
-                shell = True)
+            subprocess.check_call([	# bring lower up
+                "/usr/sbin/ip", "link", "set", "dev", ifname, "up",
+                "promisc", "on"
+            ])
             self._if_rename(target)
         elif mode == 'virtual':
             # We create a bridge, to serve as lower
@@ -316,34 +319,38 @@ class vlan_pci(ttbl.power.impl_c):
                 # This function might be being called to restablish a
                 # half baced operating state.
                 commonl.if_remove_maybe(bridge_ifname)
-                subprocess.check_call(
-                    f"/usr/sbin/ip link add name {bridge_ifname} type bridge",
-                    shell = True)
-                subprocess.check_call(	# bring lower up
-                    f"/usr/sbin/ip link set dev {bridge_ifname} up promisc on",
-                    shell = True)
+                subprocess.check_call([
+                    "/usr/sbin/ip", "link", "add", "name", bridge_ifname,
+                    "type", "bridge"
+                ])
+                subprocess.check_call([	# bring lower up
+                    "/usr/sbin/ip", "link", "set", "dev", bridge_ifname,
+                    "up", "promisc", " on",
+                ])
         else:
             raise AssertionError("Unknown mode %s" % mode)
 
         # Configure the IP addresses for the top interface
-        subprocess.check_call(		# clean up existing address
-            f"/usr/sbin/ip add flush dev {bridge_ifname}", shell = True)
-        subprocess.check_call(		# add IPv6
+        subprocess.check_call([		# clean up existing address
+            "/usr/sbin/ip", "add", "flush", "dev", bridge_ifname ])
+        subprocess.check_call([		# add IPv6
             # if this fails, check Network Manager hasn't disabled ipv6
             # sysctl -a | grep disable_ipv6 must show all to 0
-            "/usr/sbin/ip addr add"
-            f"  {target.kws['ipv6_addr']}/{target.kws['ipv6_prefix_len']}"
-            f" dev {bridge_ifname}",
-            shell = True)
-        subprocess.check_call(		# add IPv4
-            "/usr/sbin/ip addr add"
-            f"  {target.kws['ipv4_addr']}/{target.kws['ipv4_prefix_len']}"
-            f"  dev {bridge_ifname}", shell = True)
+            "/usr/sbin/ip", "addr", "add",
+            f"{target.kws['ipv6_addr']}/{target.kws['ipv6_prefix_len']}",
+            "dev", bridge_ifname
+        ])
+        subprocess.check_call([		# add IPv4
+            "/usr/sbin/ip", "addr", "add",
+            f"{target.kws['ipv4_addr']}/{target.kws['ipv4_prefix_len']}",
+            "dev", bridge_ifname
+        ])
 
         # Bring up the top interface, which sets up ther outing
-        subprocess.check_call(
-            f"/usr/sbin/ip link set dev {bridge_ifname} up promisc on",
-            shell = True)
+        subprocess.check_call([
+            "/usr/sbin/ip", "link", "set", "dev", bridge_ifname,
+            "up", "promisc", "on"
+        ])
 
 
 
@@ -357,11 +364,18 @@ class vlan_pci(ttbl.power.impl_c):
         if mode == 'physical':
             # bring down the lower device
             ifname = commonl.if_find_by_mac(target.property_get('mac_addr'))
-            subprocess.check_call(
+            subprocess.check_call([
                 # flush the IP addresses, bring it down
-                f"/usr/sbin/ip add flush dev {ifname}; "
-                f"/usr/sbin/ip link set dev {ifname} down promisc off",
-                shell = True)
+                "/usr/sbin/ip", "add", "flush", "dev", ifname
+            ])
+            subprocess.check_call([
+                # flush the IP addresses, bring it down
+                "/usr/sbin/ip", "add", "flush", "dev", ifname
+            ])
+            subprocess.check_call([
+                "/usr/sbin/ip", "link", "set", "dev", ifname,
+                "down", "promisc", "off"
+            ])
         elif mode == 'vlan':
             commonl.if_remove_maybe(bridge_ifname)
             # nothing; we killed the upper and on the lwoer, a
