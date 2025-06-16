@@ -88,8 +88,8 @@ def apc_pdu_add(name, powered_on_start = None, hostname = None):
             target.power.put_on(target, ttbl.who_daemon(), {}, {}, None)
 
 
-def dlwps7_add(hostname, powered_on_start = None, basename = None,
-               user = "admin", password = "1234"):
+def dlwps7_add(hostname, user: str, password: str,
+               powered_on_start = None, basename = None):
     """Add test targets to individually control each of a DLWPS7's sockets
 
     The DLWPS7 needs to be setup and configured; this function exposes
