@@ -7,10 +7,94 @@
 # pylint: disable = missing-docstring
 
 import os
-import shutil
+import re
 
 import tcfl
 import tcfl.tc
+
+
+
+def run_tcf_config(self):
+    # copy the cmdline_environment_run.py file to temp as test_ ->
+    # we do it like this so when we 'tcf run tests/', we don't
+    # run that one.
+    with self.subcase("run_tcf_config"):
+        output = self.run_local(
+            os.path.join(self.kws['srcdir_abs'], os.path.pardir, "tcf")
+            + " config")
+        self.report_pass(
+            "can run 'tcf config' command",
+            { "output": output }, subcase = "execution")
+    #
+    # This shall print
+    #
+    ## tcf: ./tcf
+    ## tcf/realpath: .../tcf
+    ## tcfl: .../tcfl/__init__.py
+    ## commonl: .../commonl/__init__.py
+    ## share path: ...
+    ## state path: $HOME/.tcf
+    ## config path: .../zephyr:...:$HOME/.tcf:.tcf
+    ## config file 0: .../zephyr/conf_zephyr.py
+    ## config file 1: .../conf_...
+    ## version: ...
+    ## python: ...
+    ## uname.machine: ...
+    ## uname.node: ...
+    ## uname.processor: ...
+    ## uname.release: ...
+    ## uname.system: ...
+    ## uname.version: ...
+    ## servers: 11
+    ## server ...: ...
+    ## resolvconf: ...
+    ## resolvconf: ...
+    #
+    with self.subcase("section_presence"):
+        for subsection in [
+                "tcf",
+                "tcf/realpath",
+                "tcfl",
+                "commonl",
+                "share path",
+                "state path",
+                "config path",
+                # at least it will discover one config file
+                "config file 0",
+                "version",
+                "python",
+                "servers",
+                # this is only if we discover servers, which we
+                # won't in this run
+                #"server",
+                "resolvconf",
+        ]:
+            if not subsection + ":" in output:
+                self.report_fail(
+                    f"can't find section '{subsection}': in 'tcf config' output",
+                    subcase = subsection)
+
+    # parse the output, it mush match tcfl.tc.version
+    with self.subcase("version_check"):
+        version_regex = re.compile("^version: (?P<version>\S+)$", re.MULTILINE)
+        m = version_regex.search(output)
+        if not m:
+            self.report_error(
+                f"can't extract version with pattern {version_regex.pattern}",
+                { "output": output })
+        else:
+            version_found = m.groupdict()['version']
+            if version_found != tcfl.tc.version:
+                self.report_fail(
+                    f"CLI reports version '{version_found}';"
+                    f" expected '{tcfl.tc.version}' from tcfl.tc.version",
+                    { "output": output })
+            else:
+                self.report_pass(
+                    f"CLI reports version '{version_found}';"
+                    f" matching expected from tcfl.tc.version")
+
+
 
 @tcfl.tc.tags(
     "tcf_client",
@@ -23,61 +107,4 @@ class _test(tcfl.tc.tc_c):
     """
 
     def eval(self):
-        # copy the cmdline_environment_run.py file to temp as test_ ->
-        # we do it like this so when we 'tcf run tests/', we don't
-        # run that one.
-        with self.subcase("execution"):
-            output = self.run_local(
-                os.path.join(self.kws['srcdir_abs'], os.path.pardir, "tcf")
-                + " config")
-            self.report_pass(
-                "can run 'tcf config' command",
-                { "output": output }, subcase = "execution")
-        #
-        # This shall print
-        #
-        ## tcf: ./tcf
-        ## tcf/realpath: .../tcf
-        ## tcfl: .../tcfl/__init__.py
-        ## commonl: .../commonl/__init__.py
-        ## share path: ...
-        ## state path: $HOME/.tcf
-        ## config path: .../zephyr:...:$HOME/.tcf:.tcf
-        ## config file 0: .../zephyr/conf_zephyr.py
-        ## config file 1: .../conf_...
-        ## version: ...
-        ## python: ...
-        ## uname.machine: ...
-        ## uname.node: ...
-        ## uname.processor: ...
-        ## uname.release: ...
-        ## uname.system: ...
-        ## uname.version: ...
-        ## servers: 11
-        ## server ...: ...
-        ## resolvconf: ...
-        ## resolvconf: ...
-        #
-        with self.subcase("section_presence"):
-            for subsection in [
-                    "tcf",
-                    "tcf/realpath",
-                    "tcfl",
-                    "commonl",
-                    "share path",
-                    "state path",
-                    "config path",
-                    # at least it will discover one config file
-                    "config file 0",
-                    "version",
-                    "python",
-                    "servers",
-                    # this is only if we discover servers, which we
-                    # won't in this run
-                    #"server",
-                    "resolvconf",
-            ]:
-                if not subsection + ":" in output:
-                    self.report_fail(
-                        f"can't find section '{subsection}': in 'tcf config' output",
-                        subcase = subsection)
+        run_tcf_config(self)
