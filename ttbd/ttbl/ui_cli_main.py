@@ -1557,10 +1557,7 @@ _local_addresses = set()
 # Anonymous user, if the connection comes from one of the local ones,
 # we just create an special anonymous user that has full privilege.
 def _create_anonymous_user():
-    local_auth_disabled_runtime = os.path.exists(
-        os.path.join(args.var_state_path, "local_auth_disabled"))
-    if not local_auth_disabled_runtime \
-       and flask.request.remote_addr in _local_addresses:
+    if flask.request.remote_addr in _local_addresses:
         return ttbl.user_control.User('local', roles = [ "admin" ])
     return flask_login.AnonymousUserMixin()
 
@@ -1918,6 +1915,7 @@ def __main__():
 
     # Allow local users access as admins? [--local-auth]
     # Command line goes after configuration file
+    global local_auth
     local_auth += args.local_auth
     if local_auth:
         import ttbl.auth_party
@@ -2094,6 +2092,7 @@ def __main__():
             raise
         # It is already a session leader...can ignore
 
+    global daemon_user
     daemon_user = ttbl.user_control.User('local', roles = [ "admin" ])
     if server == "gunicorn":
         # gunicorn conflicts with MP and kills cleanup, so just fork
