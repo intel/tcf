@@ -1215,6 +1215,7 @@ def __main__():
     # determine in which distro we are running, except for overrides
     global distro
     global distro_version
+    global distro_method
     distro, distro_version = _distro_version_get(args.distro, args.distro_version)
     if args.distro_method:
         distro_method = args.distro_method
