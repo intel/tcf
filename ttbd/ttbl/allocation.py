@@ -1308,7 +1308,9 @@ def maintenance(ts_now, calling_user, keepalive_fn = None):
     # - when priorities change, maybe reassign ownerships if
     #   preemption
     #logging.error("DEBUG: maint %s", ts_now)
-    assert isinstance(calling_user, ttbl.user_control.User)
+    assert isinstance(calling_user, ttbl.user_control.User), \
+        "calling_user: expected type derived from ttbl.user_control.User;" \
+        f" got {type(calling_user)}"
     assert keepalive_fn == None or callable(keepalive_fn)
 
     # allocations: run maintenance (expire, check overtimes)
