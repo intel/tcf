@@ -53,8 +53,13 @@ import time
 import traceback
 import types
 
-import filelock
-import requests
+#
+# DO NOT IMPORT ANYTHING THAT IS NOT PYTHON STANDARD
+#
+# import in the function where needed; this is a workaround needed so
+# nreqs.py works only with an installation pyyaml. Proper fix pending.
+#
+
 
 import urllib.parse
 
@@ -67,9 +72,11 @@ except ImportError as e:
     logging.warning("can't import keyring, functionality disabled")
     keyring_available = False
 
-from . import expr_parser
-
 # filelock is very chatty
+#
+# we might import it later--we don't import it now so we don't have a
+# lot of dependencies pulled in--especially important when running
+# nreqs.py; we want minimum dependencies
 #
 # Mar 05 13:00:01 ... ttbd[2438170]: INFO[2438170] filelock.acquire():274: Lock 140152041517312 acquired on /var/lib/ttbd/production/cache/socket_gethostbyaddr/lockfile
 # Mar 05 13:00:01 ... ttbd[2438170]: INFO[2438170] filelock.release():318: Lock 140152041517312 released on /var/lib/ttbd/production/cache/socket_gethostbyaddr/lockfile
@@ -852,6 +859,7 @@ class fs_cache_c():
             self.fsdb = base_type(self.cache_dir)
 
     def lock(self):
+        import filelock
         return filelock.FileLock(self.cache_lockfile)
 
     def set_unlocked(self, field, value, ex = None):
@@ -1424,6 +1432,8 @@ def hash_file_maybe_compressed(hash_object, filepath, cache_entries = 128,
 
 
 def request_response_maybe_raise(response):
+    import requests	# only when needed
+
     if not response:
         try:
             json = response.json()
@@ -1436,7 +1446,7 @@ def request_response_maybe_raise(response):
                     message = "no specific error text available"
             else:
                 message = "no specific error text available"
-        except ValueError as e:
+        except ValueError:
             message = "no specific error text available"
         logging.debug("HTTP Error: %s", response.text)
         e = requests.exceptions.HTTPError(
@@ -2195,6 +2205,7 @@ def conditional_eval(tag, kw, conditional, origin,
     if conditional == None:
         return True
     try:
+        from . import expr_parser
         return expr_parser.parse(conditional, kw)
     except Exception as e:
         raise Exception("error evaluating %s %s "
