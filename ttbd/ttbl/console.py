@@ -969,6 +969,81 @@ class generic_c(impl_c):
                     else:
                         raise
 
+
+
+class local_c(ttbl.power.socat_pc, generic_c):
+    """
+    Run a console to the local system
+
+    Note when the process implementing the console dies, the console
+    gets disabled and needs to be enabled again.
+
+    :param str shell_command: (optional; default *bash --login*)
+      command to get to a console/shell
+
+      Examples:
+
+      - to start a console in a given container image:
+
+        >>> shell_command = "podman run -ti --network=none registry.fedoraproject.org/fedora:34 /bin/bash")
+
+      - to start a console in a given python venv:
+
+        >>> shell_command = "bash --init-file SOMEDIR/bin/activate -i"
+        >>> shell_command = "venvdir=SOMEDIR; rm -rf $venvdir; cp -al ${venvdir}.orig $venvdir; bash --init-file $venvdir/bin/activate -i"
+
+    Rest of arguments are the same as to :class:`ttbl.console.generic_c`
+    """
+
+    def __init__(self, *args,
+                 shell_command: str = "bash --login",
+                 **kwargs):
+        generic_c.__init__(self, *args, **kwargs)
+        ttbl.power.socat_pc.__init__(
+            self,
+            # note it is important to do the rawer first thing, then
+            # do the settings; rawer resets to raw state
+            "PTY,link=console-%(component)s.write,rawer"
+            "!!CREATE:console-%(component)s.read",
+            # pty: needed for bash to behave as if we were typing
+            # cty: needed for job control
+            f"SHELL:'{shell_command}',stderr,pty,ctty"
+        )
+        self.upid_set("local console")
+
+
+    def target_setup(self, target, iface_name, component):
+        generic_c.target_setup(self, target, iface_name, component)
+        ttbl.power.socat_pc.target_setup(self, target, iface_name, component)
+
+
+    # console interface; state() is implemented by generic_c
+    def on(self, target, component):
+        ttbl.power.socat_pc.on(self, target, component)
+        generation_set(target, component)
+        generic_c.enable(self, target, component)
+
+    def off(self, target, component):
+        generic_c.disable(self, target, component)
+        ttbl.power.socat_pc.off(self, target, component)
+
+    def enable(self, target, component):
+        self.on(target, component)
+
+    def disable(self, target, component):
+        return self.off(target, component)
+
+    def state(self, target, component):
+        # we want to use this to gather state, since the generic_c
+        # implementation relies on the console-NAME.write file
+        # existing; this can linger if a process dies or not...
+        # but the ttbl.power.socat_pc.get() implementation checks if
+        # the process is alive looking at the PIDFILE
+        # COMPONENT-socat.pid and verifying that thing is still running
+        return ttbl.power.socat_pc.get(self, target, component)
+
+
+
 class serial_pc(ttbl.power.socat_pc, generic_c):
     """Implement a serial port console and data recorder
 
