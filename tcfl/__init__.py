@@ -1313,7 +1313,6 @@ class server_c:
     seen_hosts_lock = threading.Lock()
 
 
-
     def _herds_get(self, count, loops_max):
         """
         Query for a given server the /ttb URL, which provides
@@ -1327,6 +1326,12 @@ class server_c:
            *None* in case of error
          - *None* on sucess, else string with error description
         """
+
+        exclude_reason = self._cache_get_unlocked("exclude")
+        if exclude_reason:
+            return self, None, \
+                f"{self.url}: excluding because of 'exclude' setting in" \
+                f" cache: {exclude_reason}"
 
         failure_count = self._cache_get_unlocked("failure_count", 0)
         if isinstance(failure_count, str):	# COMPAT: previously was str
@@ -1653,6 +1658,15 @@ class server_c:
 
         - hosts for which we have cached information
 
+          If a host has an *exclude* field set, it will be ignored. You
+          can set with::
+
+            $ cd ~/.cache/tcf/servers
+            $ ln -s "REASON DESCRIPTION" SERVERAKA.exclude
+
+          this comes handy when a server is misbehaving and is still
+          published, so it keeps trying.
+
         This tries a few times (controlled by *loops_max*) to query
         each known server for more servers and gives up if it can't
         get more server twice. If a run provides more servers, on the
@@ -1777,6 +1791,13 @@ class server_c:
                     fsdb.set(aka, None)
                     continue
 
+                exclude_reason = fsdb.get(aka + ".exclude", None)
+                if exclude_reason:
+                    log_sd.error(
+                        f"{key}: excluding because 'exclude' setting in"
+                        f" cache: {exclude_reason}")
+                    continue
+
                 ssl_verify = fsdb.get(aka + ".ssl_verify", False)
                 if not isinstance(ssl_verify, bool):
                     log_sd.debug(
@@ -1861,8 +1882,17 @@ class server_c:
         # So now for each of those servers we know of, let's
         # re-discover only those who have been not discovered for a
         # long time, since they don't change this often
-        for server_name, server in cls.servers.items():
+        # use list -> we'll delete servers we need to exclude
+        for server_name, server in list(cls.servers.items()):
             try:
+                exclude_reason = server._cache_get("exclude", None)
+                if exclude_reason:
+                    log_sd.warning("%s: excluding because of 'exclude'"
+                                   " setting in cache: %s",
+                                   server_name, exclude_reason)
+                    del cls.servers[server_name]
+                    continue
+
                 last_discovery = int(server._cache_get("last_discovery", 0))
                 utcnow = int(datetime.datetime.utcnow().strftime("%Y%m%d%H%M%S"))
                 failure_last = int(server._cache_get("failure_last", utcnow))
@@ -1874,6 +1904,7 @@ class server_c:
                         "%s: ignoring cache age; re-discovering:"
                         " failure detected %.2fs after last discovery",
                         server_name, delta)
+                    exclude_reason = server._cache_get("exclude", None)
                 if max_cache_age == 0:
                     log_sd.warning(
                         f"{server_name}: ignoring cache age; re-discovering")
