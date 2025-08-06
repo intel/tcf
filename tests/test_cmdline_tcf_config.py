@@ -12,19 +12,20 @@ import re
 import tcfl
 import tcfl.tc
 
+import clil
 
 
-def run_tcf_config(self):
+def run_tcf_config(self, target: tcfl.tc.target_c):
     # copy the cmdline_environment_run.py file to temp as test_ ->
     # we do it like this so when we 'tcf run tests/', we don't
     # run that one.
-    with self.subcase("run_tcf_config"):
-        output = self.run_local(
-            os.path.join(self.kws['srcdir_abs'], os.path.pardir, "tcf")
-            + " config")
+    with self.subcase("execution"):
+        output = target.shell.run("tcf config", output = True)
         self.report_pass(
             "can run 'tcf config' command",
-            { "output": output }, subcase = "execution")
+            { "output": output })
+
+    # FIXME: verify we just print that, nothing more, nothing less
     #
     # This shall print
     #
@@ -73,6 +74,10 @@ def run_tcf_config(self):
                 self.report_fail(
                     f"can't find section '{subsection}': in 'tcf config' output",
                     subcase = subsection)
+            else:
+                self.report_pass(
+                    f"can find section '{subsection}': in 'tcf config' output",
+                    subcase = subsection)
 
     # parse the output, it mush match tcfl.tc.version
     with self.subcase("version_check"):
@@ -84,7 +89,12 @@ def run_tcf_config(self):
                 { "output": output })
         else:
             version_found = m.groupdict()['version']
-            if version_found != tcfl.tc.version:
+            if version_found == "vNA":
+                self.report_fail(
+                    "CLI reports version vNA, meaning not available;"
+                    " expected vMAJOR.MINOR.PL....",
+                    { "output": output })
+            elif version_found != tcfl.tc.version:
                 self.report_fail(
                     f"CLI reports version '{version_found}';"
                     f" expected '{tcfl.tc.version}' from tcfl.tc.version",
@@ -95,16 +105,19 @@ def run_tcf_config(self):
                     f" matching expected from tcfl.tc.version")
 
 
-
 @tcfl.tc.tags(
     "tcf_client",
     # files relative to top level this testcase exercises
     files = [ 'tcf', 'tcfl/ui_cli_main.py' ],
     level = "basic")
-class _test(tcfl.tc.tc_c):
+class _test(clil.test_base_c):
     """
-    Test running the config command basically works
+    Test running *tcf config* works basically
     """
 
-    def eval(self):
-        run_tcf_config(self)
+    # clil.test_base_c has setup the environment and path to run into
+    # whatever combination of local|containerimge, source tree, dir
+    # prefix or virtual environment
+
+    def eval_10(self, target):
+        run_tcf_config(self, target)
