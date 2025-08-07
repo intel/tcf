@@ -9440,6 +9440,13 @@ def _run(args):
         shards = 0
 
     tc_c._hash_salt = args.hash_salt
+    for env, value in os.environ.items():
+        if env.startswith("PARAMETER_"):
+            # we take these as parameters to the testcases, which
+            # might modify the way the operate; so for now we hack the
+            # hash salt with this; in the futre, which will be an axis
+            logger.info("adding to hash salt env var %s=%s", env, value)
+            tc_c._hash_salt += f"{env}={value}"
 
     # Is there a Run ID specified? or we asked to generate one? or none?
     global runid
