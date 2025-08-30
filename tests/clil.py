@@ -138,7 +138,7 @@ class test_base_c(tcfl.tc.tc_c):
                 f"export PYTHONPATH=$(readlink -e {prefix}/lib/python*/site-packages):$PYTHONPATH")
             # verify we have the right TCF
             output = target.shell.run(
-                "readlink -e $(which tcf)", output = True, trim = True)
+                "readlink -e $(which tcf)", output = True, trim = True).strip()
             if output != f"{prefix}/bin/tcf":
                 raise tcfl.error_e(
                     f"'which tcf' reports version '{output}'; expected '{prefix}/bin/tcf'")
@@ -154,7 +154,7 @@ class test_base_c(tcfl.tc.tc_c):
             #
             # so we force the hand a wee bit
             output = target.shell.run(
-                "readlink -e $(which tcf)", output = True, trim = True)
+                "readlink -e $(which tcf)", output = True, trim = True).strip()
             if output != f"{venvdir}/bin/tcf":
                 raise tcfl.error_e(
                     f"'which tcf' reports version '{output}'; expected '{venvdir}/bin/tcf'")
@@ -164,7 +164,7 @@ class test_base_c(tcfl.tc.tc_c):
                 f"TCF CLI will run off source tree {topdir} in {system_image}")
             target.shell.run(f"export PATH={topdir}:$PATH")
             output = target.shell.run(
-                "readlink -e $(which tcf)", output = True, trim = True)
+                "readlink -e $(which tcf)", output = True, trim = True).strip()
             if output != f"{topdir}/tcf":
                 raise tcfl.error_e(
                     f"'which tcf' reports version '{output}'; expected f{venvdir}/bin/tcf")
