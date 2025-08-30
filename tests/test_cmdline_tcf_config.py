@@ -6,8 +6,8 @@
 #
 # pylint: disable = missing-docstring
 
-import os
 import re
+import subprocess
 
 import tcfl
 import tcfl.tc
@@ -16,10 +16,40 @@ import clil
 
 
 def run_tcf_config(self, target: tcfl.tc.target_c):
+
+
+    # this should report the same as "python -m setuptools_scm" ran in
+    # the source tree
+    with self.subcase("version_check_vs_setuptools_scm"):
+        output = subprocess.run(
+            "python -m setuptools_scm".split(),
+            capture_output = True, text = True, cwd = clil.topdir).stdout.strip()
+        if output != tcfl.tc.version:
+            self.report_fail(
+                f"tcfl.tc.version '{tcfl.tc.version}' does not match"
+                f" output of 'python -m setuptools_scm': '{output}'",
+                { "tcfl.tc": tcfl.tc.__file__ })
+        else:
+            self.report_pass(
+                f"tcfl.tc.version '{tcfl.tc.version}' matches"
+                " output of 'python -m setuptools_scm'")
+
     # copy the cmdline_environment_run.py file to temp as test_ ->
     # we do it like this so when we 'tcf run tests/', we don't
     # run that one.
     with self.subcase("execution"):
+        # the environment has been set so this runs the right TCF
+        # command; eg PATH has been set to be:
+        #
+        # - for running from source, the first path component is the
+        #   source tree
+        #
+        # - for running from python vevn, activated and the path set
+        #   to the python venv
+        #
+        # - for running from prefix, the first path is set to the
+        #   prefix's path
+        #
         output = target.shell.run("tcf config", output = True)
         self.report_pass(
             "can run 'tcf config' command",
@@ -61,7 +91,11 @@ def run_tcf_config(self, target: tcfl.tc.target_c):
                 "state path",
                 "config path",
                 # at least it will discover one config file
-                "config file 0",
+                # FIXME: when running in prefix/venv/container it
+                # might disconver no config files, so for now we won't
+                # check for it, but we need a test that creates a
+                # config file and we discover it
+                #"config file 0",
                 "version",
                 "python",
                 "servers",
