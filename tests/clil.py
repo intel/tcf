@@ -147,7 +147,9 @@ class test_base_c(tcfl.tc.tc_c):
             target.report_info(
                 f"TCF CLI will run off Python venv {venvdir} in {system_image}")
             venvdir_basename = os.path.basename(venvdir)
-            target.shell.run(f'source {venvdir}/bin/activate; export PS1="({venvdir_basename}) $PS1"')
+            target.shell.run(
+                f'source {venvdir}/bin/activate;'
+                f' export PS1="({venvdir_basename}) $PS1"')
             # this changes the prompt to
             #
             ## (tcf-cli.env) bash-5.2$
@@ -167,7 +169,7 @@ class test_base_c(tcfl.tc.tc_c):
                 "readlink -e $(which tcf)", output = True, trim = True).strip()
             if output != f"{topdir}/tcf":
                 raise tcfl.error_e(
-                    f"'which tcf' reports version '{output}'; expected f{venvdir}/bin/tcf")
+                    f"'which tcf' reports version '{output}'; expected {topdir}/bin/tcf")
 
 
 
