@@ -57,13 +57,15 @@ class _test(tcfl.tc.tc_c):
     
     def eval(self, target):
 
-        target.capture.streamers_start()
+        if hasattr(target, "capture"):
+            target.capture.streamers_start()
         try:
             target.power.cycle()
             tcfl.biosl.boot_efi_shell(target)
             target.shell.prompt_regex = re.compile("[^>]+>")
             target.shell.run("echo I booted", "I booted", timeout = 80)
         finally:
-            target.capture.streamers_stop_and_get()
-            target.capture.snapshoters_get()
+            if hasattr(target, "capture"):
+                target.capture.streamers_stop_and_get()
+                target.capture.snapshoters_get()
             target.console.capture_complete()
