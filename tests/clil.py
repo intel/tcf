@@ -25,8 +25,8 @@ ttbd = commonl.testing.test_ttbd(
         os.path.join(srcdir, "conf_%s" % os.path.basename(__file__.rstrip('cd')))
     ],
     errors_ignore = [
-        re.compile(r"ERROR:.*\(AUDIT\|serving with\)"),
-        re.compile(r"DEBUG:.*"),
+        re.compile(r"ERROR\[.*\(AUDIT\|serving with\)"),
+        re.compile(r"DEBUG\[.*"),
     ]
 )
 
