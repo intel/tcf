@@ -5,6 +5,8 @@
 
 argcomplete         # package: python3-argcomplete
 filelock	    # package: python3-filelock
+jaraco.functools
+jaraco.text
 # Ubuntu 20.4 -- issue installing 3.x
 # >=2.10.1 due to https://osv.dev/vulnerability/GHSA-462w-v97r-4m45
 # >=3.1.6 due to https://osv.dev/vulnerability/GHSA-cpwx-vrp4-4pq7
