@@ -121,6 +121,8 @@ import traceback
 import types
 import typing
 
+import setuptools_scm
+
 import tcfl
 
 # We multithread to run testcases in parallel
@@ -191,9 +193,53 @@ import commonl
 import commonl.expr_parser
 from . import msgid_c
 
-# discovered by the importer
-version = None
+logger = logging.getLogger("tcfl.tc")
 
+# Find out what is the current version
+#
+# This sets tcfl.tc.version to the version of the code/package we are
+# running as soon as we import. It setuptools_scm to find it from git,
+# if we are in the source tree; otherwise it assumes we are installed
+# and pull it from the metadata files.
+try:
+    # this will work when running from source, as it picks up the GIT path
+    # the settings matches ../pyproject.toml
+    #
+    # these files had to exist before we consider we are running from
+    # the source tree
+    srcdir = os.path.normpath(os.path.join(
+        os.path.dirname(__file__), os.pardir))
+    for source_file in [
+            'README.rst',
+            "LICENSE",
+            "pyproject.toml" ]:
+        file_path = os.path.join(srcdir, source_file)
+        if not os.path.exists(file_path):
+            # this not running from the source tree, do metadata
+            # lookup, we might be installed--otherwise just fail
+            raise LookupError(f"can't find {file_path}")
+    logger.info(
+        "we seem to be in source tree %s,"
+        " getting version from"
+        " setuptools_scm.get_version()",
+        srcdir)
+    version = setuptools_scm.get_version(
+        root = '..', relative_to = __file__,
+        version_scheme = "python-simplified-semver",
+        local_scheme = "dirty-tag")
+    logger.info(
+        "version from source dir %s via"
+        "setuptools_scm.get_version(): %s",
+        srcdir, version)
+except LookupError as e:
+    # wops -- failed! we might be running from an installed one
+    #
+    # this gets defaults from ../pyproject.toml which were used
+    # to create the METADATA file when installing
+    version = importlib.metadata.version("tcf_client")
+    logger.info(
+        "version from package metadata (exception %s): %s"
+        % ( e, version ), exc_info = True)
 
 #
 # FIXME: COMPAT moved to tcfl to start cleaning up import hell
@@ -214,7 +260,6 @@ skip_e = tcfl.skip_e
 
 valid_results = tcfl.valid_results
 
-logger = logging.getLogger("tcfl.tc")
 # classes inheriting tc_c can have methos called any of these NAME*
 # which will be run as test steps
 

@@ -98,7 +98,6 @@ def __main__():
     import tcfl
     import tcfl.tc
     import commonl
-    tcfl.tc.version = commonl.version_get(tcfl, "tcf")
 
     if "TCF_NEW_COMMANDS" in os.environ:
         tcfl.ui_cli.commands_old_suffix = "-old"
