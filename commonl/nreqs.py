@@ -92,6 +92,7 @@ Hackish yaml schema description::
    distro|METHODNAME|DISTRO[:[OPERATOR?]VERSION]:
      name: "NAME"                           # O: package name in disto (defaults to REQUIREMENT)
      exclusive: true|false                  # O: install exclusively with this method
+     skip: true|false                       # O: skip installing with this distro/method
      method: "NAME"                         # O: use a given method (data,dnf, apt, pip) instead of guessing based on distro
      license: "SPDX-LICENSE-HEADER"         # O: overrides top
      description|reason: "DESCRIPTION"      # O: overrides top
@@ -999,6 +1000,13 @@ def _command_install(args):
                 # package_data['method'] != method, skip
                 _method_details = method_details.get(method.name, {}).get(package, {})
                 package_alternate = _method_details.get('name', package)
+                skip_per_method = _method_details.get('skip', False)
+                if skip_per_method == True:
+                    logging.warning(
+                        f"{package} [{method.name}/{package_alternate}]:"
+                        f" skipping because of instructions for package"
+                        f" regarding method {method.name}")
+                    continue
                 logging.warning(
                     f"{package} [{method.name}/{package_alternate}]:"
                     " trying to install")
