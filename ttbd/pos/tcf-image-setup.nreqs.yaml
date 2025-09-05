@@ -1,3 +1,7 @@
+# We use pip: skip: true liberally here since there are many packages
+# that need it because there seems to be a pip package conflict in
+# name with it
+
 btrfs-progs:
   reason: tools for formatting BTRFS filesystems
 
@@ -11,6 +15,8 @@ device-mapper:
 
 diffutils:
   reason: tools to compare changes
+  pip:
+    skip: true
 
 e2fsprogs:
   reason: tools for formatting EXT3/EXT4 filesystems
@@ -18,8 +24,12 @@ e2fsprogs:
 grep:
   reason: tool to find strings in text
 
-modutils:
-  reason: tools to load Linux kernel modules
+kmod:
+  reason: |
+    tools to load Linux kernel modules, to ensure nbd is loaded
+    to mount QCOW2 images
+  pip:
+    skip: true
 
 openssh:
   reason: tool ssh-keygen to generate SSH host keys

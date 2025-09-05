@@ -34,3 +34,7 @@ pyusb:
 setuptools:
   # >=78.1.1 due to https://osv.dev/vulnerability/GHSA-5rjg-fvgr-3xxf
   distro: python3-setuptools
+
+openldap-devel:
+  dnf: openldap-devel
+  apt: openldap-dev
