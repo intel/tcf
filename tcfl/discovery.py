@@ -132,10 +132,10 @@ def is_tcf_testcase(path, from_path, tc_name, subcases_cmdline,
 
     See examples of drivers in:
 
-    - :meth:`tcfl.tc_clear_bbt.tc_clear_bbt_c.is_testcase`
     - :meth:`tcfl.tc_zephyr_sanity.tc_zephyr_sanity_c.is_testcase`
     - :meth:`examples.test_ptest_runner` (:term:`impromptu
       testcase driver`)
+    - (deprecated) Clear BBT (find historical in git logs, eg https://github.com/intel/tcf/commit/789812abcc057652e11ca31341f94e7c176f75f6)
 
     note drivers need to be registered with
     :meth:`tcfl.tc.tc_c.driver_add`; on the other hand, a Python

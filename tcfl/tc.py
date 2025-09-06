@@ -8732,10 +8732,10 @@ class tc_c(reporter_c, metaclass=_tc_mc):
 
         See examples of drivers in:
 
-        - :meth:`tcfl.tc_clear_bbt.tc_clear_bbt_c.is_testcase`
         - :meth:`tcfl.tc_zephyr_sanity.tc_zephyr_sanity_c.is_testcase`
         - :meth:`examples.test_ptest_runner` (:term:`impromptu
           testcase driver`)
+        - (deprecated) Clear BBT (find historical in git logs, eg https://github.com/intel/tcf/commit/789812abcc057652e11ca31341f94e7c176f75f6)
 
         note drivers need to be registered with
         :meth:`tcfl.tc.tc_c.driver_add`; on the other hand, a Python
@@ -9443,10 +9443,6 @@ def _run(args):
     """
     Runs one ore more test cases
     """
-
-    # FIXME: move this to a more formal orchestrator specific config
-    import tcfl.tc_clear_bbt
-    tcfl.tc.tc_c.driver_add(tcfl.tc_clear_bbt.tc_clear_bbt_c)
 
     import tcfl.tc_jtreg
     tcfl.tc.tc_c.driver_add(tcfl.tc_jtreg.driver)
