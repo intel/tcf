@@ -117,16 +117,10 @@ class test_base_c(tcfl.tc.tc_c):
             # need it
             target.send(
                 f"podman run --network=none --entrypoint= -ti -v $HOME:$HOME {container} /bin/bash")
-            target.shell.run(
-                r'export PS1="TCF-%(tc_hash)s:\w %%%% \$ "' % target.kws)
             target.shell.setup()
             system_image = f"container {container}"
         else:
             system_image = "local OS"
-
-        # remove all special stuff for pretty prompts that interferes
-        # with automation
-        target.shell.run("unset PROMPT_COMMAND PS0")
 
         if prefix and prefix != "<prefix:none>":
             target.report_info(

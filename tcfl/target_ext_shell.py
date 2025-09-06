@@ -332,7 +332,11 @@ class shell(tc.target_extension_c):
             self.prompt_regex = re.compile(
                 r"TCF-%(tc_hash)s:.+ %%%% [\$#] " % self.target.kws)
             self.run(
-                r'export PS1="TCF-%(tc_hash)s:\w %%%% \$ "' % self.target.kws,
+                # PROMPT_COMMAND and PS0 in many distros adds a lot of
+                # control chars to prompts for the terminal, invisible
+                # to the naked eye, but havocing to automation
+                'unset PROMPT_COMMAND PS0;'
+                r' export PS1="TCF-%(tc_hash)s:\w %%%% \$ "' % self.target.kws,
                 console = console)
         # disable line editing for proper recording of command line
         # when running bash; otherwise the scrolling readline does
