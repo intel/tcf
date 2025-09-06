@@ -12,6 +12,11 @@ import shutil
 import tcfl
 import tcfl.tc
 
+@tcfl.tc.tags(
+    "tcf_client",
+    # files relative to top level this testcase exercises
+    files = [ 'tcf', 'tcfl/ui_cli_main.py' ],
+    level = "basic")
 class _test(tcfl.tc.tc_c):
     """
     Test both methods of running and asking for subcases (with commas
