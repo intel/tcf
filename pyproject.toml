@@ -1,0 +1,91 @@
+# Build system requirements.
+[build-system]
+requires = [
+    "setuptools>=64",
+    "setuptools-scm>=8",
+    "build",
+    "wheel",
+]
+build-backend = "setuptools.build_meta"
+
+# Project metadata
+[project]
+name = "tcf-client"
+description = "TCF client"
+readme = "README.rst"
+requires-python = ">=3.8"
+#license = "Apache-2.0"
+dynamic = [
+    # gets version using setuptools_scm (see requires and tool.setuptools_scm)
+    "version",
+    "entry-points",
+    "dependencies"
+]
+# Classifiers list: https://pypi.org/classifiers/
+classifiers = [
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+]
+
+[project.urls]
+repository = "https://github.com/intel/tcf"
+
+[[project.authors]]
+name = "Inaky Perez-Gonzalez"
+email = "inaky.perez-gonzalez@intel.com"
+
+[project.scripts]
+tcf = "tcfl.ui_cli_main:__main__"
+nreqs = "commonl.nreqs:__main__"
+
+[tool.setuptools]
+include-package-data = true
+# TODO this places these modules under /site-packages/ directly;
+# probably not actually desired and it's very likely to cause conflicts;
+# see entry-points via project.scripts above instead as a prefered option
+# py-modules = [
+#    "nreqs",
+# ]
+
+[tool.setuptools.dynamic]
+dependencies = {file = ["requirements.txt"]}
+
+[tool.setuptools.packages.find]
+where = ["."]  # list of folders that contain the packages (["."] by default)
+include = [
+    "commonl",
+#    "examples",
+    "tcfl",
+]
+# package names should match these glob patterns (["*"] by default)
+# exclude packages matching these glob patterns (empty by default)
+exclude = [
+        "examples",
+        "ttbd",
+        "zephyr",
+]
+# namespaces = true  # to disable scanning PEP 420 namespaces (true by default)
+# TODO this really doesn't want to include individual files, so I placed nreqs & tcf under commonl
+# TODO if the entry scripts this generates aren't correct, we can revisit this
+
+[tool.setuptools.package-data]
+# include all data files
+commonl = ["*"]
+# examples = ["*"]
+tcfl = ["*"]
+
+[tool.setuptools_scm]
+# specify relative path where to find the .git directory
+root = "."
+# TODO verify this version makes sense with preivous, see
+# https://setuptools-scm.readthedocs.io/en/latest/extending/#setuptools_scmversion_scheme
+version_scheme = "python-simplified-semver"
+local_scheme = "dirty-tag"
