@@ -1,6 +1,6 @@
 #
 # Simple dockerfile to create an image that contains all the
-# dependencies needed to run TCF and:
+# dependencies needed to run TCF:
 #
 # - all the dependencies needed to build the TCF packages
 #
@@ -12,13 +12,31 @@
 #
 # - a root based installation in /
 #
-# See also ../client.Dockerfile
+# - can also be used to create an image that contains just the client
+#   and its dependencies (for client, we only need the dependencies in
+#   ./base.nreqs.yaml)
 #
-# Build as:
+# - can also be used to run builds
 #
-#  $ cd .../tcf.git
-#  $ mkdir -p ~/tmp/cache/dnf  ~/tmp/cache/pkg
-#  $ buildah bud -t tcf-nreqs  -v ~/tmp/dnf:/var/cache/dnf:rw  -v ~/tmp/pkg:/var/cache/PackageKit:rw  -v $PWD:/home/work/tcf.git:O --label version="$(git describe --always)" -f nreqs.Dockerfiler
+# Note this is called after nreqs so autobuilders pick it up.
+#
+# Building:
+#
+#  - Full dependency environment:
+#
+#     $ cd .../tcf.git
+#     $ mkdir -p ~/tmp/fedora-34/dnf ~/tmp/fedora-34/packages
+#     $ buildah bud -t tcf-client-34 -v ~/tmp/fedora-34/dnf:/var/cache/dnf:rw -v ~/tmp/fedora-34/packages:/var/cache/PackageKit:rw -v $PWD:/home/work/tcf.git:O --label version="$(git describe --always)" -f nreqs.Dockerfile
+#
+#     add --build-arg from=registry.fedoraproject.org/fedora:40
+#
+#     $ mkdir -p ~/tmp/fedora-40/dnf ~/tmp/fedora-40/packages
+#     $ buildah bud --build-arg from=registry.fedoraproject.org/fedora:40 -t tcf-client-40 -v ~/tmp/fedora-40/dnf:/var/cache/dnf:rw -v ~/tmp/fedora-40/packages:/var/cache/PackageKit:rw -v $PWD:/home/work/tcf.git:O --label version="$(git describe --always)" -f nreqs.Dockerfile
+#
+#  - Full just client environment:
+#
+#     $ mkdir -p ~/tmp/fedora-40/dnf ~/tmp/fedora-40/packages
+#     $ buildah bud --build-arg nreqs_files=/home/work/tcf.git/base.nreqs.yaml --build-arg from=registry.fedoraproject.org/fedora:40 -t tcf-client-40 -v ~/tmp/fedora-40/dnf:/var/cache/dnf:rw -v ~/tmp/fedora-40/packages:/var/cache/PackageKit:rw -v $PWD:/home/work/tcf.git:O --label version="$(git describe --always)" -f nreqs.Dockerfile
 #
 # By default it bases off a Fedora version; you can force it with --build-arg setting
 #
@@ -51,8 +69,22 @@ ARG from=registry.fedoraproject.org/fedora:${fedora_version}
 FROM ${from}
 LABEL maintainer https://github.com/intel/tcf
 
+#
+# Any variables set before the FROM seem to magically dissapear, so
+# declare them here
+#
+# *.nreqs.yaml files to install; by default all of those found under
+# /home/work/tcf.git
+# say
+#
+#   --build-arg nreq_files /home/work/tcf.git/base.nreqs.yaml
+#
+# to do only the client
+ARG NREQS=/home/work/tcf.git
+ENV NREQS=${NREQS}
+
 # We copy the source in the container so it is available to run from
-source for different scenarios (Jenkins, unit testing, etc)
+# source for different scenarios (Jenkins, unit testing, etc)
 COPY . /home/work/tcf.git
 
 # What do we install?
@@ -80,17 +112,27 @@ RUN \
     set -e; \
     chmod a+rwX -R /home/work; \
     dnf install -y python3-pip python3-yaml; \
-    DNF_COMMAND=dnf /home/work/tcf.git/nreqs.py install --skip-package=tcf-client /home/work/tcf.git; \
+    DNF_COMMAND=dnf /home/work/tcf.git/nreqs.py install ${NREQS} --skip-package=tcf-client; \
     dnf install -y \
         bind-utils \
+        gdb \
         iputils \
+        telnet \
         strace \
         which; \
+    echo INFO: git version: $(cd /home/work/tcf.git; git describe --always); \
+    echo INFO: setuptools_scm version: $(cd /home/work/tcf.git; python3 -m setuptools_scm); \
+    echo INFO: ROOT: installing TCF; \
     pip3 install --root=/ --prefix=/ /home/work/tcf.git; \
+    echo INFO: PREFIX /opt/tcf-client.dir: installing TCF; \
     pip install --prefix=/opt/tcf-client.dir /home/work/tcf.git; \
     python3 -m venv /opt/tcf-client.venv; \
     source /opt/tcf-client.venv/bin/activate; \
-    pip install /home/work/tcf.git; \
+    pip install pyyaml; \
+    echo INFO: VENV /opt/tcf-client.venv: installing client only nreqs; \
+    /home/work/tcf.git/nreqs.py install /home/work/tcf.git/base.nreqs.yaml; \
+    echo INFO: VENV /opt/tcf-client.venv: installing TCF; \
+    pip install /home/work/tcf.git;
 
 # when just running the container, run TCF off the source path so we
 # don't have to add extra PATHs and stuff
