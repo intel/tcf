@@ -595,6 +595,20 @@ def _runids_postprocess_summary_per_run(runid_raw):
                             },
                         ]
                     },
+                    "fail%": {
+                        "$cond": [
+                            { "$eq": [ "$total_ran", 0 ] },
+                            0,
+                            { "$divide": [ "$fail", "$total_ran" ] },
+                        ]
+                    },
+                    "errr%": {
+                        "$cond": [
+                            { "$eq": [ "$total_ran", 0 ] },
+                            0,
+                            { "$divide": [ "$errr", "$total_ran" ] },
+                        ]
+                    },
                     "blck%": {
                         "$cond": [
                             { "$eq": [ "$total_ran", 0 ] },
@@ -1795,6 +1809,8 @@ def sheet_update(runid_raw):
 	"Blocked": doc.get('blck', 0),
 	"Passed": doc.get('pass', 0),
         'Blocked%': doc.get('blck%', 0),
+	'Failed%': doc.get('fail%', 0),
+	'Errored%': doc.get('errr%', 0),
 	'Passed%': doc.get('pass%', 0),
         'Number of used target servers': doc.get('number_used_target_servers', 0),
         'Number of used target types': doc.get('number_used_target_types', 0),
