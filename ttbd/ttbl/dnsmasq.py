@@ -302,7 +302,7 @@ class pc(ttbl.power.daemon_c):
                 # allow (static) the ones set below with dhcp-host
                 if self.allow_other_macs:
                     configl.append(
-                        f"dhcp-range={ipv4_addr},{network.broadcast_address},"
+                        f"dhcp-range={ic_ipv4_addr},{network.broadcast_address},"
                         f"{ipv4_prefix_len}")
                 else:
                     configl.append("dhcp-range=%(ipv4_addr)s,static")
@@ -339,7 +339,6 @@ class pc(ttbl.power.daemon_c):
                     # ip_hostnames is a space separated list of
                     # hostnames this can be identified with in the
                     # internal network--you can use this to shadow names
-                    hostnamep = ic.property_get("ip_hostnames", "")
                     hostnamel = [ ic.id ] \
                         + ic.property_get("ip_hostnames", "").split()
                     hostnames = " ".join(hostnamel)
