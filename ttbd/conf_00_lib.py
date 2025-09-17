@@ -293,7 +293,7 @@ class vlan_pci(ttbl.power.impl_c):
                 # half baked operating state.
                 subprocess.check_call([
                     "/usr/sbin/ip", "link", "add",
-                    "link", "ifname", "name", bridge_ifname,
+                    "link", ifname, "name", bridge_ifname,
                     "type", "vlan", "id", str(vlan_id),
                     #" protocol VLAN_PROTO"
                     #" reorder_hdr on|off"
@@ -392,8 +392,10 @@ class vlan_pci(ttbl.power.impl_c):
 
     @staticmethod
     def _find_addr(addrs, addr):
+        addr = addr.replace(":0", ":")
         for i in addrs:
-            if i['addr'] == addr:
+            itr_addr = i['addr'].replace(":0", "L")
+            if itr_addr == addr:
                 return i
         return None
 
