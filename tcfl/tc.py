@@ -3396,7 +3396,7 @@ class parameter_choices_c(parameter_c):
                 f"parameter '{self.name}':"
                 f" invalid value '{choice}': must be one of: "
                 f" {', '.join(self.choices)}")
-
+        return choice
 
 
 def parameters(*args):
