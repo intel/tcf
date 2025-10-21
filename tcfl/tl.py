@@ -371,6 +371,118 @@ def zephyr_tags():
     return tags
 
 
+
+#
+# PCI selector support specification
+#
+
+pci_selector_regex_entry = re.compile(
+        "^"
+        "(?P<pcivid>[^:]*)"
+        ":(?P<pcidid>[^:]*)"
+        "(:(?P<pci_path>[^:]*)"
+        "(:(?P<type>.+)))?"
+        "$"
+    )
+
+
+def pci_selector_spec_compile(spec: str, qualifier: str = "PCI selector") -> dict:
+    """Compile a PCI selector specification
+
+    >>> pci_selector_spec = '''
+    >>> 8086:1533::BHS-.*
+    >>> 8086:1533::OKS-.*
+    >>> :1533
+    >>> '''
+    >>> pci_selector_regexes = pci_selector_spec_compile(pci_selector_spec)
+
+    :param str spec: PCI Selector specification string; is a
+      whitespace separated string of
+      entries that describe possible PCI devices, in the form::
+
+        PCIVID:PCIDID(:[[DDDD.][BB.DD[.FF]]:TYPE)
+
+      - all entries are python regex patterns
+
+      - an empty entry means anything will match
+
+      - all entries are to be matched (case ignored) against the target
+        devices, which will be as::
+
+          VENDORID:DEVICEID:DOMAIN.BUS.DEVICE.FUNCTION:TARGETTYPE
+
+        All numbers (VENDORID, DEVICEID, DOMAIN, BUS, DEVICE, FUNCTION)
+        are in lowercase hex (without 0x prefix).
+
+      - TYPE is matched against the target type
+    """
+    regexes = {}
+    count = 0
+    for v in spec.split():
+        count += 1
+        v = v.strip()
+        if v == "+":
+            regexes = {}
+        m = pci_selector_regex_entry.search(v)
+        if not m:
+            continue
+        regexes[v] = {}
+        for field in [ "pcivid", "pcidid", "pci_path", "type" ]:
+            try:
+                if m.group(field):
+                    regexes[v][field] = re.compile(m.group(field), re.IGNORECASE)
+            except Exception as e:
+                raise RuntimeError(f"{qualifier}: can't parse entry #{count}"
+                                   f" of spec '{v}', field '{field}': {e}") from e
+
+
+    return regexes
+
+
+def pci_selector_match(pci_selector_regexes: dict, spec: str) -> bool:
+    """Compile a PCI selector specification
+
+    >>> pci_selector_spec = '''
+    >>> 8086:1533::BHS-.*
+    >>> 8086:1533::OKS-.*
+    >>> :1533
+    >>> '''
+    >>> pci_selector_regexes = pci_selector_spec_compile(pci_selector_spec)
+    >>> pci_selector_match(pci_selector_regexes, "8086:1533:00.2a.00.0:OKS-JC-DMR")
+
+    :param dict pci_selector_regexes: compiled PCI selector specs; see
+      :func:`pci_selector_spec_compile` for the format spec and to
+      generate it.
+
+    :param str spec: PCI spec to match against
+
+    :returns bool: *True* if the spec matches any regex in the
+      selector argument; *False* otherwise.
+    """
+    spec_m = pci_selector_regex_entry.search(spec)
+    if not spec_m:
+        raise RuntimeError("{spec} is not a valid PCI Selector expression")
+
+    for selector, selector_regexs in pci_selector_regexes.items():
+        # each regex has N fields; the ones that are not specified are
+        # optional, so are a True; but the ones specified need to
+        # match
+        matches = False
+        for field, regex_field in selector_regexs.items():
+            value = spec_m.groupdict().get(field, None)
+            if not value:	# a non match, there has to be a value bc...
+                break		# ... we have a regex
+            m = regex_field.search(value)
+            if not m:
+                break    	# a non match, value doesn't fit regex
+        else:
+            matches = True	# no non-matches, so we are good
+        if matches:
+            return True		# all fields specified matched, so we good
+
+    return False		# no matches
+
+
 def console_dump_on_failure(testcase, alevel = 0):
     """
     If a testcase has errored, failed or blocked, dump the consoles of
