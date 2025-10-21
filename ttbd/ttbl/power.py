@@ -3273,6 +3273,219 @@ class buttons_released_pc(impl_c):
         return None			# no real press status, so can't tell
 
 
+
+class windows_service_over_ssh_c(ttbl.power.impl_c):
+    """
+    Power Rail controller to manage over SSH a service running in a Windows machine
+
+    This logs in via SSH into the target host and uses the *sc start*,
+    *sc stop* and *sc query* commands to manage the execution of the
+    service.
+
+    The output of the processes is collected in the log files:
+
+    - STATEDIR/console-COMPONENT.stderr
+    - STATEDIR/console-COMPONENT.stdout
+
+    which then can be exported to consoles with something like:
+
+    >>> consoles["log-COMPONENT-stdout"] = ttbl.console.logfile_c("console-COMPONENT.stdout")
+    >>> consoles["log-COMPONENT-stderr"] = ttbl.console.logfile_c("console-COMPONENT.stderr")
+
+    the maximum size of the logfiles is controled with *max_log_size*.
+
+    :param str device_spec: specification of the remote host in the
+      form *USERNAME:PASWORD@HOSTNAME*; the password can be located in
+      the multiple keyrings supported by :func:`commonl.password_get`
+      (eg: myuser:FILE:/etc/ttbd-production/pwd.somefile@somehost.com)
+
+    :param str service_name: name of the service to manage
+
+    :param numbers.Number timeout: (optional) positive number of
+      seconds to wait for the command to execute
+
+    :param int max_log_size: (optional) maximum size in bytes of the
+      *stderr* and *stdout* log files.
+
+    Other arguments as to :class:`ttbl.power.impl_c`
+    """
+
+    class exception_e(Exception):
+        pass
+
+
+    def __init__(self, device_spec: str, service_name: str,
+                 timeout: int = 30, max_log_size: int = 65 * 1025 * 1024,
+                 *args, **kwargs):
+        assert isinstance(service_name, str), \
+            f"service_name: expected string, got {type(service_name)}"
+        assert isinstance(timeout, numbers.Number) and timeout > 0, \
+            f"timeout: expected a positive number, got [{type(timeout)}] {timeout}"
+        assert isinstance(max_log_size, int) and max_log_size > 0, \
+            f"max_log_size: expected a positive integer, got [{type(max_log_size)}] {max_log_size}"
+        ttbl.power.impl_c.__init__(self, *args, **kwargs)
+        self.service_name = service_name
+        self.device_spec = device_spec
+        self.user_orig, self.password_orig, self.hostname_orig = \
+            commonl.split_user_pwd_hostname(device_spec, expand_password = False)
+
+        self.user = None
+        self.password = None
+        self.hostname = None
+        if not self.password_orig:
+            password_publish = None
+        elif self.password_orig.split(":", 1)[0] in ( "KEYRING", "FILE", "ENVIRONMENT" ):
+            # this means the password is taken off a keyring, it is
+            # safe to publish, since it is a reference to the storage place
+            password_publish = self.password_orig
+        else:		            # this is a plain text passsword
+            password_publish = "<plain-text-password-censored>"
+        self.ssh_port = 22
+        self.timeout = timeout
+        self.max_log_size = max_log_size
+        hostname_nopasswd = f"{self.user_orig}@{self.hostname_orig}"
+        self.upid_set(f"SSH to {hostname_nopasswd}",
+                      hostname = hostname_nopasswd,
+                      password = password_publish,
+                      service_name = service_name)
+
+
+    def _resolve(self, target: ttbl.test_target) -> tuple:
+        # resolve the parameters for the connection, since they might
+        # have been updated in the inventory DB; default to whatever
+        # was configured
+        # we expect USER:PASSWORD@HOSTNAME:OUTLET
+        device_spec = target.fsdb.get(
+            f"instrumentation.{self.upid_index}.device_spec", self.device_spec)
+
+        # by default, inventory
+        # instrumentation.{self.upid_index}.hostname will always be
+        # set to USER@HOSTNAME, whatever we configured; we
+        # censored whatever password it had. So if splitting yields an
+        # empty password but the rest of hte fields are the same, we
+        # need to redo with self.device_spec
+        user, password, hostname = \
+            commonl.split_user_pwd_hostname(device_spec)
+        if self.password == None \
+           and user == self.user_orig \
+           and hostname == self.hostname_orig:
+            user, self.password, hostname = \
+                commonl.split_user_pwd_hostname(device_spec)
+
+        # did the username/pwd change from the last time we ran? if it
+        # did...remove the expect object so we create a new connection
+        self.user = user
+        self.password = password
+        self.hostname = hostname
+
+        if self.password == None:
+            raise self.exception_e(
+                f"{device_spec}: missing :PASSWORD@ specification")
+
+
+
+    def _ssh_run(self, target, component: str, cmd: list) -> subprocess.CompletedProcess:
+        commonl.assert_list_of_strings(cmd, "cmd", "command line components")
+        logfile_prefix = os.path.join(target.state_path, target.id, "console-" + component)
+        self._resolve(target)
+        cmdline = [
+            "sshpass",
+            "-e",
+            "ssh",
+            # be verbose (for debugging)
+            # DO not use -t to allocate a terminal, otherwise Windows acts up
+            "-v",
+            # We place the control file for the shared
+            # connection in /var/cache/ttbd-production/ssh-NAME-HOSTNAME-PORT.control;
+            # this way is shared by all targets that same the
+            # same PDU and username to it.
+            "-oControlMaster auto",
+            f"-oControlPath {ttbl.test_target.files_path}/ssh-{self.user}-{self.hostname}-{self.ssh_port}.control",
+            # we can't do any of this registering, so we
+            # disable it so SSH doesn't ask for it
+            # interactively and makes a mess
+            "-oUserKnownHostsFile /dev/null",
+            "-oCheckHostIP no",
+            "-oStrictHostKeyChecking no",
+            f"{self.user}@{self.hostname}"
+        ] + cmd
+        timestamp = datetime.datetime.now(datetime.UTC).strftime("\nrun %Y-%m-%d %H:%M:%S\n")
+        try:
+            env = dict(os.environ)
+            env['SSHPASS'] = self.password
+            p = subprocess.run(
+                cmdline,
+                capture_output = True, text = True,
+                env = env,
+                timeout = self.timeout)
+            with open(logfile_prefix + ".read", "a") as f:
+                f.write(timestamp)
+                f.write(p.stdout)
+            commonl.file_truncate_from_end(logfile_prefix + ".read", self.max_log_size)
+            with open(logfile_prefix + ".stderr", "a") as f:
+                f.write(timestamp)
+                f.write("cmdline:" + " ".join(cmdline) + "\n")
+                f.write(p.stderr)
+            commonl.file_truncate_from_end(logfile_prefix + ".stderr", self.max_log_size)
+            return p
+
+        except subprocess.CalledProcessError as e:
+            with open(logfile_prefix + ".read", "a") as f:
+                f.write(timestamp)
+                f.write(e.stdout)
+            commonl.file_truncate_from_end(logfile_prefix + ".read", self.max_log_size)
+            with open(logfile_prefix + ".stderr", "a") as f:
+                f.write(timestamp)
+                f.write("cmdline:" + " ".join(cmdline) + "\n")
+                f.write(e.stderr)
+            commonl.file_truncate_from_end(logfile_prefix + ".stderr", self.max_log_size)
+            target.log.error(f"error running command '{cmd}' [see logs]: {e}")
+            raise
+
+        except subprocess.SubprocessError as e:
+            target.log.error(f"error running command '{cmd}': {e}")
+            raise
+
+
+    def on(self, target, component):
+        self._ssh_run(target, component, [ "cmd", "/C", "sc", "start", self.service_name ])
+
+
+    def off(self, target, component):
+        self._ssh_run(target, component, [ "cmd", "/C", "sc", "stop", self.service_name ])
+
+
+    def get(self, target, component):
+        p = self._ssh_run(target, component, [ "cmd", "/C", "sc", "query", self.service_name ])
+        # this shall contain the output
+        #
+        ## SERVICE_NAME: jtagserver
+        ##         TYPE               : 10  WIN32_OWN_PROCESS
+        ##         STATE              : 4  RUNNING
+        ##                                 (STOPPABLE, PAUSABLE, ACCEPTS_SHUTDOWN)
+        ##         WIN32_EXIT_CODE    : 0  (0x0)
+        ##         SERVICE_EXIT_CODE  : 0  (0x0)
+        ##         CHECKPOINT         : 0x0
+        ##         WAIT_HINT          : 0x0
+        #
+        #
+        # let's try to do this w/o regex; it's simple enough it should just work
+        for line in p.stdout.splitlines():
+            if "SERVICE_NAME" in line:
+                if self.service_name not in line:
+                    return None
+            # looking for STATE              : 4  RUNNING
+            if "STATE" in line:
+                if "RUNNING" in line:
+                    return True
+                if "STOPPED" in line:
+                    return False
+        # Can't parse output?
+        target.log.error(f"{self.service_name}: can't parse query output [see logs]")
+        return None
+
+
+
 def create_pc_from_spec(power_spec, **kwargs):
     # FIXME: this needs to be improved, it assumes raritan now and has
     # to be more generic (take as stanza the driver name, for example)
