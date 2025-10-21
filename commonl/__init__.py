@@ -2328,13 +2328,34 @@ def raise_from(what, cause):
     setattr(what, "__cause__", cause)
     raise what
 
+
+
 #: Regex to filter out ANSI characters from text, to ease up debug printing
 #:
 #: Use as:
 #:
 #: >>> data = commonl.ansi_regex.sub('', source_data)
 #:
-ansi_regex = re.compile(r'\x1b\[\d+(;\d+){0,2}m')
+# https://stackoverflow.com/a/14693789
+ansi_regex = re.compile(r'''
+    (?: # either 7-bit C1, two bytes, ESC Fe (omitting CSI)
+        \x1B
+        [@-Z\\-_]
+    |   # or a single 8-bit byte Fe (omitting CSI)
+        [\x80-\x9A\x9C-\x9F]
+    |   # or CSI + control codes
+        (?: # 7-bit CSI, ESC [
+            \x1B\[
+        |   # 8-bit CSI, 9B
+            \x9B
+        )
+        [0-?]*  # Parameter bytes
+        [ -/]*  # Intermediate bytes
+        [@-~]   # Final byte
+    )
+''', re.VERBOSE)
+
+
 
 def ansi_strip(s):
     """
