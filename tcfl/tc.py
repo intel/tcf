@@ -4819,7 +4819,27 @@ class tc_c(reporter_c, metaclass=_tc_mc):
 
 
 
-    def parameter_get(self, name):
+    def _parameter_get(self, name):
+        if name not in self._parameters:
+            raise tcfl.block_e(
+                f"{name}: unknown testcase parameter; known are"
+                f" {' '.join(self._parameters.keys())}",
+                {
+                    name: {
+                        "origin": parameter.origin,
+                        # we textrap so it is kinda easier to read in the
+                        # report files
+                        "description": textwrap.wrap(
+                            parameter.description, width = 50),
+                        "default": parameter.default,
+                    }
+                    for name, parameter in self._parameters.items()
+                }
+            )
+        return self._parameters[name]
+
+
+    def parameter_get(self, name: str):
         """
         Obtain the value of a testcase parameter
 
@@ -4841,23 +4861,15 @@ class tc_c(reporter_c, metaclass=_tc_mc):
         >>> directory_a = self.parameter_get("directory_a")
 
         """
-        if name not in self._parameters:
-            raise tcfl.block_e(
-                f"{name}: unknown testcase parameter; known are"
-                f" {' '.join(self._parameters.keys())}",
-                {
-                    name: {
-                        "origin": parameter.origin,
-                        # we textrap so it is kinda easier to read in the
-                        # report files
-                        "description": textwrap.wrap(
-                            parameter.description, width = 50),
-                        "default": parameter.default,
-                    }
-                    for name, parameter in self._parameters.items()
-                }
-            )
-        return self._parameters[name]._get(self)
+        return self._parameter_get(name)._get(self)
+
+
+
+    def parameter_origin(self, name: str) -> str:
+        """
+        Return the origin of a testcase parameter (where declared/set)
+        """
+        return self._paramater_get(name).origin
 
 
 
