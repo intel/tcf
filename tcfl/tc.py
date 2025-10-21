@@ -4450,7 +4450,8 @@ class tc_c(reporter_c, metaclass=_tc_mc):
     # all the stuff from the phase Note: this is copied in
     # __init_shallow__() so it is specific to each instance
     _start_triggered = collections.defaultdict(lambda: True)
-
+    _skip_fname_regexes = set()
+    _run_only_fname_regexes = set()
 
     def __init__(self, name, tc_file_path, origin, hashid = None):
         #
@@ -5943,6 +5944,29 @@ class tc_c(reporter_c, metaclass=_tc_mc):
                     # these are important for clarity: report'em at #1
                     level = 1)
             self._start_triggered[phase] = True
+
+        for skip_regex in self._skip_fname_regexes:
+            if skip_regex.search(fname):
+                self.report_skip(
+                    f"{fname}: skipped because it matches"
+                    f" --skip-fname '{skip_regex.pattern}'",
+                    # these are important for clarity: report'em at #1
+                    level = 1)
+                return result_c(skipped = 1)
+
+        if self._run_only_fname_regexes:
+            # user specified --run-only-fname, so we get to filter
+            for run_only_regex in self._run_only_fname_regexes:
+                if run_only_regex.search(fname):
+                    break
+            else:
+                self.report_skip(
+                    f"{fname}: skipped because it doesn't match any --run-only-fname"
+                    f" regex: {' '.join(i.pattern for i in self._run_only_fname_regexes)}",
+                    # these are important for clarity: report'em at #1
+                    level = 1)
+                return result_c(skipped = 1)
+
         targets = self._mk_target_args_for_fn(fn, args)
         return self.__method_trampoline_call(fname, fn, _type, targets)
 
@@ -9573,6 +9597,27 @@ def _run(args):
             f" {start_at_fname}()",
             level = 0)
 
+    for skip_fname in args.skip_fname:
+        try:
+            tcfl.tc.tc_c._skip_fname_regexes.add(re.compile(skip_fname))
+            tc_global.report_info(
+                f"WARNING! will skip any function called {skip_fname}()",
+                level = 0)
+        except re.error as e:
+            raise tcfl.error_e(
+                f"--skip-fname '{skip_fname}' invalid regex: {e}")
+
+    for run_only_fname in args.run_only_fname:
+        try:
+            tcfl.tc.tc_c._run_only_fname_regexes.add(re.compile(run_only_fname))
+            tc_global.report_info(
+                f"WARNING! will run only function called {run_only_fname}()",
+                level = 0)
+        except re.error as e:
+            raise tcfl.error_e(
+                f"--run-only-fname '{run_only_fname}' invalid regex: {e}")
+
+
     # Setup defaults in the base testcase class
     tc_c.preempt = args.preempt
     tc_c.priority = args.priority
@@ -9976,6 +10021,20 @@ def argp_setup(arg_subparsers):
         action = "append", default = [],
         help = "Start executing from a function called FUNCTIONNAME;"
         " note this skips anything previous until said function; note the"
+        " WARNING!! use only with a single testcase!")
+    ap.add_argument(
+        "--skip-fname", metavar = "FUNCTIONNAMEREGEX",
+        action = "append", default = [],
+        help = "Skip executing testing function called FUNCTIONNAME "
+        " (can be a regex); "
+        " note this skips any side effect said function might have;"
+        " WARNING!! use only with a single testcase!")
+    ap.add_argument(
+        "--run-only-fname", metavar = "FUNCTIONNAMEREGEX",
+        action = "append", default = [],
+        help = "Run only testing function called FUNCTIONNAME "
+        " (can be a regex); "
+        " note this skips any side effect of other functions;"
         " WARNING!! use only with a single testcase!")
     ap.add_argument(
         "--taps", action = "store_true", default = False,
