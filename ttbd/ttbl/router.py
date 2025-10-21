@@ -260,6 +260,18 @@ class cisco_c(router_c):
     pulls the ports and then calls :meth:`vlan_create`.
 
 
+    Configuration for the switch
+    ----------------------------
+
+    We need to enable the HTTP API interface (NXAPI) for some
+    functionality; :meth:`server_link_setup` will do this as part of
+    the switch setup, which basically is::
+
+      conf t
+      ...
+      feature nxapi
+      exit
+
     **References**
 
     - https://www.cisco.com/c/en/us/td/docs/switches/datacenter/nexus9000/sw/6-x/layer2/configuration/guide/b_Cisco_Nexus_9000_Series_NX-OS_Layer_2_Switching_Configuration_Guide/b_Cisco_Nexus_9000_Series_NX-OS_Layer_2_Switching_Configuration_Guide_chapter_011.html
@@ -347,7 +359,19 @@ class cisco_c(router_c):
             self.logger.error(msg)
             raise RuntimeError(msg, j)
         except requests.exceptions.RequestException as e:
-            self.logger.error("execution HTTP error %s: ", e)
+            # FFS, we might get a requests.exceptions.ConnectionError
+            # which in theory subclasses a lot of good stuff but it
+            # turns out in other environments it just wraps and wraps
+            # and wraps a string that says "connection refused" ($!#@$#)
+            if e.errno == errno.ECONNREFUSED \
+               or "connection refused" in str(e).lower():
+                # this might mean the router is not properly
+                # configured to accept the HTTP[S] interface
+                self.logger.error(
+                    "can't connect to router's HTTP API, is it enabled?"
+                    " check ttbl.router.cisco_c doc: %s", e)
+            else:
+                self.logger.error("execution HTTP error %s: ", e)
             raise
 
     def _copy_running_config_retrying(self):
@@ -426,6 +450,9 @@ class cisco_c(router_c):
             return
         self._sequence_run(
             "conf",
+            # this enables the HTTPS interface we use to talk to the
+            # server when running _sequence_run()
+            "feture nxapi",
             # select the interface/port where the server is
             # connected
             f"int {server_switch_port}",
@@ -435,6 +462,7 @@ class cisco_c(router_c):
             # set the port to mode trunk, so multiple VLANs can be
             # routed over it.
             "switchport mode trunk",
+            # FIXME: we need to be able to pass extra commands
             "no shut",	# actully enable it
             # done!
             "exit",
