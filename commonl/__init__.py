@@ -805,6 +805,28 @@ def file_touch(file_name):
     os.utime(file_name, ( ts, ts ))
 
 
+
+def file_truncate_from_end(filename: str, max_size: int):
+    """
+    Truncate the end of a file so it is no larger than *max_size bytes
+
+    :param str: name of file to truncate
+    :param int max_size: maximum size it shall have
+
+    Does not work very well with very big files since it just reads to
+    memory.
+    """
+    if os.path.getsize(filename) <= max_size:
+        return
+    with open(filename, 'rb+') as f:
+        f.seek(max_size, os.SEEK_END)
+        data = f.read()
+        f.seek(0)
+        f.write(data)
+        f.truncate()
+
+
+
 def hash_file(hash_object, filepath, blk_size = 8192):
     """
     Run a the contents of a file though a hash generator.
