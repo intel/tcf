@@ -270,7 +270,6 @@ else
     lsblk $loop_dev
 fi
 
-
 assume_there=yes
 case $dest_type in
     qcow2)
@@ -302,7 +301,7 @@ case $dest_type in
 esac
 
 info current block devices
-lsblk
+lsblk -o NAME,SIZE,TYPE,FSTYPE,LABEL,MOUNTPOINTS
 
 # full blown override; this comes handy when it turns out the image
 # has a volume group inside, that shows up in /dev/mapper
