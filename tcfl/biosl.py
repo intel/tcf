@@ -1666,6 +1666,308 @@ def main_level_entries_get(target):
     return [ entry[1] for entry in sorted(entries.items(), key = lambda x: x[0]) ]
 
 
+def uefi_dh_extract(dh_output: str):
+    """
+    Extract fields from the output of the EFI dh command.
+
+    WARNING! Only single line fields in the form *KEY:VALUE *are handled!
+
+    :param str dh_output: output of *dh -v HANDLE* EFI command, such as::
+        20F: 5F86BD18
+        E3161450-AD0F-11D9-9669-0800200C9A66(5EAB3050)
+        PCIIO(5F83F428)
+          Segment #.....: 00
+          Bus #.........: 2A
+          Device #......: 00
+          Function #....: 00
+          ROM Size......: 0
+          ROM Location..: 0
+          Vendor ID.....: 8086
+          Device ID.....: 1533
+          Class Code....: 00 00 02
+          Configuration Header :
+               86803315470110000300000220000000
+               0000309C00000000015000000000389C
+               000000000000000000000000FFFF0000
+               000000004000000000000000FF010000
+        DevicePath(5F846F98)
+          PciRoot(0x11)/Pci(0x6,0x0)/Pci(0x0,0x0)
+
+    :returns: dictionary keyed by field name with value; both strings
+    """
+    regex_dh = re.compile("^\w*(?P<field>[^:]+): (?P<value>.*)$")
+    d = {}
+    for line in dh_output.splitlines():
+        m = regex_dh.search(line)
+        if not m:
+            continue
+        # why they had to add periods to trail the field name beats me
+        field = m.group("field").strip().rstrip(".")
+        value = m.group("value").strip()
+        d[field] = value
+    return d
+
+
+
+def uefi_devtree_extract_dhs_from_mac(devtree_output: str):
+
+    """Parse the output of EFI's devtree command to extract MAC
+    addresses and what device handles they map to.
+
+    :param str devtree_output: a string from the output of running
+      'devtree' in EFI, which looks like::
+
+        Ctrl[^[[1m^[[37m^[[40mC0^[[0m^[[37m^[[40m] PciRoot(0x11)
+          Ctrl[^[[1m^[[37m^[[40m20A^[[0m^[[37m^[[40m] PciRoot(0x11)/Pci(0x0,0x0)
+          Ctrl[^[[1m^[[37m^[[40m20B^[[0m^[[37m^[[40m] PciRoot(0x11)/Pci(0x0,0x1)
+          Ctrl[^[[1m^[[37m^[[40m20C^[[0m^[[37m^[[40m] PciRoot(0x11)/Pci(0x0,0x2)
+          Ctrl[^[[1m^[[37m^[[40m20D^[[0m^[[37m^[[40m] PciRoot(0x11)/Pci(0x0,0x4)
+          Ctrl[^[[1m^[[37m^[[40m20E^[[0m^[[37m^[[40m] PciRoot(0x11)/Pci(0x6,0x0)
+          Ctrl[^[[1m^[[37m^[[40m20F^[[0m^[[37m^[[40m] Intel(R) I210 Gigabit  Network Connection
+            Ctrl[^[[1m^[[37m^[[40m3B5^[[0m^[[37m^[[40m] Intel(R) I210 Gigabit  Network Connection
+              Ctrl[^[[1m^[[37m^[[40m3B6^[[0m^[[37m^[[40m] PciRoot(0x11)/Pci(0x6,0x0)/Pci(0x0,0x0)/MAC(A4BF018D0DB0,0x1)/VenHw(D79DF6B0-EF44-43BD-9797-43E93BCF5FA8)
+              Ctrl[^[[1m^[[37m^[[40m3B7^[[0m^[[37m^[[40m] MNP (MAC=A4-BF-01-8D-0D-B0, ProtocolType=0x806, VlanId=0)
+
+      without ANSI it looks like::
+
+        Ctrl[C0] PciRoot(0x11)
+          Ctrl[20A] PciRoot(0x11)/Pci(0x0,0x0)
+          Ctrl[20B] PciRoot(0x11)/Pci(0x0,0x1)
+          Ctrl[20C] PciRoot(0x11)/Pci(0x0,0x2)
+          Ctrl[20D] PciRoot(0x11)/Pci(0x0,0x4)
+          Ctrl[20E] PciRoot(0x11)/Pci(0x6,0x0)
+          Ctrl[20F] Intel(R) I210 Gigabit  Network Connection
+            Ctrl[3B5] Intel(R) I210 Gigabit  Network Connection
+              Ctrl[3B6] PciRoot(0x11)/Pci(0x6,0x0)/Pci(0x0,0x0)/MAC(A4BF018D0DB0,0x1)/VenHw(D79DF6B0-EF44-43BD-9797-43E93BCF5FA8)
+              Ctrl[3B7] MNP (MAC=A4-BF-01-8D-0D-B0, ProtocolType=0x806, VlanId=0)
+
+      - ^[ is an escape char in there--the ANSI control sequences might
+        or not might show up (dep on the machine), so we make them
+        optional in the regexes
+
+      - we latch to the first mention of something that looks like a mac
+        address *MAC(A4BF018D0DB0* and use that
+
+      - note each level adds two spaces of depth
+
+      :returns: dictionary of sets, keyed by macaddress as parsed from
+        the output and then moved to lowercase. All values are strings
+
+        >>> {
+        >>>     '40a6b78d8898': {'424', 'B3', '2FA', '44D', '423', '42E', '425'},
+        >>>     '40a6b79fc4f0': {'3F0', '21C', 'B3', '3F1', '419', '3EF', '3FA'},
+        >>>     'a4bf018d0db0': {'B3', '3B7', '3C0', '3B6', '3B5', '20F', '3DF'}
+        >>> }
+
+      """
+
+    regex_entry = re.compile("^(?P<level> +)Ctrl\[(\x1b.+40m)?(?P<dh>[0-9A-F]+)(\x1b.+40m)?\] (?P<device_str>.*)$")
+    regex_devicestr = re.compile("MAC\((?P<macaddr>[0-9A-Fa-f]+),0x[0-9]+\)/VenHw.*$")
+
+    dh = None
+    dhs = []
+    level0 = 0
+    level = None
+    dhs_by_mac = collections.defaultdict(set)
+    for line in devtree_output.splitlines():
+        m = regex_entry.search(line)
+        if not m:
+            continue
+        dh = m.group("dh")
+        level = len(m.group("level"))
+        if level == level0:		# no change in level
+            if dhs:			# replace current DH in the stack
+                dhs.pop()
+            dhs.append(dh)
+        elif level > level0:		# went up one level, append current
+            dhs.append(dh)
+        elif level < level0:		# went down in levels
+            # the level string gets incremented two spaces for each level
+            # and it can decrease in a single shot multiple levels, so
+            # calculate how many levels we are up to remove them from the
+            # stack
+            for i in range((level0 - level) // 2):
+                dhs.pop()
+
+        # check now the device string; if it looks like a MAC, report
+        # the stack of DHs so far accumulated
+        device_str = m.group("device_str")
+        m = regex_devicestr.search(device_str)
+        if m:
+            macaddr = m.group("macaddr")
+            dhs_by_mac[macaddr].update(dhs)
+        level0 = level
+
+    return { mac.lower(): dhs for mac, dhs in  dhs_by_mac.items() }
+
+
+
+def uefi_shell_extract_mac_info(target):
+    """
+    Generate a map of EFI interfaces
+
+
+    :param tcfl.tc.target_c target: machine where to operate; must be
+      in the EFI shell.
+
+    :returns: a tuple of two dictionaries:
+
+      - *ifaces*: as returned by
+        :func:`tcfl.biosl.uefi_ifconfig_l_parse`, which looks like::
+
+           {
+             'eth1': {
+               '': True,
+               'DNS server': '',
+               'Media State': 'Media present',
+               'default gateway': '0.0.0.0',
+               'ipv4 address': '0.0.0.0',
+               'mac addr': '00:07:E9:34:8A:AA',
+               'name': 'eth1',
+               'policy': 'static',
+               'subnet mask': '0.0.0.0'
+             }
+           }
+
+
+      - dictionary by MAC address (lower case, no colons) of all
+      fields we could extract from the DH commands in the EFI shell;
+      if available, for example the PCI fields will show as::
+
+
+        {
+          '40a6b78d8898': {
+        ...
+            'Bus #': 'B8',
+            'Device #': '00',
+            'Function #': '00',
+            'Segment #': '00',
+        ...
+            'Vendor ID': '8086',
+            'Device ID': '1592',
+          },
+        }
+
+
+    """
+    target.shell.run("cls")
+    output = target.shell.run(
+        "ifconfig -l", output = True, trim = True)
+    ifaces = tcfl.biosl.uefi_ifconfig_l_parse(target, output)
+    if not ifaces:
+        raise tcfl.tc.failed_e(
+            "UEFI's `ifconfig -l` didn't find any network interfaces"
+            " (this usually means EFI networking is disabled)" ,
+            {
+                "output": output,
+                "target": target,
+            })
+
+    # ifaces is a simple parsing of the output by interface
+    #
+    ## {
+    ##     'eth0': {
+    ##         '': True,
+    ##         '  Routes (0 entries)': '',
+    ##         'DNS server': '',
+    ##         'Media State': 'Media disconnected',
+    ##         'default gateway': '0.0.0.0',
+    ##         'ipv4 address': '0.0.0.0',
+    ##         'mac addr': '40:A6:B7:8D:9F:28',
+    ##         'name': 'eth0',
+    ##         'policy': 'static',
+    ##         'subnet mask': '0.0.0.0'
+    ##     },
+    ##     'eth1': {
+    ##         '': True,
+    ##         '  Routes (0 entries)': '',
+    ##         'DNS server': '',
+    ##         'Media State': 'Media present',
+    ##         'default gateway': '0.0.0.0',
+    ##         'ipv4 address': '0.0.0.0',
+    ##         'mac addr': '00:07:E9:34:8A:AA',
+    ##         'name': 'eth1',
+    ##         'policy': 'static',
+    ##         'subnet mask': '0.0.0.0'
+    ##     }
+    ## }
+    #
+    # make each interface configure w/ DHCP, see what IPs they
+    # get; the one that gets an IP address which resolves to the name of hte SUT is the main IT connection
+
+    # mac here is lower case, no :, matching the mac_data bus info
+    # we'll calculate later
+    mac_to_ifname = {}
+    ifname_to_mac = {}
+    for ifname, ifdata in ifaces.items():
+        mac_addr = ifdata.get('mac addr', "").lower()
+        if mac_addr:
+            target.report_info(
+                f"EFI found mac {mac_addr} for {ifname}", dlevel = -1)
+            mac_to_ifname[mac_addr.lower().replace(":", "")] = ifname
+            ifname_to_mac[ifname] = mac_addr.lower().replace(":", "")
+
+    # Use now the EFI shell command dh to get bus information about
+    # the macs; this is kinda tricky because there is no direct way to
+    # do it. So first we use EFI shell devtree to print the tree of
+    # dvices/drivers -> from there find the ones that look like
+    # MAC(MACADDR)/HwVenblablah, and query all the device handles in
+    # its chain for the device info
+
+    devtree_output = target.shell.run(
+        "devtree  # getting device infos to find network interfaces",
+        timeout = 400,	# this can be long
+        # FIXME: use progress regex
+        output = True, trim = True)
+    dhs_by_mac = uefi_devtree_extract_dhs_from_mac(devtree_output)
+
+    # dhs_by_mac looks like
+    ##  {
+    ##    '40a6b78d8898': {'424', 'B3', '2FA', '44D', '423', '42E', '425'},
+    ##    '40a6b79fc4f0': {'3F0', '21C', 'B3', '3F1', '419', '3EF', '3FA'},
+    ##    'a4bf018d0db0': {'B3', '3B7', '3C0', '3B6', '3B5', '20F', '3DF'}
+    ## }
+    #
+    # note the MAC address is regularized to lower case, no colons
+
+    mac_bus_info = {}
+    for macaddr, dhs in dhs_by_mac.items():
+        # MACADDR in 001122334455 form
+        # DHS is list of handles
+        ifname = mac_to_ifname[macaddr]
+        mac_bus_info[macaddr] = { "ifname": ifname }
+        for dh in dhs:
+            target.report_info(f"EFI: getting info for {ifname} MAC {macaddr} DH {dh}")
+            dh_output = target.shell.run(
+                f"dh -v {dh}  # getting info for {ifname} MAC {macaddr}",
+                output = True, trim = True)
+            # merge all the fields we get from the different DHs
+            mac_bus_info[macaddr].update(uefi_dh_extract(commonl.ansi_strip(dh_output)))
+
+            # the fields we care for most is
+            #
+            # {
+            #   '40a6b78d8898': {
+            # ...
+            #     'Bus #': 'B8',
+            #     'Device #': '00',
+            #     'Function #': '00',
+            #     'Segment #': '00',
+            # ...
+            #     'Vendor ID': '8086',
+            #     'Device ID': '1592',
+            #   },
+            # }
+            #
+            # Which are what we need to identify against our
+            #configuration mapping; but let's also make it easy and
+            #set the interface name
+
+
+    return ifaces, mac_bus_info
+
+
+
 def uefi_ifconfig_l_parse(target, output):
     """
     Parse the output of UEFI's *ifconfig -l* into a dictionary
