@@ -22,7 +22,7 @@ DIRECTORY: where to expand the image to
   PATH/DISTRO:SPIN:VERSION:SUBVERSION:ARCH.tar.xz to avoid scp erroring
   because it considers the : host separators. Likewise for tar.
 
-IMAGEFILE: source ISO, qcow2 or rootfs image file
+IMAGEFILE: source ISO, qcow2 or rootfs image file, *.tar.gz
 
 IMAGETYPE: force image detection
 
@@ -65,9 +65,9 @@ SETUPL           Space separated list of paths to of scripts that are
 
                  Environment
 
-                 - $destdir: location where the image is expanded
+                 - \$destdir: location where the image is expanded
 
-                 - $selinux_relable: tag files modified that need relabeling; eg:
+                 - \$selinux_relable: tag files modified that need relabeling; eg:
 
                    selinux_relabel["etc/passwd"]=1
 
@@ -202,6 +202,8 @@ if [ -z "$image_type" ]; then
             image_type=fedora;;
         *raspbian*img)
             image_type=raspbian;;
+        *.tar|*.tar.*)
+            image_type=tar;;
 
         *)
             error Unknown image type for $image_file
@@ -248,6 +250,8 @@ case "$image_type" in
         root_part=p${ROOT_PARTITION:-1}
         ;;
     android|rootfsimage)
+        ;;
+    tar)
         ;;
     *)
         error Unknown image type for $image_file
@@ -442,6 +446,11 @@ elif [ $image_type == rootfsimage ]; then
     root_fstype=$(lsblk -n -o fstype ${loop_dev})
     mounted_dirs="$tmpdir/root ${mounted_dirs:-}"
 
+elif [ $image_type == tar ]; then
+
+    # do nothing, since we'll extract directly to $tmpdir /destdir
+    :
+
 else
 
     sudo mount ${loop_dev}${root_part} $tmpdir/root
@@ -500,6 +509,12 @@ initrd /initrd.img
 options quiet root=/dev/ram0 androidboot.selinux=permissive vmalloc=192M buildvariant=userdebug SRC=/android
 EOF
     info android: faked Linux-like /boot environment
+
+elif [ $image_type == tar ]; then
+
+    sudo install -m 0755 -d $destdir
+    info extracting $image_file to $destdir
+    tar xf $image_file --selinux --acls --xattrs -C $destdir/.
 
 elif [ $assume_there = no ] || ! [ -d $destdir ]; then
 
