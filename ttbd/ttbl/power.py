@@ -3274,7 +3274,7 @@ class buttons_released_pc(impl_c):
 
 
 
-class windows_service_over_ssh_c(ttbl.power.impl_c):
+class windows_service_over_ssh_c(impl_c):
     """
     Power Rail controller to manage over SSH a service running in a Windows machine
 
