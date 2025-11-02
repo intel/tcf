@@ -13,7 +13,7 @@ discover testcases in a number in different files.
 A discovery agent object :class:`agent_c` is created to maintain the
 discovery state; then :meth:`agent_c.run` executed to run the discovery
 process. :data:`agent_c.tcis` will contain the information about found
-testcases. 
+testcases.
 
 The discovery process involves enumerating all possible files in the
 paths passed as input and spawning a separate process for each (to
@@ -49,7 +49,9 @@ Quick usage:
 #            _classes_enumerate()
 #              _classes_enumerate()
 #           driver.is_testcase()
-#    agent_c.tcis_get_from_queue()
+#    loop
+#      agent_c.tcis_update_from_queue()
+#        agent_c.tcis_get_from_queue()
 #
 #
 #

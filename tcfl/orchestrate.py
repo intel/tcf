@@ -6,8 +6,47 @@
 
 # FIXME: moving this from orch/tcfl/target_ext_run.py
 
-"""Execution engine
+"""\
+Execution engine
 ================
+
+When executing test cases, you have
+
+- A discovery agent, that runs in your process, discovers testcases
+  and spawn test case server processes (tcsrv)
+
+- an executor, that runs in the same process as the discovery agent
+  ran and takes care of allocating targets into target groups that the
+  testcases can run in; for each, they signal the testcase server
+  process to span a subprocess to execute the testcase in that target
+  group.
+
+::
+
+      discovery-agent (process A)
+
+         tc1 srv testcase server (subprocess X)
+
+           tc1 run on tg P    <--------(subprocess)--------+
+                                                           |
+         tc2 srv testcase server (subprocess Y)            |
+                                                           |
+           tc2 run on tg Q    <--------(subprocess)--------|------+
+                                                           |      |
+           tc2 run on tg R    <--------(subprocess)--------|--+   |
+         ...                                               |  |   |
+                                                           |  |   |
+                                                           |  |   |
+       executor_c (process A)                              |  |   |
+                                                           |  |   |
+         allocate target groups                            |  |   |
+                                                           |  |   |
+         schedule run on target group (tg P) --------------+  |   |
+                                                              |   |
+         schedule run on target group (tg Q) -----------------+   |
+                                                                  |
+         schedule run on target group (tg R) ---------------------+
+
 
 The following is implemented by this module:
 
@@ -52,10 +91,10 @@ executor_c.run()   <- cmdline "tcf run2"
           append to executor_c.testcases_pending
 
   for each pending testcase
-    executor_c._run_testcase_spawn_static
+    executor_c._run_testcase_spawn_static()
       executor_c._testcase_axes_iterate()
         calculate APIDs
-        for each APID (maybe random)
+        for each APID
           testcase._axes_all_mr.from_integer(APID)
             get axes values for APID
           join those with axes keys to get a dict axis/value
@@ -281,7 +320,7 @@ class cache_c(collections.OrderedDict):
             return default
 
 
-
+# FIXME: create general dict_to_str k:v[, k:v]...
 def groups_to_str(groups: dict[str]) -> str:
     """
     Creates a name out of a list of gropus
@@ -423,6 +462,9 @@ class executor_c(contextlib.AbstractContextManager):
           B     2
           B     3
 
+        FIXME: this shall be able to be done in the testcase-servers
+        for each testcase
+
       - With all the axes permutations decided for each testcase, the
         executor then decides which targets support each execution and
         decides decides pairing of testcases with 1 or more target
@@ -437,8 +479,9 @@ class executor_c(contextlib.AbstractContextManager):
       - send keepalives to the server for each active target group
         until execution completed
 
-    - N testcase server subprocesses: for each discovered testcase,
-      and depending on the testcase framework needs and other details
+    - N testcase server subprocesses: for each discovered file or
+      testcase in the file, and depending on the testcase framework
+      needs and other details.
 
       when discovering each testcase, first thing is discovering its
       axes, so the execution will iterate all the possible
