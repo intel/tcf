@@ -217,6 +217,7 @@ import traceback
 import types
 import shutil
 import subprocess
+import sys
 import logging
 
 import commonl
@@ -2365,8 +2366,7 @@ RUN \
 
 
 class delay_til_shell_cmd_c(impl_c):
-    """
-    Delay until a shell commands returns an specific value
+    """Delay until a shell commands returns an specific value
 
     This is meant to be used in a power rail to delay until a certain
     shell command evaluates as succesful (return 0).
@@ -2376,14 +2376,117 @@ class delay_til_shell_cmd_c(impl_c):
     - look for USB devices whose serial number has to be dug from a
       deeper protocol than USB
 
+    - execute one shot (*timeout = 0, when_on = True, when_get =
+      False*) commands in response to power on / button press
+
+    - test conditions in the system that can be evaluated with a
+      command (*when_on = when_off = False, when_get = True*)
+
+    The output is captured to a file, by default called
+    *console-COMPONENT.stderr* in the target's state directory, that
+    then can be exposed as a logfile console::
+
+       power['delayer'] = ttbl.power.delay_til_shell_cmd_c(
+           [ "command", "-c", "SOMETHING" ],
+           expected_retval = 2,
+           when_get = False,
+           console = "log-delayer",
+       )
+       consoles["log-delayer"] = ttbl.console.logfile_c(
+           "console-delayer.stderr")
+
+
+    :param list cmdline: command line to execute, in the form of a
+      list of strings, that will be expanded by keywords *%(FIELD)[dsf..]*.
+
+    :param str condition_msg: (optional; default "COMMAND returns
+      VALUE") messagee to print when the command returns the expected value.
+
+    :param str cwd: (optional; default "/tmp") directory where to run
+      the command.
+
+    :param dict env: environment variables to pass to the process
+
+      >>> env = dict(os.environ)
+      >>> env["MYVAR"] = "xyz"
+      >>> ttbl.power.delay_til_shell_cmd_c(... env = env)
+
+    :param int expected_retval: (optional; default 0) the return code
+      from the command to:
+
+      - stop delaying the power on (when_on == *True*)
+      - stop delaying the power off (when_off == *True*)
+      - report the power is on (when_get == *True*)
+
+    :param bool when_on: (optional; default True) if *True*, the
+      command will be executed when powering *on* the power rail,
+      repeatedly until it returns the expected return code.
+
+    :param bool when_off: (optional; default False) if *True*, the
+      command will be executed when powering *off* the power rail,
+      repeatedly until it returns the expected return code.
+
+    :param bool when_get: (optional; default True) if *True*, the
+      command will be executed when asking aout the power state of the
+      component and return *True* ("powered on") if the command
+      returns the expected return code.
+
+    :param float timeout: (optional; default 25s) the command will be
+      called multiple times until it returns the expected return
+      value. In between calls, *poll_perid* seconds are waited. If we
+      exceed *timeout*, raise an exception.
+
+      If zero, work in one shot mode; will run only once. This can be
+      used to implement buttons that run a single action:
+
+      >>> buttons['example-cmd-button'] = ttbl.power.delay_til_shell_cmd_c(
+      >>>     [
+      >>>         "sh", "-c", "echo hello at $(date)"
+      >>>     ],
+      >>>     timeout = 0,
+      >>>     when_get = False,
+      >>>     console = "log-debug-buttons",
+      >>>     logfile = "console-debug-buttons.log",
+      >>> )
+      >>> consoles["log-buttons"] = ttbl.console.logfile_c(
+      >>>     "console-debug-buttons.log")
+
+    :param float poll_period: (optional; default 0.25s) time to wait
+      (in seconds) in between calls to the command.
+
+    :param float run_timeout: (optional; default 3) maximum time
+      (in seconds) for the command to run each time it is called; if
+      exceeded an exception will be raised
+
+    :param str console: (optional) name of a console driver that is
+      being used to read the log file created by this component.
+
+      If specified, the console's *last_size* property will be reset
+      to trigger a client to restart reading the console file. This
+      assumes the console has been created as defined in the example
+      above for *timeout*.
+
+    :param str logfile: (optional) name of the logfile where to dump
+      the output of the process (just a file, not directories). By
+      default it will be called *console-COMPONENT.stderr*.
+
+      >>> logfile = "console-debug-buttons.log"
+
     Other parameters as to :class:ttbl.power.impl_c.
 
     """
-    def __init__(self, cmdline,
-                 condition_msg = None,
-                 cwd = "/tmp", env = None,
-                 expected_retval = 0, when_on = True, when_off = False,
-                 poll_period = 0.25, timeout = 25, **kwargs):
+    def __init__(
+            self, cmdline: list,
+            condition_msg: str = None,
+            cwd: str = "/tmp", env: dict = None,
+            expected_retval: int = 0,
+            when_on: bool = True, when_off: bool = False, when_get: bool = True,
+            timeout: float = 25,
+            poll_period: float = 0.25,
+            run_timeout: float = 3,
+            console: str = None,
+            logfile: str = None,
+            **kwargs):
         commonl.assert_list_of_strings(cmdline, "cmdline",
                                        "command line components")
         assert condition_msg == None or isinstance(condition_msg, str)
@@ -2392,8 +2495,18 @@ class delay_til_shell_cmd_c(impl_c):
         assert isinstance(expected_retval, int)
         assert isinstance(when_on, bool)
         assert isinstance(when_off, bool)
+        assert isinstance(when_get, bool)
         assert isinstance(poll_period, numbers.Real)
         assert isinstance(timeout, numbers.Real)
+        assert isinstance(run_timeout, numbers.Real) and run_timeout > 0, \
+            f"{run_timeout}: expected a positive number of seconds;" \
+            f" got [{type(run_timeout)}] {run_timeout}"
+        assert console == None or isinstance(console, str), \
+            f"{console}: expected a console name (str);" \
+            f" got [{type(console)}] {console}"
+        assert logfile == None or isinstance(logfile, str), \
+            f"{logfile}: expected a logfile name (str);" \
+            f" got [{type(logfile)}] {logfile}"
 
         impl_c.__init__(self, **kwargs)
         self.cmdline = cmdline
@@ -2408,8 +2521,12 @@ class delay_til_shell_cmd_c(impl_c):
         self.expected_retval = expected_retval
         self.when_on = when_on
         self.when_off = when_off
+        self.when_get = when_get
         self.poll_period = poll_period
         self.timeout = timeout
+        self.run_timeout = run_timeout
+        self.console = console
+        self.logfile = logfile
         self.upid_set(
             "Delayer until command '%s' returns %d,"
             " checking every %.2fs timing out at %.1fs" % (
@@ -2418,6 +2535,8 @@ class delay_til_shell_cmd_c(impl_c):
             expected_retval = expected_retval,
             poll_period = poll_period,
             timeout = timeout)
+
+
 
     def _cmdline_format(self, target, component):
         kws = dict(target.kws)
@@ -2437,13 +2556,16 @@ class delay_til_shell_cmd_c(impl_c):
             raise self.power_on_e(message)
         return cmdline, kws
 
-    def _test(self, target, component, cmdline):
-        outfile = os.path.join(target.state_dir, f"console-{component}.stderr")
-        with open(outfile, "w") as of:
-            r = subprocess.call(cmdline,
-                                env = self.env, cwd = self.cwd,
-                                stdin = of, stderr = subprocess.STDOUT)
-        return r == self.expected_retval
+
+
+    def _test(self, target, component, cmdline, of):
+        p = subprocess.run(
+            cmdline,
+            stdout = of, stderr = subprocess.PIPE, text = True,
+            env = self.env,
+            timeout = self.run_timeout)
+        return p.returncode == self.expected_retval
+
 
 
     def on(self, target, component):
@@ -2453,26 +2575,43 @@ class delay_til_shell_cmd_c(impl_c):
         condition_msg = self.condition_msg % kws
         ts0 = time.time()
         ts = ts0
-        while ts - ts0 < self.timeout:
-            if self._test(target, component, cmdline):
-                break
-            target.log.debug(
-                "%s: delaying power-on %.fs until %s" % (
-                    component, self.poll_period, condition_msg,
-                ))
-            time.sleep(self.poll_period)
-            ts = time.time()
-        else:
-            raise RuntimeError(
-                "%s: timeout (%.1fs) on power-on delay "
-                "waiting for %s" % (
-                    component, self.timeout, condition_msg
-                ))
+        if self.console:
+            # if we have declared a console, reset the size to
+            # something it won't have now so we force/pretend the
+            # ttbl.console.logfile_c driver to understand there has
+            # been a file change, which will trigger a generation
+            # change (see ttbl.console.logfile_c._size).
+            target.fsdb.set(
+                f"interfaces.console.{self.console}.last_size", sys.maxsize)
+        outfile = os.path.join(
+            target.state_dir, self.logfile or f"console-{component}.stderr")
+        with open(outfile, "w") as of:
+            # this allows timeout = 0 -> single shot
+            while ts - ts0 <= self.timeout:
+                if self._test(target, component, cmdline, of):
+                    break
+                target.log.debug(
+                    "%s: delaying power-on %.fs until %s",
+                    component, self.poll_period, condition_msg)
+                of.write(f"""
+
+-----------
+{time.ctime()}: Delaying {self.poll_period} before a new execution
+------------
+
+""")
+                time.sleep(self.poll_period)
+                ts = time.time()
+            else:
+                raise RuntimeError(
+                    "%s: timeout (%.1fs) on power-on delay "
+                    "waiting for %s" % (
+                        component, self.timeout, condition_msg
+                    ))
         target.log.info(
-            "%s: delayed power-on %.1fs (max %.1fs) until %s"
-            % (
-                component, ts - ts0, self.timeout, condition_msg
-            ))
+            "%s: delayed power-on %.1fs (max %.1fs) until %s",
+            component, ts - ts0, self.timeout, condition_msg)
+
 
 
     def off(self, target, component):
@@ -2482,31 +2621,52 @@ class delay_til_shell_cmd_c(impl_c):
         condition_msg = self.condition_msg % kws
         ts0 = time.time()
         ts = ts0
-        while ts - ts0 < self.timeout:
-            if not self._test(target, component, cmdline):
-                break
-            target.log.debug(
-                "%s: delaying power-off %.fs until (not) %s" % (
-                    component, self.poll_period, condition_msg
-                ))
-            time.sleep(self.poll_period)
-            ts = time.time()
-        else:
-            raise RuntimeError(
-                "%s: timeout (%.1fs) on power-off delay waiting"
-                " until (not) %s" % (
-                    component, self.timeout, condition_msg
-                ))
+        if self.console:
+            target.fsdb.set(
+                f"interfaces.console.{self.console}.last_size", sys.maxsize)
+        outfile = os.path.join(
+            target.state_dir, self.logfile or f"console-{component}.stderr")
+        with open(outfile, "w") as of:
+            # this allows timeout = 0 -> single shot
+            while ts - ts0 <= self.timeout:
+                if not self._test(target, component, cmdline, of):
+                    break
+                target.log.debug(
+                    "%s: delaying power-off %.fs until (not) %s",
+                    component, self.poll_period, condition_msg)
+                of.write(f"""
+
+-----------
+{time.ctime()}: Delaying {self.poll_period} before a new execution
+------------
+
+""")
+                time.sleep(self.poll_period)
+                ts = time.time()
+            else:
+                raise RuntimeError(
+                    "%s: timeout (%.1fs) on power-off delay waiting"
+                    " until (not) %s" % (
+                        component, self.timeout, condition_msg
+                    ))
         target.log.info(
-            "%s: delayed power-off %.1fs (max %.1fs)"
-            " until (not) %s" % (
-                component, ts - ts0, self.timeout, condition_msg
-            ))
+            "%s: delayed power-off %.1fs (max %.1fs) until (not) %s",
+            component, ts - ts0, self.timeout, condition_msg)
+
 
 
     def get(self, target, component):
+        if self.when_get == False:
+            return None
         cmdline, _kws = self._cmdline_format(target, component)
-        return self._test(target, component, cmdline)
+        if self.console:
+            target.fsdb.set(
+                f"interfaces.console.{self.console}.last_size", sys.maxsize)
+        outfile = os.path.join(
+            target.state_dir, self.logfile or f"console-{component}.stderr")
+        with open(outfile, "w") as of:
+            return self._test(target, component, cmdline, of)
+
 
 
 class rpyc_c(daemon_podman_container_c):
