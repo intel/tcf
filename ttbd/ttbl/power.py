@@ -2472,6 +2472,31 @@ class delay_til_shell_cmd_c(impl_c):
 
       >>> logfile = "console-debug-buttons.log"
 
+    :param tuple rpyc_spec: (optional; default *None*) if specified,
+      tuple of string with a hostname and an integer TCP port where an
+      RPYC server is listening.
+
+      If specified, the command will be run in the remote host.
+
+      An RPYC server is usually created as a separate power component
+      that uses :class:`ttbl.console.ssh_pc` to run an SSH command
+      that starts RPYC in the remote host and creates an encrypted
+      tunnel for the RPYC connection. eg:
+
+      >>> power_rail['redir_rpyc'] = ttbl.console.ssh_pc(
+      >>>     "USER:PASSWORD@HOSTNAME",
+      >>>     crlf = "\r",
+      >>>     shell_cmd = "py /Python311/Scripts/rpyc_classic.py --host 127.0.0.1 -p 5998",
+      >>>     extra_opts = {
+      >>>         "LocalForward#127.0.0.1:23000": "127.0.0.1:5998"
+      >>>     },
+      >>>     extra_tcp_ports = { 23000 }
+      >>> )
+
+      then when powered on, the server's 127.0.0.1:23000 will be
+      redirected to HOSTNAME"s 127.0.0.1:5998, where RPYC is
+      listening over the SSH encrypted connection.
+
     Other parameters as to :class:ttbl.power.impl_c.
 
     """
@@ -2486,6 +2511,7 @@ class delay_til_shell_cmd_c(impl_c):
             run_timeout: float = 3,
             console: str = None,
             logfile: str = None,
+            rpyc_spec: tuple = None,	# host port
             **kwargs):
         commonl.assert_list_of_strings(cmdline, "cmdline",
                                        "command line components")
@@ -2527,6 +2553,20 @@ class delay_til_shell_cmd_c(impl_c):
         self.run_timeout = run_timeout
         self.console = console
         self.logfile = logfile
+        if rpyc_spec:
+            assert isinstance(rpyc_spec, tuple) \
+                and len(rpyc_spec) == 2, \
+                f"rpyc_spec: got {type(rpyc_spec)}; expected tuple (host:str, port:int)"
+            self.rpyc_host = rpyc_spec[0]
+            self.rpyc_port = rpyc_spec[1]
+            assert isinstance(self.rpyc_host, str), \
+                f"rpyc_spec[0]: expected str (hostname), got {type(self.rpyc_host)}"
+            assert isinstance(self.rpyc_port, int) and self.rpyc_port > 0, \
+                f"rpyc_spec[1]: expected int (0 < TCP port < 65536)," \
+                f" got [{type(self.rpyc_port)}] {self.rpyc_port}"
+        else:
+            self.rpyc_host = None
+            self.rpyc_port = None
         self.upid_set(
             "Delayer until command '%s' returns %d,"
             " checking every %.2fs timing out at %.1fs" % (
@@ -2534,7 +2574,9 @@ class delay_til_shell_cmd_c(impl_c):
             command = cmdline_s,
             expected_retval = expected_retval,
             poll_period = poll_period,
-            timeout = timeout)
+            timeout = timeout,
+            rpyc_host = self.rpyc_host, rpyc_port = self.rpyc_port,
+        )
 
 
 
@@ -2558,12 +2600,31 @@ class delay_til_shell_cmd_c(impl_c):
 
 
 
-    def _test(self, target, component, cmdline, of):
-        p = subprocess.run(
+    def _subrocess_get(self):
+        if self.rpyc_host:
+            import rpyc
+            remote = rpyc.classic.connect(self.rpyc_host, self.rpyc_port)
+            return remote.modules['subprocess']
+
+        else:
+            remote = None
+            return subprocess
+
+
+
+    def _test(self, target, component, cmdline, of, rsubprocess):
+
+        p = rsubprocess.run(
             cmdline,
-            stdout = of, stderr = subprocess.PIPE, text = True,
+            stdout = rsubprocess.PIPE, stderr = rsubprocess.STDOUT, text = True,
             env = self.env,
             timeout = self.run_timeout)
+        # capture like this because we cannot pass the descriptor of a
+        # local file ot the remote side; this works for smallish
+        # output; if it gets huge, we need to switch to just do a
+        # Popen, and read from the pipe, append to the file, until
+        # finish or timeout
+        of.write(p.stdout)
         return p.returncode == self.expected_retval
 
 
@@ -2586,9 +2647,10 @@ class delay_til_shell_cmd_c(impl_c):
         outfile = os.path.join(
             target.state_dir, self.logfile or f"console-{component}.stderr")
         with open(outfile, "w") as of:
+            rsubprocess = self._subrocess_get()
             # this allows timeout = 0 -> single shot
             while ts - ts0 <= self.timeout:
-                if self._test(target, component, cmdline, of):
+                if self._test(target, component, cmdline, of, rsubprocess):
                     break
                 target.log.debug(
                     "%s: delaying power-on %.fs until %s",
@@ -2628,8 +2690,9 @@ class delay_til_shell_cmd_c(impl_c):
             target.state_dir, self.logfile or f"console-{component}.stderr")
         with open(outfile, "w") as of:
             # this allows timeout = 0 -> single shot
+            rsubprocess = self._subrocess_get()
             while ts - ts0 <= self.timeout:
-                if not self._test(target, component, cmdline, of):
+                if not self._test(target, component, cmdline, of, rsubprocess):
                     break
                 target.log.debug(
                     "%s: delaying power-off %.fs until (not) %s",
@@ -2665,7 +2728,8 @@ class delay_til_shell_cmd_c(impl_c):
         outfile = os.path.join(
             target.state_dir, self.logfile or f"console-{component}.stderr")
         with open(outfile, "w") as of:
-            return self._test(target, component, cmdline, of)
+            rsubprocess = self._subrocess_get()
+            return self._test(target, component, cmdline, of, rsubprocess)
 
 
 
