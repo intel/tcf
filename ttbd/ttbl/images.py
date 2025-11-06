@@ -1610,8 +1610,20 @@ class flash_shell_cmd_c(impl2_c):
 
     :param dict env_add: (optional) variables to add to the environment when
       running the command
+
+    :param str|list(str) cmdline_for_each_image: list of strings
+      to append to the command line for each image we want to flash:
+
+      >>> cmdline_for_each_image = [ "%(image_name)s:%(image_file)s" ])
+
+      Fields *%(FIELD)s* are replaced from target's keywords, with added
+
+       - *image_name*: the name of the image being flashed (destination)
+
+       - *image_file*: the file name of the image being flashed
     """
     def __init__(self, cmdline, cwd = "/tmp", path = None, env_add = None,
+                 cmdline_for_each_image: list = None,
                  **kwargs):
         commonl.assert_list_of_strings(cmdline, "cmdline", "arguments")
         assert cwd == None or isinstance(cwd, str)
@@ -1622,6 +1634,14 @@ class flash_shell_cmd_c(impl2_c):
         self.path = path
         self.cmdline = cmdline
         self.cwd = cwd
+        if isinstance(cmdline_for_each_image, str):
+            self.cmdline_for_each_image = [ cmdline_for_each_image ]
+        elif cmdline_for_each_image:
+            commonl.assert_list_of_strings(
+                cmdline_for_each_image, "cmdline_for_each_image", "cmdline")
+            self.cmdline_for_each_image = cmdline_for_each_image
+        else:
+            self.cmdline_for_each_image = []
         if env_add:
             commonl.assert_dict_of_strings(env_add, "env_add")
             self.env_add = env_add
@@ -1629,9 +1649,11 @@ class flash_shell_cmd_c(impl2_c):
             self.env_add = {}
         impl2_c.__init__(self, **kwargs)
 
+
+
     def flash_start(self, target, images, context):
 
-        kws = dict(target.kws)
+        kws = target.kws_collect()
         context['images'] = images
 
         # make sure they are sorted so they are always listed the same
@@ -1671,7 +1693,26 @@ class flash_shell_cmd_c(impl2_c):
         try:
             for i in self.cmdline:
                 # some older Linux distros complain if this string is unicode
-                cmdline.append(str(i % kws))
+                try:
+                    cmdline.append(commonl.kws_expand(str(i), kws))
+                except Exception as e:
+                    target.log.error(
+                        "Can't expand commandline component #%d: %s", count, e)
+                    raise
+                count += 1
+            count = 0
+            for cmdline_image in self.cmdline_for_each_image:
+                for image_name, image_file in images.items():
+                    kws_image = dict(kws)
+                    kws_image['image_name'] = image_name
+                    kws_image['image_file'] = image_file
+                    try:
+                        cmdline.append(commonl.kws_expand(cmdline_image, kws_image))
+                    except Exception as e:
+                        target.log.error(
+                            "Can't expand commandline for each image"
+                            " component #%d: %s", count, e)
+                        raise
             count += 1
         except KeyError as e:
             message = "configuration error? can't template command line #%d," \
@@ -1794,6 +1835,7 @@ class flash_shell_cmd_c(impl2_c):
         except IOError as e:
             if e.errno != errno.ENOENT:
                 raise
+
 
 
 class quartus_pgm_c(flash_shell_cmd_c):
