@@ -642,7 +642,7 @@ class interface(ttbl.tt_interface):
                 except Exception as e:
                     target.log.warning(
                         "flashing: (ignoring) exception stating file %s: %s",
-                        filename, exception)
+                        filename, e)
 
             time.sleep(check_period)
             for impl, images in parallel.items():
