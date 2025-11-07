@@ -75,6 +75,7 @@ import traceback
 import typing
 
 import commonl
+import tcfl
 from . import tc
 from . import target_ext_console
 
@@ -331,9 +332,28 @@ class shell(tc.target_extension_c):
             # positives is close to impossible.
             self.prompt_regex = re.compile(
                 r"TCF-%(tc_hash)s:.+ %%%% [\$#] " % self.target.kws)
-            self.run(
-                r'export PS1="TCF-%(tc_hash)s:\w %%%% \$ "' % self.target.kws,
-                console = console)
+            last_e = None
+            for i in range(0, 3):
+                try:
+                    self.run(
+                        # PROMPT_COMMAND and PS0 in many distros adds a lot of
+                        # control chars to prompts for the terminal, invisible
+                        # to the naked eye, but havocing to automation
+                        'unset PROMPT_COMMAND PS0;'
+                        r'export PS1="TCF-%(tc_hash)s:\w %%%% \$ "' % self.target.kws,
+                        console = console, timeout = 10)
+                    break
+                except tcfl.fail_e as e:
+                    # sigh -- sometimes some OSes, as they are
+                    # promtping, they send a hidden ANSI seq ESC [6n
+                    # or whatever to the terminal to report and the
+                    # terminal sends back the size and it interferes
+                    # with termina input, so ....just blind try a few times.
+                    target.report_info(
+                        f"failed to set prompt, retrying {i}/3: {e}")
+                    last_e = e
+            else:
+                raise last_e
         # disable line editing for proper recording of command line
         # when running bash; otherwise the scrolling readline does
         # messes up the output
