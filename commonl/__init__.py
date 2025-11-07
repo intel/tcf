@@ -834,6 +834,15 @@ def hash_file(hash_object, filepath, blk_size = 8192):
     :param hash_object: hash object (from :py:mod:`hashlib`)
     :param str filepath: path to the file to feed
     :param int blk_size: read the file in chunks of that size (in bytes)
+
+
+    >>> import commonl
+    >>> import hashlib
+    >>> h = hashlib.sha256()
+    >>> commonl.hash_file(h, "/etc/passwd")
+    >>> h.hexdigest()
+    >>> 'f46cc133c72229e45a98020ad322fc150b819263f1b04c51a6e36fe7bdb3a19c'
+
     """
     assert hasattr(hash_object, "update")
     with open(filepath, 'rb') as f:
