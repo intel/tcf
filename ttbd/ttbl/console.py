@@ -1355,6 +1355,11 @@ class ssh_pc(ttbl.power.socat_pc, generic_c):
 
     :param int port: (optional) port to connect to (defaults to 22)
 
+    :param set extra_tcp_ports: (optional) set of extra TCP ports to
+      monitor for ON status. If specified, each TCP port here must
+      respond to a connection for the component to be considered on.
+
+      This is mostly used when we add extra options to forward ports.
 
     :param str shell_cmd: (optional; default empty, which lets sshd
       decide) shell to use.
@@ -1408,7 +1413,8 @@ class ssh_pc(ttbl.power.socat_pc, generic_c):
 
     """
     def __init__(self, hostname, port = 22, extra_opts = None,
-                 shell_cmd: str = '', **kwargs):
+                 shell_cmd: str = '', extra_tcp_ports: set = None,
+                 **kwargs):
         assert isinstance(hostname, str)
         assert port > 0
         assert extra_opts == None \
@@ -1417,6 +1423,16 @@ class ssh_pc(ttbl.power.socat_pc, generic_c):
                          for k, v in list(extra_opts.items()))), \
             "extra_opts: expected dict of string:string; got %s" \
             % type(extra_opts)
+        if extra_tcp_ports == None:
+            extra_tcp_ports = []
+        else:
+            assert (
+                isinstance(extra_tcp_ports, ( set, list ))
+                and all(isinstance(tcp_port, int) and tcp_port > 0 and tcp_port < 65536
+                        for tcp_port in extra_tcp_ports)
+            ), \
+            f"extra_tcp_ports: expected list of valid TCP ports," \
+            f" (positive integers); got [type{extra_tcp_ports}] '{extra_tcp_ports}'"
 
         generic_c.__init__(self, **kwargs)
         ttbl.power.socat_pc.__init__(
@@ -1448,6 +1464,7 @@ class ssh_pc(ttbl.power.socat_pc, generic_c):
         # SSHPASS always has to be defined
         self.env_add['SSHPASS'] = password if password else ""
         self.extra_opts = extra_opts
+        self.extra_tcp_ports = extra_tcp_ports
         self.paranoid_get_samples = 1
         self.upid_set(f"console over SSH to {hostname}:{port}",
                       name = f"ssh:{hostname}:{port}",
@@ -1575,7 +1592,19 @@ EscapeChar = none
         # but the ttbl.power.socat_pc.get() implementation checks if
         # the process is alive looking at the PIDFILE
         # COMPONENT-socat.pid and verifying that thing is still running
-        return ttbl.power.socat_pc.get(self, target, component)
+        main = ttbl.power.socat_pc.get(self, target, component)
+        if not main:
+            return False
+        # if there are extra TCP ports to monitor, check they are
+        # responding; this way, if whatver is in the other side they
+        # should be checking is dead, we'll report off and we'll be
+        # able to restart
+        for tcp_port in self.extra_tcp_ports:
+            connectable = commonl.tcp_port_connectable("127.0.0.1", tcp_port)
+            if not connectable:
+                return False
+        return True
+
 
 
 class netconsole_pc(ttbl.power.socat_pc, generic_c):
