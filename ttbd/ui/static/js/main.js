@@ -168,7 +168,7 @@ async function js_buttons(targetid, action, component) {
         '<b><label style="color: green;">SUCCESS</label></b>'
     );
 
-    window.location.reload()
+    buttons_state_update_for_all_components(targetid)
 }
 
 function common_error_check(r, error_message) {
