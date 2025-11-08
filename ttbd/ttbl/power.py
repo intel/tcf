@@ -2733,6 +2733,96 @@ class delay_til_shell_cmd_c(impl_c):
 
 
 
+class proc_killer_c(impl_c):
+    """
+    Power component that kills a process when powering on/off and
+    senses its presence
+
+    This is useful to kill processes in the server that are holding resources
+    (serial ports, JTAG adapters, etc) when powering off a target.
+
+    For example, to kill an SSH mux process for a given machine
+    and username, it is a process whose command line looks like::
+
+      ssh: /var/cache/ttbd-production/ssh-USERNAME@HOSTNAME.control [mux]
+      ssh: FILEPATHTOMUXFILE [mux]
+
+    this happens when SSH is started with ControlPath and
+    ControlPersist options.
+
+    >>> ttbl.power.proc_killer_c(
+    >>>     re.compile(f"ssh: {ttbl.test_target.files_path}/ssh-USERNAME@HOSTNAME.control \[mux\]"))
+
+    :param re.Pattern cmdline_regex: compiled regular expression to
+      match the process to be killed.
+
+    :param bool when_off: (optional; default *True*) kill the process
+      when turning off
+
+    :param bool when_on: (optional; default *False*) kill the process
+      when turning on
+
+    :param bool when_get: (optional, default *True*) report if the
+      process exists
+
+    Other parameters as to :class:`ttbl.power.impl_c`.
+    """
+    def __init__(self, cmdline_regex: re.Pattern,
+                 *args,
+                 when_on: bool = False, when_off: bool = True,
+                 when_get: bool = True,
+                 **kwargs):
+        assert isinstance(cmdline_regex, re.Pattern), \
+            f"cmdline_regex: expected a compiled regular expression;" \
+            f" got [{type(cmdline_regex)}] {cmdline_regex}"
+        assert isinstance(when_get, bool), \
+            f"when_get: expected bool; got [{type(when_get)}]"
+        assert isinstance(when_on, bool), \
+            f"when_on: expected bool; got [{type(when_on)}]"
+        assert isinstance(when_off, bool), \
+            f"when_off: expected bool; got [{type(when_off)}]"
+
+        self.cmdline_regex = cmdline_regex
+        self.when_get = when_get
+        self.when_on = when_on
+        self.when_off = when_off
+        impl_c.__init__(self, *args, **kwargs)
+        self.upid_set(
+            f"Process killer for process '{cmdline_regex.pattern}'",
+            cmdline_regex = cmdline_regex.pattern,
+        )
+
+
+    def _kill(self, target: ttbl.test_target, component: str, due: str):
+        # FIXME: I guess the regex could use keyword expansion
+        import psutil
+        for p in psutil.process_iter(["cmdline"]):
+            cmdline = " ".join(p.cmdline())
+            if self.cmdline_regex.match(cmdline):
+                p.terminate()
+                target.log.info(f"{component}: terminating pid {p.pid}"
+                                f" due to {due}")
+
+    def off(self, target: ttbl.test_target, component: str):
+        if self.when_off:
+            self._kill(target, component, "power off")
+
+    def on(self, target: ttbl.test_target, component: str):
+        if self.when_on:
+            self._kill(target, component,  "power on")
+
+    def get(self, target: ttbl.test_target, component: str):
+        import psutil
+        if self.when_get == False:
+            return None
+        for p in psutil.process_iter(["cmdline"]):
+            cmdline = " ".join(p.cmdline())
+            if self.cmdline_regex.match(cmdline):
+                return True
+        return False
+
+
+
 class rpyc_c(daemon_podman_container_c):
     """Expose a containeraized Python environment in the server to client via RPYC
 
