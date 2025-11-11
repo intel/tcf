@@ -325,7 +325,7 @@ class vlan_pci(ttbl.power.impl_c):
                 ])
                 subprocess.check_call([	# bring lower up
                     "/usr/sbin/ip", "link", "set", "dev", bridge_ifname,
-                    "up", "promisc", " on",
+                    "up", "promisc", "on",
                 ])
         else:
             raise AssertionError("Unknown mode %s" % mode)
