@@ -380,7 +380,6 @@ class extension(tc.target_extension_c):
                 try:
                     flash_image_s = target.testcase.parameter_get("image_flash")
                     if flash_image_s == "<none>":
-                        target.report_error(f"DEBUG <none>", level = 0)
                         return {}, False, False
                 except tcfl.block_e as e:
                     target.report_error(f"DEBUG {source} as {e}", level = 0)
