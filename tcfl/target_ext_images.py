@@ -296,6 +296,21 @@ class extension(tc.target_extension_c):
 
         - environment *IMAGE_FLASH*
 
+        - a testcase parameter *PARAMETER_image_flash*::
+
+            @tcfl.tc.parameters(
+                ...,
+                tcfl.tc.parameter_c(
+                    "image_flash",
+                    "Specification of images to firmware flash"
+                    " ([[no-]soft] [[no-]upload] IMAGE:NAME[ IMAGE:NAME[..]]])",
+                    "<none>"
+                ),
+                ...
+            )
+            class _test(tcfl.tc.tc_c):
+                ....
+
         With *TYPE*, *FULLID* and *ID* sanitized to any character outside
         of the ranges *[a-zA-Z0-9_]* replaced with an underscore (*_*).
 
@@ -356,14 +371,23 @@ class extension(tc.target_extension_c):
                 env_prefix,
             ]
             for source in sourcel:
+                # is this in the environment?
                 flash_image_s = os.environ.get(source, None)
                 if flash_image_s != None:
                     break
             else:
-                target.report_info(
-                    "skipping image flashing (no function argument nor environment: %s)"
-                    % " ".join(sourcel))
-                return {}, False, False
+                # is this specified as a testcase parameter?
+                try:
+                    flash_image_s = target.testcase.parameter_get("image_flash")
+                    if flash_image_s == "<none>":
+                        target.report_error(f"DEBUG <none>", level = 0)
+                        return {}, False, False
+                except tcfl.block_e as e:
+                    target.report_error(f"DEBUG {source} as {e}", level = 0)
+                    target.report_info(
+                        "skipping image flashing (no function argument nor environment: %s)"
+                        % " ".join(sourcel))
+                    return {}, False, False
         else:
             source = "function argument"
 
