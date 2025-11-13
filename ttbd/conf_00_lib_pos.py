@@ -817,6 +817,7 @@ def pos_target_add(
 #: >>> qemu_iftype_to_pos_boot_dev['NEWIFTYPE'] = 'xka1'
 qemu_iftype_to_pos_boot_dev = {
     'virtio': 'vda',
+    'virtio-blk-pci': 'vda',
     'scsi': 'sda',
     'ide': 'sda',
 }
@@ -831,7 +832,7 @@ def target_qemu_pos_add(target_name,
                         mr_partsizes = "1:2:2:10",
                         # more distros support ide than virtio/scsi with
                         # generic kernels
-                        sd_iftype = 'ide',
+                        sd_iftype = 'virtio-blk-pci',
                         extra_cmdline = "",
                         ram_megs = 3072,
                         kwargs_pos_setup = None,
@@ -930,6 +931,13 @@ def target_qemu_pos_add(target_name,
 
     :param str extra_cmdline: a string with extra command line to add;
       %(FIELD)s supported (target tags).
+
+      For example
+
+      >>> extra_cmdline = "-cdrom somefile.iso -device ide-cd,bootindex=2",
+
+      would add a drive for a CDROM and it'd be set with bootindex #2,
+      which in UEFI would come after the hard drive.
 
     :param dict kwargs_pos_setup: (optional; default *None*) arguments
       for setting up the POS characteristics of the target, which are
@@ -1042,8 +1050,10 @@ def target_qemu_pos_add(target_name,
         # EFI BIOS
         "-drive", "if=pflash,format=raw,readonly,file=%(qemu-image-bios)s",
         "-drive", "if=pflash,format=raw,file=%(path)s/OVMF_VARS.fd",
-        # Storage
-        "-drive", "file=%%(path)s/hd.qcow2,if=%s,aio=threads" % sd_iftype,
+        # Storage; specify the blockdev/device format so we can set
+        # bootindex to drive the bootorder to start with the storge
+        "-blockdev" ,"driver=qcow2,file.driver=file,file.filename=%%(path)s/hd.qcow2,node-name=drive0",
+        "-device", f"{sd_iftype},drive=drive0,bootindex=1",
         "-boot", "order=nc",	# for POS over PXE
     ]
     # Create as many consoles as directed
