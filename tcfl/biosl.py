@@ -95,6 +95,10 @@ values that are inherit to the BIOS:
   defaults to *EFI .* Shell*): name of the boot entry that boots the
   EFI shell in the boot menu.
 
+- *bios.boot_entry_pxe* Python regular expression string;
+  defaults to *UEFI PXEv4 (MAC:MACADDR)): name of the boot entry that
+  boots PXE.
+
 .. _biosl_ansi_shortref:
 
 ANSI short reference

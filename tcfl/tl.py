@@ -148,10 +148,29 @@ def ipxe_sanboot_url(target, sanboot_url, dhcp = None,
     else:
         assert isinstance(assume_in_main_menu, bool), \
             f"assume_in_main_menu: expected bool, got {type(assume_in_main_menu).__name__}"
+
+    # the bios.boot_entry_pxe section of the inventory can tell us
+    # what is the PXE boot entry--gather it or default to a default
+    # one if not set.
+    boot_entry_pxe = target.kws.get(
+        "bios.boot_entry_pxe", None)
+    if boot_entry_pxe == None:
+        boot_entry_pxe = r"UEFI PXEv4 \(MAC:%s\)"
+        target.report_info("UEFI: booting PXE boot entry (default):"
+                           f" {boot_entry_pxe}")
+    else:
+        target.report_info("UEFI: booting PXE boot entry from inventory"
+                           " bios.boot_entry_pxe:"
+                           f" {boot_entry_pxe}")
+
+    if '%' in boot_entry_pxe:
+        # Eg: UEFI PXEv4 (MAC:4AB0155F98A1)
+        # FIXME: this is lame and needs keyword encoding with macs in multiple formats
+        boot_entry_pxe = boot_entry_pxe % mac_addr.replace(":", "").upper().strip(),
+
     tcfl.biosl.boot_network_pxe(
         target,
-        # Eg: UEFI PXEv4 (MAC:4AB0155F98A1)
-        r"UEFI PXEv4 \(MAC:%s\)" % mac_addr.replace(":", "").upper().strip(),
+        boot_entry_pxe,
         assume_in_main_menu = assume_in_main_menu
     )
 
