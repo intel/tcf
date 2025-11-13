@@ -133,6 +133,11 @@ def ipxe_sanboot_url(target, sanboot_url, dhcp = None,
 
     """
     if power_cycle:
+        if 'qemu' in target.type:
+            # horrible hack -- see tcfl.biosl.main_menu_expect(); this
+            # allos the EFI to be slowed down so it receives the F2 to
+            # boot the BIOS menu
+            target.property_set("debug", True)
         target.power.cycle()
         tcfl.biosl.main_menu_expect(target)	# take boot to the BIOS menu
 

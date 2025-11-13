@@ -1290,9 +1290,23 @@ def main_menu_expect(target):
             " go to the main menu in property bios.boot_key_main_menu"
             " (eg: F2, F6, F12...)" % target.id,
             dict(target = target))
-    for _ in range(10):
+
+    vm_halted = target.property_get("debug")
+    for i in range(10):
         target.console.write(ansi_key_code(key_main_menu, bios_terminal))
         time.sleep(0.25)
+        if i > 3 and 'qemu' in target.type and vm_halted:
+            # QEMU is too fast to boot the BIOS, so if we want to
+            # press F2 to enter the BIOS, we need to have that path
+            # set in the server so QEMU's EFI can receive it. Thus we
+            # ask QEMU to halt the VM on startup when the *debug*
+            # property is set and then resume it and clear it.
+            #
+            # see tcfl.tl.ipxe_sanboot_url() for en example of a user
+            target.debug.resume()
+
+    if vm_halted:		# clear the halt-on-boot flag if set
+        target.property_set("debug", None)
 
     # This means we have reached the BIOS main menu
     target.report_info("BIOS: confirming we are at toplevel menu")
