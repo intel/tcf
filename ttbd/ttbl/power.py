@@ -2908,13 +2908,13 @@ class proc_run_expect_c(impl_c):
         target.log.info(f"{component}:      stderr: {p.stderr}")
 
         if self.on_returncode != None and p.returncode != self.on_returncode:
-            raise run_failed_e(
+            raise self.run_failed_e(
                 f"{component}: {action} failed; command {' '.join(self.on_command)}"
                 f" returned {p.returncode}, expected {returncode_expected}")
 
         if regex != None:
             if not regex.search(p.stdout + p.stderr):
-                raise run_failed_e(
+                raise self.run_failed_e(
                     f"{component}: {action} failed; command {' '.join(self.on_command)}"
                     f" output did not match regex {regex.pattern};"
                     f" stdout+stderr:\n{p.stderr}\n{p.stdout}")
