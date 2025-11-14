@@ -2823,6 +2823,149 @@ class proc_killer_c(impl_c):
 
 
 
+class proc_run_expect_c(impl_c):
+    """
+    Power controller than runs programs and analyzes result and ouput for on/off/get
+
+    :param list on_command: a list of strings with command line to run
+      to power on; will be fed to :func:`subprocess.run`.
+
+    :param int on_returncode: (optional, default *None*) if specified
+      a returncdode the command needs to return for the operation to
+      be succesful.
+
+    :param int on_regex: (optional, default *None*) if specified a
+      regular expression that has to match on the concatenation of the
+      command's standard output and standard error.
+
+    :param list off_command: see *on_command*
+    :param int off_returncode: see *on_returncode*
+    :param int off_regex: see *on_regex*
+
+    :param list get_command: see *on_command*; if none, the state will
+      show as not available; for it to report on (*True*), the command
+      has to execute and verify successfully, otherwise it will be
+      consider off (*False*)
+    :param int get_returncode: see *on_returncode*
+    :param int get_regex: see *on_regex*
+
+    Other arguments as to :class:`ttbl.power.impl_c`.
+    """
+    def __init__(self,
+                 on_command: list = None, on_regex: re.Pattern = None,
+                 on_returncode: int = None,
+                 off_command: list = None, off_regex: re.Pattern = None,
+                 off_returncode: bool = None,
+                 get_command: list = None, get_regex: re.Pattern = None,
+                 get_returncode: bool = None,
+                 *args,
+                 **kwargs):
+        commonl.assert_list_of_strings(on_command, "on_command",
+                                       "command line components")
+        assert on_regex == None or isinstance(on_regex, re.Pattern), \
+            f"on_regex: expected compiled regular expression or None;" \
+            f" got [{type(on_regex)}] {on_regex}"
+        assert on_returncode == None or isinstance(on_returncode, int), \
+            f"on_returncode: expected int; got [{type(on_returncode)}] {on_returncode}"
+        self.on_command = on_command
+        self.on_regex = on_regex
+        self.on_returncode = on_returncode
+
+        commonl.assert_list_of_strings(off_command, "off_command",
+                                       "command line components")
+        assert off_regex == None or isinstance(off_regex, re.Pattern), \
+            f"off_regex: expected compiled regular expression or None;" \
+            f" got [{type(off_regex)}] {off_regex}"
+        assert off_returncode == None or isinstance(off_returncode, int), \
+            f"off_returncode: expected int; got [{type(off_returncode)}] {off_returncode}"
+        self.off_command = off_command
+        self.off_regex = off_regex
+        self.off_returncode = off_returncode
+
+        commonl.assert_list_of_strings(get_command, "get_command",
+                                       "command line components")
+        assert get_regex == None or isinstance(get_regex, re.Pattern), \
+            f"get_regex: expected compiled regular expression or None;" \
+            f" got [{type(get_regex)}] {get_regex}"
+        assert get_returncode == None or isinstance(get_returncode, int), \
+            f"get_returncode: expected int; got [{type(get_returncode)}] {get_returncode}"
+        self.get_command = get_command
+        self.get_regex = get_regex
+        self.get_returncode = get_returncode
+
+        impl_c.__init__(self, *args, **kwargs)
+
+    class run_failed_e(Exception):
+        pass
+
+    def _run(self, target: ttbl.test_target, component: str,
+             command: list, regex: re.Pattern, returncode_expected: int,
+             action: str):
+
+        p = subprocess.run(command, check = False, capture_output = True, text = True)
+        target.log.info(f"{component}: return code: {p.returncode}")
+        target.log.info(f"{component}:      stdout: {p.stdout}")
+        target.log.info(f"{component}:      stderr: {p.stderr}")
+
+        if self.on_returncode != None and p.returncode != self.on_returncode:
+            raise run_failed_e(
+                f"{component}: {action} failed; command {' '.join(self.on_command)}"
+                f" returned {p.returncode}, expected {returncode_expected}")
+
+        if regex != None:
+            if not regex.search(p.stdout + p.stderr):
+                raise run_failed_e(
+                    f"{component}: {action} failed; command {' '.join(self.on_command)}"
+                    f" output did not match regex {regex.pattern};"
+                    f" stdout+stderr:\n{p.stderr}\n{p.stdout}")
+
+
+
+    def on(self, target: ttbl.test_target, component: str):
+        if self.on_command == None:
+            return
+
+        target.log.info(f"{component}: powering on"
+                        f" with command {' '.join(self.on_command)}")
+        self._run(target, component,
+                  self.on_command, self.on_regex, self.on_returncode, "power on")
+        target.log.info(f"{component}: powered on"
+                        f" with command {' '.join(self.on_command)}")
+
+
+
+    def off(self, target: ttbl.test_target, component: str):
+        if self.off_command == None:
+            return
+
+        target.log.info(f"{component}: powering off"
+                        f" with command {' '.join(self.off_command)}")
+        self._run(target, component,
+                  self.off_command, self.off_regex, self.off_returncode, "power off")
+        target.log.info(f"{component}: powered off"
+                        f" with command {' '.join(self.off_command)}")
+
+
+
+    def get(self, target: ttbl.test_target, component: str) -> bool:
+        if self.get_command == None:
+            return None
+
+        target.log.info(f"{component}: getting power"
+                        f" with command {' '.join(self.get_command)}")
+        try:
+            self._run(target, component,
+                      self.get_command, self.get_regex, self.get_returncode, "power get")
+            target.log.info(f"{component}: got power *true*"
+                            f" with command {' '.join(self.get_command)}")
+            return True
+        except self.run_failed_e:
+            target.log.info(f"{component}: got power *false*"
+                            f" with command {' '.join(self.get_command)}")
+            return False
+
+
+
 class rpyc_c(daemon_podman_container_c):
     """Expose a containeraized Python environment in the server to client via RPYC
 
