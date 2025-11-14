@@ -209,6 +209,29 @@ def nw_pos_add(nw_name, power_rail = None,
                            '/home/ttbd/images')
         ))
     _power_rail.append(( "dnsmasq", ttbl.dnsmasq.pc() ))
+    _power_rail.append((
+        # configure DNS; most Linux machines these days ship with
+        # systemd-resolve, which does DNS resolution management and
+        # supports mutliple interfaces; this tells the daemon that it
+        # needs to query to a new server for that interface.
+        #
+        # Note this needs 80-ttbd-resolved-dns.rules installed in
+        # /usr/share/polkit-1/rules.d so ttbd user can configure the
+        # DNS subsystem.
+        "resolvectl",
+        ttbl.power.proc_run_expect_c(
+            on_command = [ "resolvectl", "dns", f"b{nw_name}", f"192.{x}.{y}.1" ],
+            on_returncode = 0,
+            off_command = [ "resolvectl", "revert", f"b{nw_name}" ],
+            # we don't check the return code, in case the IFNAME was
+            # removed, and at this point it doesn't matter either
+            #off_returncode = 0,
+            get_command = [ "resolvectl", "dns", f"b{nw_name}" ],
+            get_returncode = 0,
+            ## Link 3 (bnwa): 192.168.97.1
+            get_regex = re.compile(fr"Link .* \(b{nw_name}\): 192\.{x}\.{y}\.1"),
+        )
+    ))
 
     interconnect.interface_add(
         "power",

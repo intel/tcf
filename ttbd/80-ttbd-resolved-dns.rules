@@ -1,0 +1,18 @@
+// Allow group ttbd to use resolvectl to manage DNS servers that
+// are network specific (for private networks)
+//
+// Needed by ttbd drivers configured in ttbd/conf_00_lib_pos.nw_pos_add()
+//
+// installed by package ttbd in
+// /etc/polkit-1/rules.d/80-ttbd-resolved-dns.rules
+//
+// Got the info from systemd-resolved's /usr/share/polkit-1/actions/org.freedesktop.resolve1.policy
+
+polkit.addRule(function(action, subject) {
+    if (
+        (action.id == "org.freedesktop.resolve1.set-dns-servers" ||
+         action.id == "org.freedesktop.resolve1.revert") &&
+        subject.isInGroup("ttbd")) {
+        return polkit.Result.YES;
+    }
+});

@@ -162,6 +162,9 @@ targets over HTTP to be controlled by the TCF client.
         ('/var/lib/ttbd',[
         ]),
         ('@prefix@/lib/udev/rules.d', [ '80-ttbd.rules' ]),
+        ('@prefix@/share/polkit-1/rules.d', [
+            '80-ttbd-resolved-dns.rules'
+        ]),
     ]
 )
 
