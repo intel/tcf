@@ -9430,6 +9430,34 @@ def _allocids_keepalive_once():
         # with waits for all the executors to finish
 
 
+
+def _signal_verbosity_down(signum, frame):
+    if report_console_impl == None or not hasattr(report_console_impl, "verbosity"):
+        return
+    verbosity = getattr(report_console_impl, "verbosity", None)
+    if not isinstance(verbosity, int):
+        logging.warning("SIGUSR1: can't decrease testcase verbosity,"
+                        f" unknown type {type(verbosity)}")
+        return
+    report_console_impl.verbosity -= 1
+    logging.error(f"SIGUSR1: decreased testcase verbosity to {report_console_impl.verbosity}")
+
+
+
+def _signal_verbosity_up(signum, frame):
+    if report_console_impl == None or not hasattr(report_console_impl, "verbosity"):
+        return
+    verbosity = getattr(report_console_impl, "verbosity", None)
+    if not isinstance(verbosity, int):
+        logging.warning("SIGUSR2: can't increase testcase verbosity,"
+                        f" unknown type {type(verbosity)}")
+        return
+    report_console_impl.verbosity += 1
+    logging.error(f"SIGUSR2: increased testcase verbosity to {report_console_impl.verbosity}")
+
+
+
+
 def _run(args):
     """
     Runs one ore more test cases
@@ -9750,6 +9778,8 @@ def _run(args):
 
         signal.signal(signal.SIGINT, _sigint_handler)
         if sys.platform != "win32":
+            signal.signal(signal.SIGUSR1, _signal_verbosity_down)
+            signal.signal(signal.SIGUSR2, _signal_verbosity_up)
             signal.signal(signal.SIGQUIT, _sigint_handler)
 
         # we do oly two executions per process--it doesn't matter in
@@ -9821,10 +9851,14 @@ def argp_setup(arg_subparsers):
                                    help = "Run testcases")
     ap.add_argument(
         "-v", dest = "verbosity", action = "count", default = 0,
-        help = "Increase information to display about the tests")
+        help = "Increase information to display about the tests;"
+        " you can also send a SIGUSR2 signal during runtime"
+    )
     ap.add_argument(
         "-q", dest = "quietosity", action = "count", default = 0,
-        help = "Decrease information to display about the tests")
+        help = "Decrease information to display about the tests;"
+        " you can also send a SIGUSR1 signal during runtime"
+    )
     ap.add_argument(
         "--no-remove-tmpdir", dest = "remove_tmpdir",
         action = "store_false", default = True,
