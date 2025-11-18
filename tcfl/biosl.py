@@ -1582,7 +1582,8 @@ def boot_network_pxe(target, entry = "UEFI PXEv4.*",
       it to arrive.
     """
     assert isinstance(target, tcfl.tc.target_c)
-    assert isinstance(entry, str)
+    assert isinstance(entry, str), \
+        f"entry: expected str, got [{type(entry)}] '{entry}'"
     assert isinstance(assume_in_main_menu, bool)
     top = 4
     for cnt in range(top):
