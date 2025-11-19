@@ -4909,15 +4909,17 @@ class tc_c(reporter_c, metaclass=_tc_mc):
           do if there is an exception; by default, report and
           raise. If disabled, report and keep going. This is useful to
           keep checking things that might be unrelated.
+
+          See :meth:`tcfl.tc.subcase`
         """
+        if break_on_non_pass == False:
+            intercept_exceptions = [ Exception ]
+        else:
+            intercept_exceptions = None
+
         self.testcase_name_validate(subcase)
-        try:
-            # this yields a new subcase context
-            return msgid_c(subcase = subcase)
-        except Exception as e:
-            result_c.report_from_exception(self, e, subcase = subcase)
-            if break_on_non_pass:
-                raise
+        return msgid_c(subcase = subcase,
+                       intercept_exceptions = intercept_exceptions)
 
 
 

@@ -618,8 +618,7 @@ def tls_var(name, factory, *args, **kwargs):
 
 
 class msgid_c(object):
-    """
-    Accumulate data local to the current running thread.
+    """Accumulate data local to the current running thread.
 
     This is used to generate a random ID (four chars) at the beginning
     of the testcase run in a thread by instantiating a local object of
@@ -649,6 +648,31 @@ class msgid_c(object):
         msgid_c.ident()
         msgid_c.phase()
         msgid_c.depth()
+
+    :param list intercept_exceptions: (optional, default *None*) if
+      specified, a list of types that can be raised as exceptions.
+
+      If an exception is caught in a block inside this class, eg:
+
+      >>>   with msgid_c(..., intercept_exceptions = [ RuntimeError ]):
+      >>>       ...do something...
+      >>>       raise RuntimeError("some message")
+
+      in this case, :meth:`msg_id_c.__exit__` will catch the exception
+      and not raise it, just report it with
+     :meth:`tcfl.tc.result_c.report_from_exception`.
+
+      This is used by :meth:`tcfl.tc.tc_c.subcase` to report
+      exceptions raised as part of a subcase while being able to
+      continue execution of the remaining blocks.
+
+      >>>  with self.subcase("subcase1", break_on_non_pass = True):
+      >>>      do_something_that_might_raise()
+      >>>      target.report_pass("all good")
+      >>>
+      >>>  with self.subcase("subcase2", break_on_non_pass = True):
+      >>>      do_something_that_might_raise()
+      >>>      target.report_pass("all good")
     """
 
     # FIXME: merge with tcfl.tls
@@ -667,11 +691,20 @@ class msgid_c(object):
     def __init__(self, s = None,
                  phase = None, depth = None, parent = None,
                  depth_relative = None,
-                 testcase = None, subcase = None):
+                 testcase = None, subcase = None,
+                 intercept_exceptions: list = None):
         cls = type(self)
         if not hasattr(cls.tls, "msgid_lifo"):
             cls.cls_init()
         cls.cls_init_maybe()
+
+        if intercept_exceptions != None:
+            commonl.assert_list_of_types(
+                intercept_exceptions,
+                "intercept_exceptions", "exception type", type)
+            self.intercept_exceptions = intercept_exceptions
+        else:
+            self.intercept_exceptions = []
 
         if depth_relative == None:
             # if a subcase is given but no relative depth, mostly this
@@ -763,7 +796,23 @@ class msgid_c(object):
             if self.subtc:
                 if self.subtc.result.total() == 0:
                     self.subtc.result.passed = 1
+        if exct_type != None:
+            for intercept_exception in self.intercept_exceptions:
+                # there was an exception and we were asked to
+                # intercept a few types; if it matches one of them,
+                # report it and don't raise it
+                if issubclass(exct_type, intercept_exception):
+                    result_c.report_from_exception(self.testcase, exce_value)
+                    cls.tls.msgid_lifo.pop()
+                    return True		# don't propagate exception
+            # there was an exception and we were not asked to
+            # intercept a that types; report it and don't reaise
+            result_c.report_from_exception(self.testcase, exce_value)
+
         cls.tls.msgid_lifo.pop()
+        return False	        	# do propagate exception
+
+
 
     @classmethod
     def encode(cls, s, l):
