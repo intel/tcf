@@ -3764,7 +3764,14 @@ class windows_service_over_ssh_c(impl_c):
     :param int max_log_size: (optional) maximum size in bytes of the
       *stderr* and *stdout* log files.
 
+    :param bool ssh_mux: (optional; default disabled *False* ), enable
+      sharing SSH connections with ControlPath
+      `FILESPATH/ssh-USERNAME-HOSTNAME-PORT.control`.
+
+      Disabled by default since we keep running into issue with them.
+
     Other arguments as to :class:`ttbl.power.impl_c`
+
     """
 
     class exception_e(Exception):
@@ -3773,6 +3780,7 @@ class windows_service_over_ssh_c(impl_c):
 
     def __init__(self, device_spec: str, service_name: str,
                  timeout: int = 30, max_log_size: int = 65 * 1025 * 1024,
+                 ssh_mux: bool = False,
                  *args, **kwargs):
         assert isinstance(service_name, str), \
             f"service_name: expected string, got {type(service_name)}"
@@ -3852,20 +3860,25 @@ class windows_service_over_ssh_c(impl_c):
             # be verbose (for debugging)
             # DO not use -t to allocate a terminal, otherwise Windows acts up
             "-v",
-            # We place the control file for the shared
-            # connection in /var/cache/ttbd-production/ssh-NAME-HOSTNAME-PORT.control;
-            # this way is shared by all targets that same the
-            # same PDU and username to it.
-            "-oControlMaster auto",
-            f"-oControlPath {ttbl.test_target.files_path}/ssh-{self.user}-{self.hostname}-{self.ssh_port}.control",
-            # we can't do any of this registering, so we
-            # disable it so SSH doesn't ask for it
-            # interactively and makes a mess
+            # we can't do any of this registering, so we disable it so
+            # SSH doesn't ask for it interactively and makes a mess
             "-oUserKnownHostsFile /dev/null",
             "-oCheckHostIP no",
             "-oStrictHostKeyChecking no",
             f"{self.user}@{self.hostname}"
-        ] + cmd
+        ]
+        if self.ssh_mux:
+            # We place the control file for the shared connection in
+            # /var/cache/ttbd-production/ssh-NAME-HOSTNAME-PORT.control;
+            # this way is shared by all targets that same the same
+            # username/host/port can share it
+            cmdline += [
+                "-oControlMaster auto",
+                f"-oControlPath {ttbl.test_target.files_path}/ssh-{self.user}-{self.hostname}-{self.ssh_port}.control",
+            ]
+        else:
+            cmdline += [ "-oControlMaster no" ]
+        cmdline += cmd
         timestamp = datetime.datetime.now(datetime.UTC).strftime("\nrun %Y-%m-%d %H:%M:%S\n")
         try:
             env = dict(os.environ)
