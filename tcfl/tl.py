@@ -10,6 +10,7 @@ Common utilities for test cases
 """
 
 import collections
+import contextlib
 import datetime
 import os
 import re
@@ -2032,6 +2033,58 @@ def linux_package_add(ic, target, *packages,
         raise tcfl.tc.error_e("unknown OS: %s %s (from /etc/os-release)"
                               % (distro, distro_version))
     return distro, distro_version
+
+
+
+@contextlib.contextmanager
+def chroot_run(target, rootdir: str, message: str = None, **report_kwargs):
+    """Enter an environment to execute commands in a systemd-nspawn chroot
+
+    >>>  with tcfl.tl.chroot_run(target, "/somepath"):
+    >>>      target.shell.run("ls -l")
+
+    This is handled as a context manager; upon entering, it will run
+    the *systemd-nspawn* command, setup the shell and then yield.
+
+    All execution now runs under it--when exiting the block, it will
+    kill the process, which will remove the chroot.
+
+    :param tcfl.tc.target_c target: target where to operate
+    :param str rootdir: path to the root of the chroot
+    :param str message: (optional) message to include in the
+      reporting information when entering and exiting the chroot
+    """
+    assert isinstance(target, tcfl.tc.target_c), \
+        f"target: expected tcfl.tc.target_c; got {type(target)}"
+    assert isinstance(rootdir, str), \
+        f"rootdir: expected str; got {type(rootdir)}"
+    assert message == None or isinstance(message, str), \
+        f"message: expected str|None; got {type(message)}"
+    try:
+        if not message:
+            message = rootdir
+        target.report_info("entering systemd/nspawn chroot for" + message,
+                           **report_kwargs)
+        target.shell.run("# entering systemd/nspawn chroot for " + message)
+
+        # SYSTEMD_NSPAWN_LOCK=0: don't lock, since the rootfs is RO
+        # --register=no: no need to register, again, rootfs is RO
+        # || true: so it doesn't print ERROR-IN-SHELL when we stop it
+        # in finally:
+        target.send(f"SYSTEMD_NSPAWN_LOCK=0 systemd-nspawn -D {rootdir} --register=no || true")
+        target.shell.setup()
+        target.shell.run(f"export PS1=CHROOT{rootdir}::$PS1")
+        yield
+    finally:
+        # systemd-nspawn prints
+        ## Press ^] three times within 1s to kill container.
+        # 0x1d is ^]
+        target.console_tx("\x1d\x1d\x1d")
+        target.report_info("exited systemd/nspawn chroot for" + message,
+                           **report_kwargs)
+        target.shell.run("# exited systemd/nspawn chroot for " + message)
+
+
 
 def linux_network_ssh_setup(ic, target, proxy_wait_online = True):
     """
