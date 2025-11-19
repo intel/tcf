@@ -1328,7 +1328,7 @@ def sh_proxy_environment(ic, target, prefix = "/"):
     if 'ftp_proxy' in proxies:
         etc_environment = True
         target.shell.run(
-            "grep -qi 'ftp_proxy=%(ftp_proxy)s}' /etc/environment"
+            "grep -qi 'ftp_proxy=%(ftp_proxy)s' /etc/environment"
             " || echo -e 'ftp_proxy=%(ftp_proxy)s\nFTP_PROXY=%(ftp_proxy)s'"
             " >> /etc/environment" % proxies)
         apt_proxy_conf.append('FTP::proxy "%(ftp_proxy)s";' % proxies)
@@ -1336,7 +1336,7 @@ def sh_proxy_environment(ic, target, prefix = "/"):
     if 'http_proxy' in proxies:
         etc_environment = True
         target.shell.run(
-            "grep -qi 'http_proxy=%(http_proxy)s}' /etc/environment"
+            "grep -qi 'http_proxy=%(http_proxy)s' /etc/environment"
             " || echo -e 'http_proxy=%(http_proxy)s\nHTTP_PROXY=%(http_proxy)s'"
             " >> /etc/environment" % proxies)
         apt_proxy_conf.append('HTTP::proxy "%(http_proxy)s";' % proxies)
@@ -1345,7 +1345,7 @@ def sh_proxy_environment(ic, target, prefix = "/"):
     if 'https_proxy' in proxies:
         etc_environment = True
         target.shell.run(
-            "grep -qi 'http_proxy=%(https_proxy)s}' /etc/environment"
+            "grep -qi 'http_proxy=%(https_proxy)s' /etc/environment"
             " || echo -e 'https_proxy=%(https_proxy)s\nHTTPS_PROXY=%(https_proxy)s'"
             " >> /etc/environment" % proxies)
         apt_proxy_conf.append('HTTPS::proxy "%(https_proxy)s";' % proxies)
@@ -1360,7 +1360,7 @@ def sh_proxy_environment(ic, target, prefix = "/"):
 
     if etc_environment:
         # we updated, let's re-parse
-        target.shell.run(". /etc/environment")
+        target.shell.run("set -a; . /etc/environment; set +a")
 
     if apt_proxy_conf:
         target.shell.run(
