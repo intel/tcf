@@ -382,7 +382,6 @@ class extension(tc.target_extension_c):
                     if flash_image_s == "<none>":
                         return {}, False, False
                 except tcfl.block_e as e:
-                    target.report_error(f"DEBUG {source} as {e}", level = 0)
                     target.report_info(
                         "skipping image flashing (no function argument nor environment: %s)"
                         % " ".join(sourcel))
