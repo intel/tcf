@@ -246,7 +246,7 @@ def ipxe_sanboot_url(target, sanboot_url, dhcp = None,
     if '%' in boot_entry_pxe:
         # Eg: UEFI PXEv4 (MAC:4AB0155F98A1)
         # FIXME: this is lame and needs keyword encoding with macs in multiple formats
-        boot_entry_pxe = boot_entry_pxe % mac_addr.replace(":", "").upper().strip(),
+        boot_entry_pxe = boot_entry_pxe % mac_addr.replace(":", "").upper().strip()
 
     tcfl.biosl.boot_network_pxe(
         target,
