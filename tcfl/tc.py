@@ -4873,7 +4873,7 @@ class tc_c(reporter_c, metaclass=_tc_mc):
 
 
 
-    def subcase(self, subcase):
+    def subcase(self, subcase, break_on_non_pass: bool = True):
         """
         Start a new subcase context
 
@@ -4895,9 +4895,21 @@ class tc_c(reporter_c, metaclass=_tc_mc):
         *_test*.
 
         :param str subcase: a subcase name
+
+        :param bool break_on_non_pass: (optional, default *True*) what to
+          do if there is an exception; by default, report and
+          raise. If disabled, report and keep going. This is useful to
+          keep checking things that might be unrelated.
         """
         self.testcase_name_validate(subcase)
-        return msgid_c(subcase = subcase)
+        try:
+            # this yields a new subcase context
+            return msgid_c(subcase = subcase)
+        except Exception as e:
+            result_c.report_from_exception(self, e, subcase = subcase)
+            if break_on_non_pass:
+                raise
+
 
 
     def is_static(self):
