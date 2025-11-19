@@ -3522,7 +3522,7 @@ def _target_app_add(obj, target_want_name, app_name, app_src):
 
 def _target_want_decorate_class(obj, cls_name,
                                 name, type_name, short_type_name,
-                                next_index, **kwargs):
+                                next_index, overwrite: bool = False, **kwargs):
     """
     Wrap function
     """
@@ -3551,7 +3551,7 @@ def _target_want_decorate_class(obj, cls_name,
         assert isinstance(name, str)
         if '%d' in name:
             name = name % next_index
-        if name in obj._targets:
+        if name in obj._targets and not overwrite:
             raise blocked_e("%s name '%s' @%s already defined, "
                             "choose another"
                             % (type_name, name, commonl.origin_get(2)))
@@ -3595,6 +3595,8 @@ def _target_want_add(obj, cls_name, name, spec, origin, count = 1, **kwargs):
         obj._targets[target_want_name]['spec'] = spec
         obj._targets[target_want_name]['origin'] = origin
         for key, val in kwargs.items():
+            if key in ( "overwrite" ):
+                continue
             valid = _target_want_add_check_key(
                 obj, cls_name, target_want_name, key, val)
             if not valid:
@@ -3628,7 +3630,8 @@ def target_want_add(_tc, target_want_name, spec, origin,
     _target_want_add(_tc, cls.__name__, target_want_name,
                      spec, origin, count = count, **kwargs)
 
-def target(spec = None, name = None, count = 1, **kwargs):
+def target(spec = None, name = None, count = 1, overwrite: bool = False,
+           **kwargs):
     """\
     Add a requirement for a target to a testcase instance
 
@@ -3720,6 +3723,8 @@ def target(spec = None, name = None, count = 1, **kwargs):
          tell TCF to run the testcase and balance how many resources
          are used.
 
+    :param bool overwrite: (optional, default *False*) if the target
+      definition already exists, overwrite it.
     """
 
     def decorate_class(cls):
@@ -3755,7 +3760,8 @@ def target(spec = None, name = None, count = 1, **kwargs):
 
         _target_want_add(cls, cls.__name__,
                          name, spec, commonl.origin_get(2),
-                         count = count, **kwargs)
+                         count = count, overwrite = overwrite,
+                         **kwargs)
         return cls
 
     return decorate_class
@@ -3773,6 +3779,8 @@ def _interconnect_want_add(obj, cls_name, name, spec, origin, count = 1, **kwarg
         obj._targets[ic_want_name]['origin'] = origin
         obj._interconnects.add(ic_want_name)
         for key, val in kwargs.items():
+            if key in ( "overwrite" ):
+                continue
             valid = _target_want_add_check_key(
                 obj, cls_name, ic_want_name,
                 key, val)
@@ -3783,7 +3791,8 @@ def _interconnect_want_add(obj, cls_name, name, spec, origin, count = 1, **kwarg
         obj._ic_count += 1
 
 
-def interconnect(spec = None, name = None, count = 1, **kwargs):
+def interconnect(spec = None, name = None, count = 1, overwrite: bool = False,
+                 **kwargs):
     """\
     Add a requirement for an interconnect to a testcase instance
 
@@ -3829,7 +3838,7 @@ def interconnect(spec = None, name = None, count = 1, **kwargs):
 
         _interconnect_want_add(cls, cls.__name__,
                                name, spec, commonl.origin_get(2),
-                               count = count,
+                               count = count, overwrite = overwrite,
                                **kwargs)
         return cls
 
