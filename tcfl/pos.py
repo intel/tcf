@@ -3342,7 +3342,7 @@ def target_power_cycle_to_normal_edkii(target):
     # means boot to localdisk
     retries_max = 6
     boot_message = "to enter setup and select boot options"
-    for retry in range(1, retries_max):
+    for retry in range(1, retries_max + 1):
         try:
 
             ts0 = time.time()
@@ -3359,11 +3359,11 @@ def target_power_cycle_to_normal_edkii(target):
             # in the same ball of retries
             if retry == retries_max - 1:
                 raise tc.failed_e(
-                    f"boot failure: retried {retries_max - 1} times"
+                    f"boot failure: retried {retries_max} times"
                     f" never found BIOS boot message: '{boot_message}'",
                     dict(recoverable = False))
             target.report_fail(
-                f"boot failure: retrying {retry}/{retries_max} "
+                f"boot failure: retrying {retry}/{retries_max}"
                 f" due to missing BIOS boot message: '{boot_message}'",
                 dict(exception = e), soft = True)
             retry_data[boot_message] += 1
@@ -3443,7 +3443,7 @@ def target_power_cycle_pos_serial_f12_ipxe(target, boot_ic, kws_pos = None):
 
     target.report_info("POS: setting target to PXE boot Provisioning OS")
     retries_max = 6
-    for retry in range(1, retries_max):
+    for retry in range(1, retries_max + 1):
         boot_message = "Press [F12] to boot from network"
         boot_message_regex = r"Press +\[F12\] +to boot from network"
         try:
@@ -3464,7 +3464,7 @@ def target_power_cycle_pos_serial_f12_ipxe(target, boot_ic, kws_pos = None):
             # in the same ball of retries
             if retry == retries_max - 1:
                 raise tc.failed_e(
-                    f"boot failure: retried {retries_max - 1} times"
+                    f"boot failure: retried {retries_max} times"
                     f" never found BIOS boot message: '{boot_message}'",
                     dict(recoverable = False))
             target.report_fail(
