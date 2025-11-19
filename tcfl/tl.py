@@ -82,6 +82,80 @@ def ansi_render_approx(s, width = 80, height = 2000):
     return r
 
 
+
+def data_deploy(target, data: dict, destpath: str = "/"):
+    """
+    Deploy any data to the target
+
+    Assumes Linux is running in the target, the default console is
+    setup for shell execution and the following tools are available:
+
+    - curl
+    - rsync
+    - cp
+
+    :param tcfl.tc.target_c target: target to which we are copying data
+
+    :param dict data: dictionary keyed by source URL and value
+      destination path in the target; eg:
+
+      >>> data = {
+      >>>     "http://example.com/somefile.bin": "/tmp/somefile.bin",
+      >>>     "rsync://example.com/otherfile.img": "/opt/otherfile.img",
+      >>>     "/gfs/gfs/group/RASP/somefile.bin": "/opt/",
+      >>> }
+
+      note that the destination path is relative to *destpath*. As
+      well, the environment variable *$GFS_SERVER* will be set so that
+      you could specify something like:
+
+      >>> data = {
+      >>>     "http://$GFS_SERVER/gfs/group/RASP/somefile.bin": "/tmp/",
+      >>> }
+    """
+    count = 0
+    total = len(data)
+    target.report_info("installing data",
+                       { "data": data }, dlevel = -1)
+    for k, v in data.items():
+        k_lower = k.lower()
+        count += 1
+        target.shell.run(f"# downloading data {count}/{total}")
+        with target.testcase.subcase(commonl.name_make_safe(k_lower)):
+
+            if k_lower.startswith("http://") or k_lower.startswith("https://"):
+                if v.endswith("/"):
+                    # filename will be the same as what we are downloading
+                    dest = v + k.split('/')[-1]
+                else:
+                    dest = v
+                target.shell.run(f"curl {k} -o {destpath}/{dest}")
+                target.report_pass(f"downloaded {k} to {dest}")
+                continue
+
+            if k_lower.startswith("rsync://"):
+                # rsync://server/path -> server/path
+                src = k.replace("rsync://", "")
+                # server /path
+                hostname, path = src.split("/", 1)
+                # remove leading /, not needed for rsync module
+                target.shell.run(f"rsync -av {hostname}::{path[1:]} {destpath}/{v}")
+                target.report_pass(f"rsynced {k} to {v}")
+                continue
+
+            if "://" in k_lower:
+                raise tcfl.error_e(f"data source URL scheme not supported: {k}")
+
+            # this is a normal file copy from something mounted, most like
+            # /gfs
+
+            target.shell.run(f"cp -a {k} {destpath}/{v}")
+            target.report_pass(f"copied {k} to {v}")
+    target.report_info("installed data",
+                       { "data": data }, dlevel = -1)
+
+
+
 def ipxe_sanboot_url(target, sanboot_url, dhcp = None,
                      power_cycle: bool = True,
                      assume_in_main_menu: bool = None,
