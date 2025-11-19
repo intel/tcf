@@ -64,7 +64,12 @@ class pc(ttbl.power.impl_c):
     **Rationale:** I was not able to find any JSON-RPC APIs that would
     work with old PDUs.
     """
-    def __init__(self, device_spec: str, **kwargs):
+    def __init__(self, device_spec: str,
+                 prompt_regex: re.Pattern = re.compile(br".*[>#]\s*\Z", re.MULTILINE),
+                 **kwargs):
+
+        assert isinstance(prompt_regex, re.Pattern), \
+            f"prompt_regex: expected re.Pattern, got [{type(prompt_regex)}] '{prompt_regex}'"
 
         ttbl.power.impl_c.__init__(self, **kwargs)
         self.user = None
@@ -86,6 +91,7 @@ class pc(ttbl.power.impl_c):
         else:		            # this is a plain text passsword
             password_publish = "<plain-text-password-censored>"
         hostname_nopasswd = f"{self.user_orig}@{self.hostname_orig}"
+        self.prompt_regex = prompt_regex
         self.upid_set(f"Raritan PX PDU {hostname_nopasswd}",
                       hostname = hostname_nopasswd,
                       # not publishing the outlet number since it will
@@ -152,7 +158,7 @@ class pc(ttbl.power.impl_c):
             log.info("reusing connection")
             try:
                 self.p.send(b"\r")
-                self.p.expect(b"# ")
+                self.p.expect(self.prompt_regex)
                 log.info("found prompt")
                 return
             except Exception as e:
@@ -173,7 +179,9 @@ class pc(ttbl.power.impl_c):
                     # connection in /var/cache/ttbd-production/ssh-NAME-HOSTNAME.control;
                     # this way is shared by all targets that same the
                     # same PDU and username to it.
-                    "-oControlMaster auto",
+                    #
+                    # IF DISABLED IT WILL OVERWHELM THE PDU WITH CONNECTIONS
+                    "-oControlMaster no",
                     f"-oControlPath {ttbl.test_target.files_path}/ssh-{self.user}-{self.hostname}.control",
                     # old SSH impl in the PDU requires old algorithms
                     "-oPubkeyAcceptedAlgorithms +ssh-rsa,ssh-dss",
@@ -202,7 +210,7 @@ class pc(ttbl.power.impl_c):
                 timeout = 30)
             log.info("found welcome message")
             self.p.send(b'\r')
-            self.p.expect(b"# ")
+            self.p.expect(self.prompt_regex)
             log.info("found prompt")
             return
 
@@ -250,7 +258,7 @@ class pc(ttbl.power.impl_c):
                 self.p.send(f"show outlets {self.outlet}\r")
                 s = self._expect(self.regex_get, log = log)
                 # s now would be *Power state: On*
-                self._expect(b"#", log = log)
+                self._expect(self.prompt_regex, log = log)
                 log.info("got response to 'show outlets': %s", s)
                 m = self.regex_get.search(s)
                 if not m:
@@ -272,6 +280,11 @@ class pc(ttbl.power.impl_c):
             except Exception as e:
                 log.error("BUG? error: %s", e, exc_info = commonl.debug_traces)
                 last_e = e
+            finally:
+                if self.p:
+                    self.p.close()
+                    del self.p
+                    self.p = None
 
         raise self.exception(
             f"{self.user}@{self.hostname}: can't get state:"
@@ -286,17 +299,21 @@ class pc(ttbl.power.impl_c):
         for _count in range(3):
             try:
                 self._open_maybe(target, component, log)
-                self.p.send(f"power outlets {self.outlet} on\r")
-                ## # power outlets 20 on
-                ## Do you wish to turn outlet 20 on? [y/n] y
-                self._expect(
-                    re.compile(rb"Do you wish to turn outlet [0-9]+ on\? \[y/n\] "),
+                self.p.send(f"power outlets {self.outlet} on /y\r")
+                ## # power outlets 20 on /y
+                ## #
+                self._expect(	# verify the echo as a way of "we got it"
+                    re.compile(b"power outlets [0-9]+ on /y"),
                     log = log)
-                self.p.send(b"y\r")
-                self._expect(b"# ", log = log)
+                self._expect(self.prompt_regex, log = log)
                 return
             except Exception as e:
                 last_e = e
+            finally:
+                if self.p:
+                    self.p.close()
+                    del self.p
+                    self.p = None
 
         raise self.exception(f"can't turn on: {last_e}") from last_e
 
@@ -309,17 +326,21 @@ class pc(ttbl.power.impl_c):
         for _count in range(3):
             try:
                 self._open_maybe(target, component, log)
-                self.p.send(f"power outlets {self.outlet} off\r")
+                self.p.send(f"power outlets {self.outlet} off /y\r")
                 ## # power outlets 20 off
-                ## Do you wish to turn outlet 20 off? [y/n] y
-                self._expect(
-                    re.compile(rb"Do you wish to turn outlet [0-9]+ off\? \[y/n\] "),
+                ## #
+                self._expect(	# verify the echo as a way of "we got it"
+                     re.compile(b"power outlets [0-9]+ off /y"),
                     log = log)
-                self.p.send(b"y\r")
-                self._expect(b"# ", log = log)
+                self._expect(self.prompt_regex, log = log)
                 return
             except Exception as e:
                 last_e = e
+            finally:
+                if self.p:
+                    self.p.close()
+                    del self.p
+                    self.p = None
 
         raise RuntimeError(
             f"{self.user}@{self.hostname}: can't turn off:"
