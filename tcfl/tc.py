@@ -6500,13 +6500,21 @@ class tc_c(reporter_c, metaclass=_tc_mc):
         if exp.name in [ i.name for i in exps ]:
             raise AssertionError(
                 "an expectation named '%s' is already present" % exp.name)
-        exps.append(exp)
         # this is an expectation we require to happen unless
         # - it has no timeout (it's a hook to catch conditions)
         # - it is a progress expectation -> exp.raise_on_found is a
         #   number to adjust the timeout by when found)
         if not isinstance(exp.raise_on_found, numbers.Number) and exp.timeout > 0:
             expectations_required.add(exp)
+            # append the expectation to the list of expecntations;
+            # since this is mandatory, check it at the end before
+            # checking the ones that are for checking errors
+            exps.append(exp)
+        else:
+            # insert the expecation at the beginning of the list
+            # because this is one that might be detecting errors or
+            # progress, and we want to check them before the mandatory ones
+            exps.insert(0, exp)
         if exp.poll_period < poll_period[exp.poll_name]:
             self.report_info(
                 '%s/%s: reducing poll period from %.2fs to %.2fs for poll '
@@ -6897,7 +6905,8 @@ class tc_c(reporter_c, metaclass=_tc_mc):
                                 " type '%s'; expected *None* or dictionary" \
                                 % (run_name, exp.name, r)
 
-                            if exp.raise_on_found == 0:
+                            if isinstance(exp.raise_on_found, numbers.Number) \
+                               and exp.raise_on_found == 0:
                                 # detector found something; but the
                                 # action on found (0) wants us to reset
                                 # the loop's timeout to as if we had
