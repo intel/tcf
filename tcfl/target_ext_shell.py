@@ -330,8 +330,16 @@ class shell(tc.target_extension_c):
             # Every distro has a different prompt with more creative
             # stuff incl ANSI stuff and latching to it without false
             # positives is close to impossible.
+            #
+            # don't want to latch to ^ (beginning of line) since if
+            # you have a dirty console that prints kernel messages to
+            # it will not fit. Also this allows prefixing the prompt.
+            #
+            # what's (?!\w)? that so that if anyone prints the current
+            # value of PS1, we don't take it for a prompt; we define
+            # PS1--hence why we set PS1 below to TCF-HASH:\w.
             self.prompt_regex = re.compile(
-                r"TCF-%(tc_hash)s:.+ %%%% [\$#] " % self.target.kws)
+                r"TCF-%(tc_hash)s:(?!\\w).+ %%%% [\$#] " % self.target.kws)
             last_e = None
             for i in range(0, 3):
                 try:
