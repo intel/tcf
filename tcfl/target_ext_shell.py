@@ -937,10 +937,36 @@ class shell(tc.target_extension_c):
           >>> "somefilename:43"
 
         :param dict progress_expectations: (optional, default none)
-          dictonary keyed by string representing a valid python
-          identifier of progress expectations (see
-          :class:`expectation_c`, parameter raise_on_found), used to
-          adjust overall timeout.
+          dictonary keyed by string of expectations with a
+          *raise_on_found* set to a postive number of integers.
+
+          These represents things that we expect to indicate positive
+          progress towards a goal and the *raise_on_found* value will
+          be added to the total timeout to give more time for it to
+          proceed (eg: a download); the *timeout* parameter on each of
+          this expectations caps the maximum timeout increase that can
+          be reached.
+
+          >>> target.shell.run(
+          >>>     "make",
+          >>>     progress_expectations = {
+          >>>         # everytime we see an invocation of the
+          >>>         # compiler, add a second
+          >>>         "compiling": target.console.text(
+          >>>             re.compile("(cpp|gcc|c\+\+)", re.IGNORECASE),
+          >>>             raise_on_found = +1, timeout = 500),
+          >>>
+          >>>         # everytime we see a submake, add 3 seconds
+          >>>         "submake": target.console.text(
+          >>>             re.compile("make"),
+          >>>             raise_on_found = +3, timeout = 500),
+          >>>     },
+          >>>     timeout = 200
+          >>> )
+
+          See also :meth:`tcfl.tc.target_c.expect` and
+          :class:`expectation_c`, parameter *raise_on_found*.
+
 
         :returns str:
 
