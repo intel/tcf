@@ -847,6 +847,10 @@ def _cmdline_console_wall(cli_args: argparse.Namespace):
             cli_args.name = "TCF Wall"
         else:
             cli_args.name = "TCF Wall: " + " ".join(cli_args.target)
+    if len(cli_args.name) >= 80:
+        # screen has a limit for the name, so if it is too long,
+        # replace with a short hash
+        cli_args.name = commonl.mkid(cli_args.name, 20)
 
     # for each target/console, create a console_descr_c object,
     # which will keep the state of the console reading now.
