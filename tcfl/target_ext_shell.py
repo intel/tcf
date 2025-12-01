@@ -368,8 +368,16 @@ class shell(tc.target_extension_c):
         # disable line editing for proper recording of command line
         # when running bash; otherwise the scrolling readline does
         # messes up the output
-        self.run('test ! -z "$BASH" && set +o vi +o emacs',
-                 console = console)
+        self.run(
+            'test ! -z "$BASH"'
+            # Sollutions for https://stackoverflow.com/a/72071483
+            # recent versions of BASH seems and some terminals to be
+            # printing this in the stream, which breaks havoc for
+            # automation--we set it up like this because we don't want
+            # to configue it in /etc/inputrc or ~/.inputrc
+            ' && bind "set enable-bracketed-paste 0"'
+            ' && set +o vi +o emacs',
+            console = console)
         # Trap the shell to complain loud if a command fails, and catch it
         # See that '' in the middle, is so the catcher later doesn't
         # get tripped by the command we sent to set it up
