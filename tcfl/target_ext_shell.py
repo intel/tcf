@@ -335,9 +335,12 @@ class shell(tc.target_extension_c):
             # you have a dirty console that prints kernel messages to
             # it will not fit. Also this allows prefixing the prompt.
             #
-            # what's (?!\w)? that so that if anyone prints the current
-            # value of PS1, we don't take it for a prompt; we define
-            # PS1--hence why we set PS1 below to TCF-HASH:\w.
+            # what's (?!\\w)? that so that if anyone prints the
+            # current value of PS1, we don't take it for a prompt; we
+            # define PS1--hence why we set PS1 below to
+            # TCF-HASH:\w. -- needs a double \\ because otherwise
+            # re.compile() will translate it to a escape sequence
+            # "whitespace"
             self.prompt_regex = re.compile(
                 r"TCF-%(tc_hash)s:(?!\\w).+ %%%% [\$#] " % self.target.kws)
             last_e = None
