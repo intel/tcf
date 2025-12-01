@@ -4,7 +4,11 @@
 # Build as:
 #
 #  # cd .../tcf.git
-#  $ buildah bud -t tcf -v $PWD:/home/work/tcf.git:O --label version="$(git describe --always)" -f client.Dockerfile
+#  $ buildah bud -t tcf-client-deps-34 -v ~/tmp/dnf-40:/var/cache/dnf:rw  -v ~/tmp/pkg-40:/var/cache/PackageKit:rw -v $PWD:/home/work/tcf.git:O --label version="$(git describe --always)" -f client.Dockerfile
+#
+#    add --build-arg from=registry.fedoraproject.org/fedora:40
+#
+#  $ buildah bud --build-arg from=registry.fedoraproject.org/fedora:40 -t tcf-client-deps-40 -v ~/tmp/dnf-40:/var/cache/dnf:rw -v ~/tmp/pkg-40:/var/cache/PackageKit:rw  -v $PWD:/home/work/tcf.git:O --label version="$(git describe --always)" -f nreqs.Dockerfile
 #
 # Run under the container without registry::
 #
@@ -42,7 +46,9 @@ RUN \
     DNF_COMMAND=dnf /home/work/tcf.git/nreqs.py install --skip-package=tcf-client /home/work/tcf.git && \
     dnf install -y \
         bind-utils \
+        gdb \
         iputils \
+        telnet \
         strace && \
     dnf clean all && \
     cd /home/work/tcf.git && \
