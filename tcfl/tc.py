@@ -3136,6 +3136,13 @@ class parameter_c:
       parameter is a credential, so defaults will be obtained also
       from keyrings; this is also useful to hide inputs in UIs.
 
+    **Integration with Jenkins credential storage**
+
+    Under Jenkins, you can define a credential called
+    *PARAMETER_<NAME>*, so it gets exported on the environment as
+    *PARAMETER_<NAME>* and this will pick it up automagically.  See
+    :class:`tcfl.parameter_username_password_c` for specifics on how
+    to do it for username/passwords.
     """
     # Note this API is non-public, only tcfl.tc.tc_c.parameter_get() uses it
     #
@@ -3280,6 +3287,13 @@ class parameter_username_password_c(parameter_c):
 
       $ keyring set parameter_cred1 someusername
       Password for 'someusername' in 'parameter_cred1': <ENTERTHEPASSWORDHER>
+
+    **Integration with Jenkins credential storage**
+
+    Under Jenkins, you can define a user/password credential called
+    *PARAMETER_<NAME>*, so it gets exported on the environment as
+    *PARAMETER_<NAME>_{USER,PASSWORD}* and this will pick it up
+    automagically.
     """
 
     def __init__(self, name: str, description: str,
