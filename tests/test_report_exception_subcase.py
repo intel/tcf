@@ -55,3 +55,27 @@ class _test(tcfl.tc.tc_c):
             # truth, the fact that is was caught, it is a pass
             self.subtc['30_not_catch_emit##subcase'].result.passed = 1
             self.subtc['30_not_catch_emit##subcase'].result.blocked = 0
+
+
+    @tcfl.tc.subcase(break_on_non_pass = False)
+    def eval_30_catch_but_report(self):
+        """
+        When we have an issue in a block, we still report it as a failure
+        """
+        try:
+            with self.subcase("subcase", break_on_non_pass = False):
+                raise tcfl.fail_e("simulated failure")
+            # FIXME: verify subcase was reported as a fail
+            if self.subtc['30_catch_but_report##subcase'].result.failed == 1:
+                self.report_pass("exception was caught as expected and reported a failure ")
+            else:
+                self.report_fail("exception was caught as expected but not reported a failure as expected {self.subtc['30_catch_but_report##subcase'].result.failed=}")
+        except Exception:
+            self.report_fail("exception was caught but it shall not")
+        finally:
+            # undo the recording as a blockage of the testcase
+            # 'subcase' patch the result gathered above in the "with
+            # self.subcase" block; it was set to blocked = 1, but in
+            # truth, the fact that is was caught, it is a pass
+            self.subtc['30_catch_but_report##subcase'].result.passed = 1
+            self.subtc['30_catch_but_report##subcase'].result.failed = 0
