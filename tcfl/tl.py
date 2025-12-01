@@ -435,6 +435,7 @@ def ipxe_sanboot_url(target, sanboot_url, dhcp = None,
         target.shell.prompt_regex = prompt_orig
 
 
+
 #! Place where the Zephyr tree is located
 # Note we default to empty string so it can be pased
 ZEPHYR_BASE = os.environ.get(
@@ -1882,6 +1883,7 @@ def linux_time_set(target):
                      % str(datetime.datetime.utcnow()))
 
 
+
 def linux_package_add(ic, target, *packages,
                       timeout = 120, fix_time = True,
                       proxy_wait_online = True,
@@ -1986,6 +1988,34 @@ def linux_package_add(ic, target, *packages,
                 target.testcase.buffers["linux_package_add.proxy_wait_online"
                                         f".{ic.id}.{target.id}"] = True
 
+    #: Expectations for different tools as they progress
+    #:
+    #: Can be used as:
+    #:
+    #: >>> target.shell.run(
+    #: >>>     "./configure",
+    #: >>>     progress_expectations = {
+    #: >>>         "autoconf": tcfl.tl.progress_expectations["autoconf"],
+    #: >>>     },
+    #: >>>     timeout = 200
+    #: >>> )
+    #:
+    # FIXME: we need to figure out a way to have this defaulted to
+    # not need the target argument; we can just create them manually,
+    # it'll be uglier, and then set as needed but it becomes kinda messy.
+    progress_expectations = {
+        ## cpp-14.3 20% [====                ]  41 MB/s |  18 MB     00:01 ETA
+        "dnf_downloading":  target.console.text(
+            re.compile("[0-9][0-9]:[0-9][0-9] ETA"),
+            raise_on_found = +3, timeout = 500),
+        ## Installing       : python3-pandas-2.2.1-8. [========                ] 154/155
+        ## Installing       : python3-pandas-2.2.1-8. [=========               ] 154/155
+        "dnf_installing":  target.console.text(
+            re.compile("Installing\s+: \s+\[=+\s+]\s+[0-9]+/[0-9]+"),
+            raise_on_found = +3, timeout = 500),
+    }
+
+
     packages = list(packages)
     if distro.startswith('clear'):
         _packages = packages + kws.get("any", []) + kws.get("clear", [])
@@ -2000,7 +2030,11 @@ def linux_package_add(ic, target, *packages,
                 "dnf install"
                 f" {target.kws.get('linux.dnf.install.options', '')}"
                 " -y " +  " ".join(_packages),
-            timeout = timeout)
+                progress_expectations = {
+                    "dnf_downloading": progress_expectations["dnf_downloading"],
+                    "dnf_installing": progress_expectations["dnf_installing"],
+                },
+                timeout = timeout)
     elif distro == 'fedora':
         _packages = packages + kws.get("any", []) + kws.get("fedora", [])
         if _packages:
@@ -2008,6 +2042,10 @@ def linux_package_add(ic, target, *packages,
                 f"dnf install --releasever {distro_version}"
                 f" {target.kws.get('linux.dnf.install.options', '')} -y "
                 +  " ".join(_packages),
+                progress_expectations = {
+                    "dnf_downloading": progress_expectations["dnf_downloading"],
+                    "dnf_installing": progress_expectations["dnf_installing"],
+                },
                 timeout = timeout)
     elif distro == 'rhel':
         _packages = packages + kws.get("any", []) + kws.get("rhel", [])
@@ -2016,6 +2054,10 @@ def linux_package_add(ic, target, *packages,
                 "dnf install"
                 f" {target.kws.get('linux.dnf.install.options', '')} "
                 " -y " + " ".join(_packages),
+                progress_expectations = {
+                    "dnf_downloading": progress_expectations["dnf_downloading"],
+                    "dnf_installing": progress_expectations["dnf_installing"],
+                },
                 timeout = timeout)
     elif distro == 'ubuntu':
         _packages = packages + kws.get("any", []) + kws.get("ubuntu", [])
