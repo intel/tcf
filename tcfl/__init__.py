@@ -307,7 +307,8 @@ class result_c:
             tc = _tc.testcase
             target = _tc
         else:
-            assert isinstance(_tc, tc.tc_c)
+            assert isinstance(_tc, tc.tc_c), \
+                f"_tc: expected tcfl.tc.target_c|tc_c, got {type(_tc)}"
             tc = _tc
             target = None
 
@@ -802,12 +803,14 @@ class msgid_c(object):
                 # intercept a few types; if it matches one of them,
                 # report it and don't raise it
                 if issubclass(exct_type, intercept_exception):
-                    result_c.report_from_exception(self.testcase, exce_value)
+                    if self.testcase:
+                        result_c.report_from_exception(self.testcase, exce_value)
                     cls.tls.msgid_lifo.pop()
                     return True		# don't propagate exception
             # there was an exception and we were not asked to
             # intercept a that types; report it and don't reaise
-            result_c.report_from_exception(self.testcase, exce_value)
+            if self.testcase:
+                result_c.report_from_exception(self.testcase, exce_value)
 
         cls.tls.msgid_lifo.pop()
         return False	        	# do propagate exception
