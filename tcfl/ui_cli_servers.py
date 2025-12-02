@@ -209,6 +209,9 @@ def _cmdline_servers_discover(cli_args: argparse.Namespace):
         ignore_cache = cli_args.flush or not cli_args.servers_cache,
         zero_strikes_max = cli_args.zero_strikes_max,
         origin = "command line",
+        # force retring each server that fails, since we are being
+        # asked interactively to discover
+        failure_count_ceiling = 0,
     )
     server_count = len(tcfl.server_c.servers)
     server_delta = server_count - server_count0

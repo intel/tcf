@@ -1366,7 +1366,7 @@ class server_c:
 
 
 
-    def _herds_get(self, count, loops_max):
+    def _herds_get(self, count, loops_max, failure_count_ceiling: float = 10):
         """
         Query for a given server the /ttb URL, which provides
         information about the server and the herds of other servers it
@@ -1408,7 +1408,7 @@ class server_c:
         # So MAX has to be proportional to the failure count, but also
         # capped to 10 min, so each 10 min we retry at least once.
         #
-        failure_delta_max = min(failure_count, 10) * 60
+        failure_delta_max = min(failure_count, failure_count_ceiling) * 60
 
         if failure_delta > 0 and failure_delta < failure_delta_max:
             return self, None, \
@@ -1566,7 +1566,8 @@ class server_c:
         return self, new_hosts, None
 
     @classmethod
-    def _discover_once(cls, servers, bad_servers, count, loops_max):
+    def _discover_once(cls, servers, bad_servers, count, loops_max,
+                       failure_count_ceiling: float = 10):
         """
         Given a list of servers (good and bad), try to discover more
         servers from them
@@ -1597,7 +1598,9 @@ class server_c:
 
             log_sd.debug(f"#{count}/{loops_max}: scheduling _herds_get()")
             futures = {
-                executor.submit(server._herds_get, count, loops_max): server
+                executor.submit(
+                    server._herds_get, count, loops_max,
+                    failure_count_ceiling = failure_count_ceiling): server
                 for server in itertools.chain(servers.values(),
                                               bad_servers.values())
 
@@ -1685,7 +1688,9 @@ class server_c:
                  max_cache_age = None,
                  loops_max = 4,
                  origin = "source code defaults",
-                 ignore_cache = False):
+                 ignore_cache = False,
+                 failure_count_ceiling: float = 10,
+):
         """
         Discover servers
 
@@ -1743,6 +1748,12 @@ class server_c:
         >>>         loops_max = 0
         >>>     )
         >>> )
+
+
+        :param floar failure_count_ceiling: (optiona; defaults to 10)
+          how many minutes to wait before retrying a failed server.
+
+          Set it to zero to retry constantly.
         """
 
         # FIXME: get default from tcfl.config -- this is always USER specific
@@ -1962,7 +1973,8 @@ class server_c:
             # the new servers found in the previous run
 
             new_servers, new_server_count, bad_server_count = \
-                cls._discover_once(seed_servers, bad_servers, count, loops_max)
+                cls._discover_once(seed_servers, bad_servers, count, loops_max,
+                                   failure_count_ceiling = failure_count_ceiling)
 
             seed_servers = dict()
             for server in new_servers:
