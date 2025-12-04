@@ -387,7 +387,16 @@ def ipxe_sanboot_url(target, sanboot_url, dhcp = None,
         target.testcase.expect_global_append(expecter_ipxe_error)
 
         if dhcp:
-            target.shell.run("dhcp " + ifname, re.compile("Configuring.*ok"),
+            # this prints
+            ## Configuring ....... ok$
+            #
+            # but on some BIOSes it might be mixed with serial
+            # messages, so we match for the ok only--note we can't use
+            # $ at the end because depending on the serial console, it
+            # comes with a \r before...a mess
+            #
+            # see also tcfl.pos.ipxee_seize_and_boot()
+            target.shell.run("dhcp " + ifname, re.compile("[\.]+ ok"),
                              timeout = timeout)
             target.shell.run("show %s/ip" % ifname, timeout = timeout)
         else:

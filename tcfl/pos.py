@@ -2657,6 +2657,7 @@ def ipxe_kws_vars_load(target, boot_ic, kws):
 
 
 def ipxe_seize_and_boot(target, boot_ic, dhcp = None, kws = None):
+    # FIXME: unify with tcfl.tl.ipxe_sanboot_url()
     """Wait for iPXE to boot on a serial console, seize control and
     direct boot to a given TCF POS image
 
@@ -2780,7 +2781,16 @@ def ipxe_seize_and_boot(target, boot_ic, dhcp = None, kws = None):
             if dhcp == None:
                 dhcp = bool(target.property_get("ipxe.dhcp", True))
             if dhcp:
-                target.shell.run("dhcp " + ifname, re.compile("Configuring.*ok"))
+                # this prints
+                ## Configuring ....... ok$
+                #
+                # but on some BIOSes it might be mixed with serial
+                # messages, so we match for the ok only--note we can't use
+                # $ at the end because depending on the serial console, it
+                # comes with a \r before...a mess
+                #
+                # see also tcfl.tl.ipxe_sanboot_url()
+                target.shell.run("dhcp " + ifname, re.compile("[\.]+ ok")),
                 target.shell.run("show %s/ip" % ifname,
                                  "ipv4 = %(ipv4_addr)s" % kws)
             else:
