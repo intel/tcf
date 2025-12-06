@@ -259,13 +259,15 @@ def _cmdline_alloc_rm(cli_args: argparse.Namespace):
     tcfl.allocation.subsystem_setup()
 
     tcfl.ui_cli.logger_verbosity_from_cli(logger, cli_args)
-    tcfl.servers.subsystem_setup()
-
-    if not tcfl.server_c.servers:
-        logger.error("E: no servers available, did you configure?")
-        return 1
+    verbosity = cli_args.verbosity - cli_args.quietosity
 
     if cli_args.allocid:
+        tcfl.servers.subsystem_setup()
+
+        if not tcfl.server_c.servers:
+            logger.error("E: no servers available, did you configure?")
+            return 1
+
         retval = 0
         for allocid in cli_args.allocid:
             retval, r = tcfl.ui_cli.run_fn_on_each_server(
@@ -278,7 +280,52 @@ def _cmdline_alloc_rm(cli_args: argparse.Namespace):
                              allocid)
                 retval = 1
         return retval
+
+    if cli_args.target:
+        tcfl.targets.setup_by_spec(
+            cli_args.target or [], verbosity = verbosity, targets_all = cli_args.all)
+
+        if not tcfl.server_c.servers:
+            logger.error("E: no servers available, did you configure?")
+            return
+
+        # user specified targets, so we only need to query those
+        # servers those targets are at, let's remove the rest.
+        servers = { rt['server'] for rt in tcfl.rts.values() }
+        for server_url, server in list(tcfl.server_c.servers.items()):
+            if server_url not in servers:
+                del tcfl.server_c.servers[server_url]
+
+
+        # List now allocations in the servers listed in tcfl.server_c.servers
+        allocations = tcfl.allocation.ls(
+            username = cli_args.username,
+            parallelization_factor = cli_args.parallelization_factor,
+            traces = cli_args.traces)
+
+        # Now filter, for the allocations listed, which ones include the
+        # targets listed
+        for _, ( r, e, tb ) in allocations.items():
+            for allocid, data in list(r.items()):
+                for rt_allocated in data.get("group_allocated", "").split(","):
+                    if rt_allocated not in tcfl.rts:
+                        del r[allocid]
+                        break
+
+        for server_url, ( r, e, tb ) in allocations.items():
+            for allocid in r.keys():
+                _alloc_rm_by_allocid(
+                    server_url, tcfl.server_c.servers[server_url],
+                    cli_args, allocid)
+        return
+
     if cli_args.username:
+        tcfl.servers.subsystem_setup()
+
+        if not tcfl.server_c.servers:
+            logger.error("E: no servers available, did you configure?")
+            return 1
+
         _, r = tcfl.ui_cli.run_fn_on_each_server(
             tcfl.server_c.servers,
             _alloc_rm_by_username, cli_args)
@@ -660,10 +707,7 @@ def cmdline_setup_intermediate(arg_subparser):
         "in any state; any targets allocated to said allocation "
         "will be released")
     tcfl.ui_cli.args_verbosity_add(ap)
-    ap.add_argument(
-        "--parallelization-factor",
-        action = "store", type = int, default = -4,
-        help = "(advanced) parallelization factor")
+    tcfl.ui_cli.args_targetspec_add(ap, argspec = [ "-t", "--target" ], nargs = 1)
     ap.add_argument(
         "-u", "--username", action = "store", default = None,
         help = "Remove allocations by user")
