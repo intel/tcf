@@ -32,25 +32,49 @@ logger = logging.getLogger("ui_cli_alloc")
 
 def _cmdline_alloc_ls(cli_args: argparse.Namespace):
     import tcfl.allocation
+    import tcfl.targets
     tcfl.allocation.subsystem_setup()
 
     log = logging.getLogger("alloc-ls")
     tcfl.ui_cli.logger_verbosity_from_cli(log, cli_args)
     verbosity = cli_args.verbosity - cli_args.quietosity
-    servers = tcfl.servers.by_targetspec(
-        cli_args.target, verbosity = verbosity)
+
+    tcfl.targets.setup_by_spec(
+        cli_args.target or [], verbosity = verbosity, targets_all = cli_args.all)
+
     if not tcfl.server_c.servers:
         log.error("E: no servers available, did you configure?")
         return
 
+    if cli_args.target:
+        # user specified targets, so we only need to query those
+        # servers those targets are at, let's remove the rest.
+        servers = { rt['server'] for rt in tcfl.rts.values() }
+        for server_url, server in list(tcfl.server_c.servers.items()):
+            if server_url not in servers:
+                del tcfl.server_c.servers[server_url]
+
+    # List now allocations in the servers listed in tcfl.server_c.servers
     allocations = tcfl.allocation.ls(
         allocids = cli_args.allocids, username = cli_args.username,
         parallelization_factor = cli_args.parallelization_factor,
         traces = cli_args.traces)
 
+    # Now filter, for the allocations listed, which ones include the
+    # targets listed
+    if not cli_args.full:
+        for _, ( r, e, e ) in allocations.items():
+            for allocid, data in list(r.items()):
+                for rt_allocated in data.get("group_allocated", "").split(","):
+                    if rt_allocated not in tcfl.rts:
+                        #print(f"DEBUG: skipping {allocid} because {rt_allocated} not there")
+                        del r[allocid]
+                        break
+
+
     if verbosity < 0:
         # just print the list of alloc ids for each server, one per line
-        for _, data in allocations.items():
+        for _, ( data, e, e ) in allocations.items():
             if data:
                 print("\n".join(data.keys()))
         return
@@ -619,6 +643,9 @@ def cmdline_setup_intermediate(arg_subparser):
         "-r", "--refresh", action = "store",
         type = float, nargs = "?", const = 1, default = 0,
         help = "Repeat every int seconds (by default, only once)")
+    ap.add_argument(
+        "-f", "--full", action = "store_true", default = False,
+        help = "list all allocations, not just active ones")
     ap.add_argument(
         "allocids",
         metavar = "ALLOCID", action = "store",
