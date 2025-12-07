@@ -552,6 +552,12 @@ class interface(ttbl.tt_interface):
 
     def _pre_off_disable_all(self, target):
         for console, impl in self.impls.items():
+            if isinstance(impl, ttbl.power.impl_c) and impl.explicit == "off":
+                target.log.info(
+                    "%s: not disabling console before powering off due"
+                    " to also being a power component with explicit=off"
+                    " setting", console)
+                continue
             target.log.info("%s: disabling console before powering off",
                             console)
             impl.disable(target, console)
