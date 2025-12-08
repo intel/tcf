@@ -25,6 +25,18 @@ _count = 0
 state_path = None
 upload_max_size = 16 * 1024 * 1024
 
+#: Maximum duration to service a request time (in seconds)
+#:
+#: All the calls in ttbd are synchronous; we let the underlaying code
+#: know about this so they can calculate when things need to be killed
+#:
+#: This is a design limitation, which is kinda problematic for
+#: firmware flashing, as it might get really long. Increase it if you
+#: find in your logs error such as::
+#:
+#:   [48821] [CRITICAL] WORKER TIMEOUT (pid:49298)
+request_duration_max = 35 * 60
+
 #: Herds this server is a member of
 #:
 
