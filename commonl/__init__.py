@@ -151,6 +151,8 @@ class fork_function_c(multiprocessing.Process):
     Run a function forking using multiprocessing (works in Windows and
     Linux) returnin its return value or exception.
 
+    See :class:`thread_function_c` for the same based in threads.
+
     Builds on multiprocessing.Process to call a function with the
     given arguments and passing the return value / exception to the
     parent it via a Pipe.
@@ -270,6 +272,55 @@ def processes_guess(factor: int):
 
 class Process(fork_c):	# COMPAT
     pass
+
+
+
+class thread_function_c(threading.Thread):
+    """
+    Run a function in a thread (works in Windows and Linux)
+    returnin its return value or exception.
+
+    See :class:`fork_function_c` for the same based in processes.
+
+    Usage:
+
+    >>> o = thread_function_c(my_func, arg1, arg2, kwarg1 = 3, kwarg2 = 4)
+    >>> o.start()
+    >>> o.join()
+    >>> r, e, tb = o.result()
+
+    """
+    def __init__(self, func, *args, **kwargs):
+
+        self.target = func
+        self.args = args
+        self.kwargs = kwargs
+        # force it like this so result()/exception()/retval() fail if
+        # not joined
+        self.r = None
+        threading.Thread.__init__(self)
+
+
+    def run(self):
+        try:
+            r = self.target(*self.args, **self.kwargs)
+            self.r = ( r, None, None )
+        except Exception as e:
+            # exception, send no return value but the exception information
+            tb = traceback.format_exc()
+            self.r = ( None, e, tb )
+
+
+    def result(self):
+        return self.r
+
+
+    def exception(self):
+        return self.r[1], self.r[2]
+
+
+    def retval(self):
+        return self.r[0]
 
 
 
