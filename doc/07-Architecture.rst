@@ -350,21 +350,15 @@ Console management
 
 This interface is used to list serial consoles, read from them
 (logging their output) and writing to them. It is implemented by
-:class:`ttbl.test_target_console_mixin`.
+:class:`ttbl.console.interface`.
 
-To log, the daemon starts a logger process
-(:func:`ttbl.cm_logger.setup`). When a target is powered up, the
-driver instructs the logger process to read from ports attached to the
-thread (using :func:`ttbl.cm_logger.spec_add`). The output is stored
-in a log file named after the *console* name in the target's state
-dir. When a client requests to read from the serial port, it is
-actually given the log file.
+When a target is powered up, the driver starts a logging process
+capturing anything coming from the port to a log file named after the
+*console* name in the target's state dir. When a client requests to
+read from the serial port, it is actually given the log file.
 
-Writing is currently not implemented, it remains a missing feature.
-
-The class :class:`ttbl.cm_serial.cm_serial` implements a driver for
-serial ports (over serial, TCP and others as supported by the PySerial
-submodule).
+The class :class:`ttbl.console.impl_c` implements an abstract driver
+for serial ports (over serial, TCP and others).
 
 
 Image deployment

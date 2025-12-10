@@ -32,7 +32,6 @@ import pexpect.fdpexpect
 
 import commonl
 import ttbl
-import ttbl.cm_serial
 try:
     from pexpect.exceptions import TIMEOUT as pexpect_TIMEOUT
     from pexpect.exceptions import EOF as pexpect_EOF
