@@ -29,6 +29,7 @@
 #
 
 import argparse
+import collections
 import copy
 import inspect
 import logging
@@ -579,7 +580,10 @@ tcf-jobserver-run:
             # note Exception always have a list of args and the first
             # one is commonly the message, the rest are details
             if args.traces:
-                logging.exception(e.args[0])
+                if isinstance(e.args, ( list, tuple )) and len(e.args) > 0:
+                    logging.exception(e.args[0])
+                else:
+                    logging.exception(e.args)
             else:
                 rep = str(e)
                 if rep == "":
