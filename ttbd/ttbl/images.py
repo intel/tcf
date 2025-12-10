@@ -209,8 +209,8 @@ import codecs
 import collections
 import copy
 import errno
+import filelock
 import hashlib
-import json
 import numbers
 import os
 import re
@@ -798,7 +798,7 @@ class interface(ttbl.tt_interface):
                     "images.flash.decompress."
                     + commonl.mkid(file_name)
                     + ".lock")
-                with ttbl.process_posix_file_lock_c(lock_file_name):
+                with filelock.FileLock(lock_file_name, timeout = 10):
                     # if a decompressor crashed, we have no way to
                     # tell if the decompressed file is correct or
                     # truncated and thus corrupted -- we need manual

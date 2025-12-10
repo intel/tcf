@@ -18,8 +18,7 @@ import collections
 import contextlib
 import errno
 import fcntl
-import fnmatch
-import functools
+import filelock
 import glob
 import ipaddress
 import json
@@ -156,65 +155,6 @@ def who_create(user_id, ticket = None):
         return user_id + ":" + ticket
     else:
         return user_id
-
-
-class process_posix_file_lock_c(object):
-    """
-    Very simple interprocess file-based spinning lock
-
-    .. warning::
-
-       - Won't work between threads of a process
-
-       - If a process dies, the next process can acquire it but there
-         will be no warning about the previous process having died,
-         thus state protected by the lock might be inconsistent
-    """
-
-    class timeout_e(Exception):
-        pass
-
-    def __init__(self, lockfile, timeout = 20, wait = 0.3):
-        self.lockfile = lockfile
-        self.timeout = timeout
-        self.wait = wait
-        self.fd = None
-        # ensure the file is created
-        with open(self.lockfile, "w+") as f:
-            f.write("")
-
-    def acquire(self):
-        ts0 = time.time()
-        self.fd = os.open(self.lockfile, os.O_RDWR | os.O_EXCL)
-        while True:
-            try:
-                fcntl.flock(self.fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-                break
-            except IOError as e:
-                if e.errno != errno.EAGAIN:
-                    self.release()
-                    raise
-                time.sleep(self.wait)
-                ts = time.time()
-                if ts - ts0 > self.timeout:
-                    self.release()
-                    raise self.timeout_e
-
-    def release(self):
-        os.close(self.fd)
-        self.fd = None
-
-    def locked(self):
-        return self.fd != None
-
-    def __enter__(self):
-        self.acquire()
-        return self
-
-    def __exit__(self, _a, _b, _c):
-        self.release()
-
-
 
 
 class acquirer_c(object):
@@ -1165,8 +1105,8 @@ class test_target(object):
                            "target %s's state" % self.id)
         commonl.makedirs_p(os.path.join(self.state_dir, "queue"), 0o2770,
                            "target %s's allocation queue" % self.id)
-        self.lock = process_posix_file_lock_c(
-            os.path.join(self.state_dir, "lockfile"))
+        self.lock = filelock.FileLock(os.path.join(self.state_dir, "lockfile"),
+                                      timeout = 2)
         #: filesystem database of target state; the multiple daemon
         #: processes use this to store information that reflect's the
         #: target's state.
@@ -1648,7 +1588,7 @@ class test_target(object):
     def _allocid_get(self):
         # return the allocid, if valid, None otherwise
         # needs to be called with self.lock taken!
-        assert self.lock.locked()
+        assert self.lock.is_locked
         _allocid = self.fsdb.get('_alloc.id')
         if _allocid == None:
             return None
@@ -1664,7 +1604,7 @@ class test_target(object):
 
     def _allocdb_get(self):
         # needs to be called with self.lock taken!
-        assert self.lock.locked()
+        assert self.lock.is_locked
         _allocid = self.fsdb.get('_alloc.id')
         if _allocid == None:
             return None
@@ -1689,7 +1629,7 @@ class test_target(object):
         #
         # NOTE: ttbl.allocation.allocdb_c.delete() does the same as
         # this because we know it to be the case
-        assert self.lock.locked()	    # Must have target.lock taken!
+        assert self.lock.is_locked	    # Must have target.lock taken!
         current_allocid = self.fsdb.get("_alloc.id")
         if current_allocid and current_allocid == allocid:
             self._allocid_wipe()

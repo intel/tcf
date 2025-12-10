@@ -4,10 +4,8 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 #
-import logging
-import pprint
+import filelock
 import os
-import re
 import struct
 
 import serial
@@ -154,7 +152,7 @@ class rly08b(ttbl.tt_interface_impl_c):
         response = []
 
         try:
-            with ttbl.process_posix_file_lock_c(
+            with filelock.FileLock(
                     f"/var/lock/lockdev/LCK..{tty_dev_base}", timeout = 2), \
                  serial.Serial(tty_dev, baudrate = 9600,
                                bytesize = serial.EIGHTBITS,
@@ -189,7 +187,7 @@ class rly08b(ttbl.tt_interface_impl_c):
                     response.append(r)
                 return response
 
-        except ttbl.process_posix_file_lock_c.timeout_e:
+        except filelock.TimeOut:
             target.log.error(
                 f"{tty_dev_base}: timed out acquiring lock for USBRLY08B")
             return []

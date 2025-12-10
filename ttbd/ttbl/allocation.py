@@ -63,18 +63,14 @@ Preemption use cases
 import bisect
 import collections
 import datetime
-import errno
-import json
+import filelock
 import logging
-import numbers
-import pprint
 import os
 import re
 import shutil
 import tempfile
 import time
 import uuid
-import werkzeug
 
 
 import commonl
@@ -166,8 +162,8 @@ class allocation_c(commonl.fsdb_symlink_c):
         # protects writing to most fields
         # - group
         # - state
-        self.lock = ttbl.process_posix_file_lock_c(
-            os.path.join(dirname, "lockfile"))
+        self.lock = filelock.FileLock(os.path.join(dirname, "lockfile"),
+                                      timeout = 5)
         self.targets_all = None
         self.groups = None
         self.target_info_reload()
@@ -609,7 +605,7 @@ def _target_allocate_locked(target, current_allocdb, waiters, preempt):
     #         None if the allocation was not changed
     # FIXME: move to test_target
     # DON'T USE target.log here, it needs to take the lock [FIXME]
-    assert target.lock.locked()	    # Must have target.lock taken!
+    assert target.lock.is_locked	    # Must have target.lock taken!
 
     # so, now it is quite simple, the first entry who made
     # it here is the highest priority in the list, so

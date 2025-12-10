@@ -370,7 +370,7 @@ class impl_c(ttbl.tt_interface_impl_c):
 
         >>> tty_dev_base = os.path.basename(tty_dev)
         >>> try:
-        >>>     with ttbl.process_posix_file_lock_c(
+        >>>     with filelock.FileLock(
         >>>              f"/var/lock/LCK..{tty_dev_base}", timeout = 2), \
         >>>          serial.Serial(tty_dev, baudrate = 9600,
         >>>                        bytesize = serial.EIGHTBITS,
@@ -383,7 +383,7 @@ class impl_c(ttbl.tt_interface_impl_c):
         >>>         ...
         >>>         return response
         >>>
-        >>> except ttbl.process_posix_file_lock_c.timeout_e:
+        >>> except filelock.Timeout:
         >>>     target.log.error(
         >>>         f"{tty_dev_base}: timed out acquiring lock for blahbla")
         >>>     return no state or re-raise, etc
