@@ -342,20 +342,19 @@ class target_extension_c(object):
 #: Character used to separate RUNID/HASHID in reports
 #:
 #: This is the consequence of a very bad past design decisison which
-#: called for a filename *report-RUNID:HASHID.txt* and of course,
+#: called for a filename *report-RUNID-HASHID.txt* and of course,
 #: colons are bad because they are used to mean a lot of things.
 #:
 #: Trying to move to hashes, but there is a lot of legacy, so these
 #: variables allow to quickly to new behaviour via configuration.
 #:
-#: Defaults to existing *:*
-report_runid_hashid_separator = ":"
+#: Defaults to *-* (dash)
+report_runid_hashid_separator = "-"
 
 #: Character used to separate RUNID/HASHID in filenames
 #:
-#: Defaults to existing *:* (see comments for
-#: data:`report_runid_hashid_separator`)
-report_runid_hashid_file_separator = ":"
+#: Defaults to *-* (dash, see comments for data:`report_runid_hashid_separator`)
+report_runid_hashid_file_separator = "-"
 
 
 class report_driver_c(object):
