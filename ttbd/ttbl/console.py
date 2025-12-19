@@ -1026,6 +1026,33 @@ class serial_pc(ttbl.power.socat_pc, generic_c):
     :param int crtscts: (optional, default 0) port implements
       hardware flow control; valid is 0 or 1 per socat man page (DATA VALUES)
 
+
+    :param list(str) bus_driver_bind: (optional, default *None*) list
+      of names of buses against which we need to bind the device
+      before turning it on.
+
+      If a device resolver specification has been given that matches
+      that bus, then the device will be resolved and we'll ask that
+      bus to prove drivers first.
+
+      eg: given spec::
+
+        usb,deep_match,idVendor=0456,idProduct=0345,bInterfaceNumber=01 and
+
+      *bus_driver_bind* set to "usb", when running *on()*, it'd
+      resolve the device to a bus path with (eg: 1-2:1.0) and we would
+      run the equivalent of
+
+        $ echo 1-2:1.0 > /sys/bus/usb/drivers_probe
+
+      Values examples
+
+       - `[ "usb", "pci" ]`: probe only if the bus part of the device
+         specification matches that bus name (eg: the previous example
+         device spec would be probed because it starts with *usb*).
+
+       - `[]` (empty list): try probing whatever bus the device spec specifies
+
     For example, create a serial port recoder power control / console
     driver and insert it into the power rail and the console of a
     target:
@@ -1050,9 +1077,13 @@ class serial_pc(ttbl.power.socat_pc, generic_c):
     """
     def __init__(self, serial_file_name = None, usb_serial_number = None,
                  baudrate = 115200, crtscts: int = 0,
+                 bus_driver_bind: list = None,
                  **kwargs):
         assert isinstance(baudrate, int) and baudrate > 0, \
             f"baudrate: expected int, got {baudrate}"
+        if bus_driver_bind != None:
+            commonl.assert_list_of_strings(
+                bus_driver_bind, "bus_driver_bind", "bus_name")
         generic_c.__init__(self, **kwargs)
         ttbl.power.socat_pc.__init__(
             self,
@@ -1082,6 +1113,7 @@ class serial_pc(ttbl.power.socat_pc, generic_c):
                           crtscts = crtscts,
 
             )
+        self.bus_driver_bind = bus_driver_bind
         self.usb_serial_number = usb_serial_number
         self.serial_file_name = serial_file_name
         self.baudrate = baudrate
@@ -1102,7 +1134,44 @@ class serial_pc(ttbl.power.socat_pc, generic_c):
             device_resolver = ttbl.device_resolver_c(
                 target, self.usb_serial_number,
                 f"instrumentation.{self.upid_index}.usb_serial_number")
-            self.kws['device'] = device_resolver.tty_find_by_spec()
+            # spec is BUSNAME,SPEC
+            if self.bus_driver_bind != None:
+                bus_name_spec = device_resolver.spec_get()[0].split(",")[0]
+            if self.bus_driver_bind == [] \
+               or bus_name_spec in self.bus_driver_bind:
+                #  this yields, eg 1-2:1.0 from /sys/bus/usb/devices/1-2:1.0
+                bus_device = os.path.basename(device_resolver.device_find_by_spec())
+                # now ensure the USB stack probes it we need to se g+w
+                # on /sys/bus/BUSNAME/drivers_probe; for USB,
+                # ttbd/ttbd@.service sets this
+                with open(f"/sys/bus/{bus_name_spec}/drivers_probe", "w") \
+                          as f:
+                    target.log.info(f"asking bus {bus_name_spec=} to probe device {bus_device=}")
+                    ## echo 1-2:1.0 > /sys/bus/{BUSNAME}/drivers_probe
+                    f.write(bus_device)
+                # FIXME: how do we wait for it to settle? ideally we'd
+                # run *udevadm settle* but then we might be caught in
+                # a storm of settling for other devices that might
+                # have nothing todo; definitely not the right thing
+                # todo, but will do for now
+                last_e = None
+                for i in range(8):	# about 2 secs we wait
+                    try:
+                        self.kws['device'] = device_resolver.tty_find_by_spec()
+                        break		# found it done
+                    except RuntimeError as e:
+                        # Another hack: if the text is like
+                        #
+                        ## found no TTYs matching device spec usb,...blahblah
+                        #
+                        # give it some time
+                        if "found no TTYs" not in str(e):
+                            raise	# something else, bail
+                        last_e = e
+                        time.sleep(0.25)
+                else:
+                    raise last_e	# not found, bail
+
         # this publishes what final device we are using at the system
         # level, which helps in diagnosing and is also used by other
         # pieces of code
