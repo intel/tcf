@@ -137,9 +137,20 @@ class interface(ttbl.tt_interface):
     survive_reboots = False
 
 
-    def __init__(self, key_size = 4096):
+    def __init__(self, key_size: int = 3072):
+        """
+        :param int key_size: (optional; default *3072*) size of the
+          keys to generate.
+
+          Set to 3kbit for future proofing; was set to 4kbit in the
+          past but it was way too long and didn't really help much.
+        """
+        assert isinstance(key_size, int) and key_size > 0, \
+            f"key_size: expected int > 0, got [{type(key_size)}]: '{key_size}'"
+
         ttbl.tt_interface.__init__(self)
         self.key_size = key_size
+
 
 
     def _setup_maybe(self, target, cert_path, cert_client_path):
