@@ -452,7 +452,7 @@ class cisco_c(router_c):
             "conf",
             # this enables the HTTPS interface we use to talk to the
             # server when running _sequence_run()
-            "feture nxapi",
+            "feature nxapi",
             # select the interface/port where the server is
             # connected
             f"int {server_switch_port}",
