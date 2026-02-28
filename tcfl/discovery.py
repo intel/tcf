@@ -1201,8 +1201,7 @@ Exception forking static execution
                 # servers don't count or the total max of threads we
                 # can consider
                 log.warning(
-                    # FIXME: this message is complicated, reword
-                    f"starting {self.threads - running}"
+                    f"starting {self.threads - running} testcase"
                     f" discoveries ({len(pending_tcs)},{pending} pending)")
                 for _ in range(self.threads - running):
                     try:
