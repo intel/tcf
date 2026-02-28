@@ -2328,8 +2328,8 @@ def assert_axes_valid(axes):
             f"'{axes_name}' needs to be a dict keyed by string;" \
             " got a key type '{type(k}}'; expected string"
         assert v == None or isinstance(v, ( list, set, tuple )), \
-            f"'{axes_name}' axis {k} value shall be " \
-            " None or a list to spin on; got a key type '{type(k}}'"
+            f"'{axes_name}' axis {k}: value shall be " \
+            f" None or a list to spin on; got [{type(v)}] '{v}'"
 
 
 
@@ -2576,6 +2576,8 @@ class tc_info_c:
 
         # initialized by the orchestrator based on self._axes_randomizer
         self._axes_randomizer_impl = None
+
+
 
     def equals(self, other):
         # not very fond of operator overloading, tbf we only compare
