@@ -2591,6 +2591,14 @@ class tc_info_c:
             and self.origin == other.origin
 
 
+
+    def __eq__(self, other) -> bool:
+        if other == None:
+            return False
+        return self.equals(other)
+
+
+
     def __data_dump__(self):
         #
         # Dump data in dict format, kinda like __repr__ but more
