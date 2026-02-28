@@ -356,9 +356,9 @@ def _tc_info_from_tc_c(testcase: tcfl.tc.tc_c):
             origin = tw['origin'],
             spec = tw['spec'],
             interconnect = False,
+            # v1 tc_c by default only spins type
+            axes = tw.get("axes", { "type": None }),
         )
-        # v1 tc_c can only spin type
-        target_role.axes = { "type": None }
         target_roles[target_want_name] = target_role
     for ic_want_name in testcase._interconnects:
         ic = testcase._targets[ic_want_name]
@@ -367,9 +367,18 @@ def _tc_info_from_tc_c(testcase: tcfl.tc.tc_c):
             origin = ic['origin'],
             spec = ic['spec'],
             interconnect = True,
+            # v1 tc_c by default only spins type
+            axes = tw.get("axes", { "type": None }),
         )
     if not target_roles:
         target_roles = None
+
+    if not testcase.axes and not target_roles:
+        # this is a static testcase, so it can't derive axes to spin
+        # on from targets (since it has none); so it needs at least
+        # one axis we'll spin it on if it declares none.
+        testcase.axes = { "axis_static": [ "value_static" ] }
+
     tc_info = tcfl.tc_info_c(
         testcase.name, testcase.kws['thisfile'],
         origin = commonl.origin_get() + ":" + testcase.origin,
@@ -379,7 +388,7 @@ def _tc_info_from_tc_c(testcase: tcfl.tc.tc_c):
         tags = testcase._tags,
         result = tcfl.result_c(),
         # original tcfl.tc.tc_c only supports spinning over the type axes
-        axes = { "type": None },
+        axes = testcase.axes,
     )
     return tc_info
 
