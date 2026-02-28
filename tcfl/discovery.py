@@ -584,8 +584,7 @@ class agent_c:
         self.manager = multiprocessing.Manager()
         # create this in the main process, on the forked one it does
         # not work
-        # FIXME rename this to queue_main_to_subprocs
-        self.queue = self.manager.Queue(maxsize = 1000)
+        self.queue_main_to_subprocs = self.manager.Queue(maxsize = 1000)
         self.queue_subprocs_to_main = self.manager.Queue(maxsize = 1000)
         self.lock = self.manager.Lock()
         self.cvar = self.manager.Condition(self.lock)
@@ -760,11 +759,11 @@ Exception forking static execution
         done = False
         while not done:
             try:
-                logger.debug(f"queue: waiting for commands from {self.queue}")
+                logger.debug(f"queue from subprocesses: waiting for commands {self.queue_main_to_subprocs}")
                 # sleep a wee when empty before printing some input,
                 # to show some activity
-                msg = self.queue.get(block = True, timeout = 5)
-                logger.info(f"queue: got command [{type(msg)}] '{msg}' from {self.queue}")
+                msg = self.queue_main_to_subprocs.get(block = True, timeout = 5)
+                logger.info(f"queue from subprocesses: got command [{type(msg)}] '{msg}' from {self.queue_main_to_subprocs}")
                 # each message is a dictionary of commands, keyed by
                 # command name, which we execute in order; they have
                 # been issued by the likes of
@@ -772,7 +771,8 @@ Exception forking static execution
                 # dictionaries too, with arguments
                 if not isinstance(msg, dict):
                     logger.error(
-                        f"BUG: unknown message type {type(msg)}; expected dict;"
+                        "BUG: unknown message type in queue from subprocesses"
+                        f" {type(msg)}; expected dict;"
                         " usually a bug in someone calling queue.put():"
                         " it shall put a dictionary of dictionaries"
                         " per tcfl.discovery.agent_c.tcis_get_from_queue()"
@@ -790,7 +790,7 @@ Exception forking static execution
                     else:
                         logger.error(
                             f"BUG? unknown message [{type(msg)}] '{msg}'")
-            except queue.Empty as e:	# queue.get() will raise on empty
+            except queue.Empty:	# queue.get() will raise on empty
                 logger.info("queue is empty, looping")
             except EOFError:		# we should be done via exit message
                 logger.warning("BUG? exiting the irregular way")
@@ -1254,7 +1254,7 @@ Exception forking static execution
             if ts - ts0 > timeout:
                 break
             # tell all the testcase process servers to exit
-            self.queue.put({ "exit": {} })
+            self.queue_main_to_subprocs.put({ "exit": {} })
             for name, p in list(self.proc_by_filename.items()):
                 if isinstance(p, commonl.fork_c) and not p.is_alive():
                     log.info(f"{name}: process server exited")

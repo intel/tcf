@@ -794,7 +794,7 @@ class executor_c(contextlib.AbstractContextManager):
                 break
             apid_log.info(
                 f"scheduling run on axes permutation {ap_descr} to"
-                f" queue {self.testcase_discovery_agent.queue}")
+                f" queue {self.testcase_discovery_agent.queue_main_to_subprocs}")
             tci_run_apid = tc_run_c(
                 tci, axes_permutation_id, axes_permutation_dict)
 
@@ -809,7 +809,7 @@ class executor_c(contextlib.AbstractContextManager):
             # The processes are waiting from an execution started by
             # tcfl.discovery.agent_c.run(); we send them a message
             # over the queue they are all listening on.
-            self.testcase_discovery_agent.queue.put({
+            self.testcase_discovery_agent.queue_main_to_subprocs.put({
                 # this is picked by the testcase servers in
                 # tcfl.discovery.agent_c.process_testcase_server() and
                 # they discriminate on tci to determine which one runs
@@ -931,7 +931,7 @@ testcase that I have been able to extract.
             # self.testcase_discovery_agent.queue_subprocs_to_main
             # queue, WHICH is being used by the testcase processes
             # spun by the testcase servers to report results.
-            logger.info(f"queue: getting commands"
+            logger.info(f"queue from subprocs: getting commands"
                         f" @+{ts-ts0:.1f}s/{period_keepalive}s"
                         f" from {self.testcase_discovery_agent.queue_subprocs_to_main}")
 
