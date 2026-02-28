@@ -37,23 +37,31 @@ Quick usage:
 # agent_c.run() gets called from whoever wants to discover testcases;
 # see *Quick Usage* above.
 #
-#  agent_c.run()
-#    agent_c._find_in_path()
-#      agent_c._find_in_directory()
-#        agent_c._find_in_file()
-#      agent_c._find_in_file()
-#    agent_c._process_find_in_file() [SEPARATE PROCESS]
-#      _create_from_file_name()
-#        _is_testcase_call()
-#           is_tcf_testcase()
-#            _classes_enumerate()
-#              _classes_enumerate()
-#           driver.is_testcase()
-#    loop
-#      agent_c.tcis_update_from_queue()
-#        agent_c.tcis_get_from_queue()
+# agent_c.run()
+#    _manifest_expand
+#   for each path
+#     agent_c._find_in_path()
+#       agent_c._find_in_directory()
+#         agent_c._find_in_file()
+#           -> creates entry in agent_c.proc_by_filename so the loop
+#              in FIXME will spawn a suprocess
 #
-#
+#   loop
+#     for files to discover in agent_c.proc_by_filename
+#       _process_find_in_file() <- FORK A SEPARATE PROCESS for each file
+#           _create_from_file_name()
+#             _is_testcase_call()
+#                is_tcf_testcase()
+#                 _classes_enumerate()
+#                   _classes_enumerate()
+#                driver.is_testcase()
+#           report to main via message in self.queue_subprocs_to_main
+#           process_testcase_server() WAITS for commands
+#             _process_testcase_server_spawn_static()
+#                process_testcase_static_trampoline()
+#   agent_c.tcis_update_from_queue()
+#     agent_c.tcis_get_from_queue()
+#       agent_c._tcis_get_from_result_msg()
 #
 import atexit
 import collections
@@ -340,7 +348,7 @@ def _is_testcase_call(tc_driver, tc_name, file_name,
 
 def _tc_info_from_tc_c(testcase: tcfl.tc.tc_c):
     assert isinstance(testcase, tcfl.tc.tc_c)
-    
+
     target_roles = dict()
     for target_want_name, tw in testcase._targets.items():
         target_role = tcfl.target_role_c(
@@ -785,6 +793,7 @@ class agent_c:
         return tcis_by_filename
 
 
+
     # COMPAT: removing list[str] so we work in python 3.8
     def run(self, paths: list, manifests: list = None,
             filter_spec = None, testcase_name = None):
@@ -952,6 +961,7 @@ class agent_c:
             _tcs_filter(tcs_filtered, result, tcs, filter_spec,
                         testcase_name = testcase_name)
 
+        # report to the log/console
         self.tcis_count = 0
         log.warning(f"testcase scan found {len(self.tcis)} testcases")
         for filename, tcid in self.tcis.items():
