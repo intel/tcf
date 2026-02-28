@@ -257,25 +257,41 @@ class Process(fork_c):	# COMPAT
 
 
 
-def format_dict_as_str(d: dict, separator: str = ' ') -> str:
+def format_dict_as_str(d: dict, separator: str = ' ', separator_inner: str = ',') -> str:
     """
     Format a dictionary as a string of K:V separated by *separator*
 
     :param dict d: input dictionary; keys and values need to be
-      representable as string
+      representable as string; if they are a list, they will be
+      printed separated with *separator_inner*.
 
       **WARNING!** keep it small
 
     :param str separator: (optional, default one space) string used to
       separate each entry in the dictionary in the final string
 
+    :param str separator_inner: (optional, default one comma) string
+      used to separate items of the same entry when they are iterable.
+
     :returns str: the formated string
+
     """
     assert isinstance(d, dict), \
         f"d: expected dict, got {type(d)}"
     assert isinstance(separator, str), \
         f"separator: expected str, got {type(separator)}"
-    return separator.join(f"{k}:{v}" for k, v in d.items())
+    l = []
+    for k, v in d.items():
+        if isinstance(v, ( str, int, float, bool )):
+            l.append(f"{k}:{v}")
+            continue
+        try:
+            iter(v)
+            l.append(f"{k}:{separator_inner.join(str(i) for i in v)}")
+        except:
+            l.append(f"{k}:{v}")
+
+    return separator.join(l)
 
 
 
