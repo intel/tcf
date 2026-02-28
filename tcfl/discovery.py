@@ -710,7 +710,7 @@ Exception forking static execution
         assert isinstance(axes_permutation_id, int)
         assert isinstance(axes_permutation_dict, dict)
 
-        logger.info("spawning static execution APID: %d [%s]",
+        logger.info("spawning static execution APID#%d [%s]",
                     axes_permutation_id,
                     commonl.format_dict_as_str(axes_permutation_dict))
         try:

@@ -727,8 +727,9 @@ class executor_c(contextlib.AbstractContextManager):
                 # FIXME: use an FFE/FPE pseudoranzomizer?
                 _i = random.choice(apids)
                 apids.remove(_i)
-                log.info("picked random APID %d out of %d left",
-                         _i, len(apids))
+                log.info("picked random APID#%d out of %d left",
+                         # +1 there was one more before we called remove()
+                         _i, len(apids) + 1)
                 i = _i
             axes = testcase._axes_all_mr.from_integer(i)
             # axes -> list of axis values for each axis we are
@@ -736,9 +737,8 @@ class executor_c(contextlib.AbstractContextManager):
 
             # eg: type:SOMETYPE cpu:CPU1
             ap_dict = dict(zip(axes_keys, axes))
-            # FIXME: use groups_to_str()
-            ap_descr = ' '.join([ f"{k}:{v}" for k, v in ap_dict.items() ])
-            log.info(f"APID#{i}:considering: {ap_descr}")
+            ap_descr = commonl.format_dict_as_str(ap_dict)
+            log.info(f"APID#{i}: are axes {ap_descr}")
 
             # use this, not _axes_permutation_filter, so we can just
             # create a method.
@@ -1164,7 +1164,7 @@ testcase that I have been able to extract.
         self.result += tci.result
 
 
-    # FIXME: add verbe, rename to _tc_pending_add()
+    # FIXME: add verbe, rename to _tc_pending_add(), for what APID?
     def _tc_pending(self, tci: tcfl.tc_info_c, log):
         log.info(f"marked pending for APID ")
 
