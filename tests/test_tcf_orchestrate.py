@@ -3,7 +3,12 @@ import commonl
 import tcfl.tc
 
 class _test(tcfl.tc.tc_c):
+    """
 
+    Check if simple static test case with no axis defaults to
+    defaults axis an runs ok
+
+    """
 
     def eval(self):
 
@@ -50,13 +55,35 @@ class _test(tcfl.tc.tc_c):
                     "test_running": executor.testcases_running,
                     "test_pending": executor.testcases_pending,
                 }, subcase = "discovery")
+        elif executor.result_discovery.passed \
+           + executor.result_discovery.errors \
+           + executor.result_discovery.failed \
+           + executor.result_discovery.blocked \
+           + executor.result_discovery.skipped == 0:
+            self.report_error(
+                "0 testcases report result_discovery; something is wrong",
+                subcase = "discovery")
+
         else:
             self.report_pass("discovery went ok",
                              subcase = "discovery")
 
+        if executor.result.passed \
+           + executor.result.errors \
+           + executor.result.failed \
+           + executor.result.blocked \
+           + executor.result.skipped == 0:
+            self.report_error(
+                "0 testcases report execution; something is wrong",
+            subcase = "execution")
+        else:
+            self.report_pass(
+                "execution went ok",
+            subcase = "execution")
 
         self.report_info(f"result discovery: {executor.result_discovery}")
         self.report_info(f"result: {executor.result}")
+
 
         with self.subcase("executor_delete"):
             executor.stop()
