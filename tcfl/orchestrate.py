@@ -617,10 +617,6 @@ class executor_c(contextlib.AbstractContextManager):
 
 
 
-    # FIXME: make argument
-    work_processes = 2
-
-
     def axes_permutation_filter_register(self, name, fn):
         """Register an axes permutation filter function that can be
         later used by testcases.
