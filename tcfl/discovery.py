@@ -584,7 +584,9 @@ class agent_c:
         self.manager = multiprocessing.Manager()
         # create this in the main process, on the forked one it does
         # not work
+        # FIXME rename this to queue_main_to_subprocs
         self.queue = self.manager.Queue(maxsize = 1000)
+        self.queue_subprocs_to_main = self.manager.Queue(maxsize = 1000)
         self.lock = self.manager.Lock()
         self.cvar = self.manager.Condition(self.lock)
         #: Number of testcases found
@@ -614,6 +616,136 @@ class agent_c:
 
 
 
+    def process_tci_match(self, tci: tcfl.tc_info_c) -> tcfl.tc_info_c:
+        """Decide if a tci we got a message for is something this
+        testcase server shall handle
+
+        (runs in the process *testcase server*)
+
+        :returns: *None* if the *tci* is not handled by this process,
+        the *tci* itself otherwise.
+
+        """
+        for filename, tcid in self.tcis.items():
+            for tci_name, tci_itr in tcid.items():
+                if tci_itr.equals(tci):
+                    return tci_itr
+        return None
+
+
+    @staticmethod
+    def args_must_have(logger, function: str, args, *arg_names):
+        failed = set()
+        for arg_name in arg_names:
+            if not arg_name in args:
+                logger.error(f"{function}: BUG? missing argument '{arg_name}'")
+                failed.add(arg_name)
+        if not failed:
+            return
+        return RuntimeError(
+            f"{function}: BUG? missing arguments {', '.join(failed)}")
+
+
+
+    def process_testcase_static_trampoline(
+            self, logger, tci: tcfl.tc_info_c,
+            axes_permutation_id: int,
+            axes_permutation_dict: dict):
+        try:
+            raise NotImplementedError(
+                f"FIXME run the testcase {tci=} {axes_permutation_id=} {tci.__dict__=} and report"
+            )
+            tci.result = tcfl.result_c(blocked = 1)
+            tci.output = """\
+NOT IMPLEMENTED EXECUTION
+"""
+
+        except Exception as e:
+            # ugh -- sth failed, report back as a testcase execution
+            # blockage; remember we are in a subprocess, so we have to
+            # send a message
+            # FIXME: do result from exception here
+            tci.result = tcfl.result_c(blocked = 1)
+            tci.output = """\
+Exception forking static execution
+"""
+            tci.exception = e
+            tci.formatted_traceback = traceback.format_tb(sys.exc_info()[2])
+
+        finally:
+            # report result back to the discovery agent
+            # tcfl.discovery.agent_c.tcis_get_from_queue()
+            logger.info(f"reporting TCI to {self.queue_subprocs_to_main}")
+            self.queue_subprocs_to_main.put({
+                "tcfl.discovery.agent_c.process_testcase_server_spawn*/result": {
+                    "origin": commonl.origin_get(),
+                    "pid": os.getpid(),
+                    "tcis": { tci.file_path: { tci.name: tci } },
+                }
+            })
+
+
+
+    def _process_testcase_server_spawn_static(self, logger, args: dict):
+        """
+
+        Spawn an static execution of the testcase for the given
+        Axes Permutation
+
+        """
+        logger.info(f"spawn static run: verifying args {args}")
+        tci = self.process_tci_match(args['tci'])
+        if tci == None:
+            logger.debug(f"ignoring message for {tci}"
+                         " we are not responsible for")
+            return
+
+        self.args_must_have(
+            logger,
+            "_process_testcase_server_spawn_static",
+            args,
+            "axes_permutation_id",
+            "axes_permutation_dict")
+        axes_permutation_id = args['axes_permutation_id']
+        axes_permutation_dict = args['axes_permutation_dict']
+        assert isinstance(axes_permutation_id, int)
+        assert isinstance(axes_permutation_dict, dict)
+
+        logger.info("spawning static execution APID: %d [%s]",
+                    axes_permutation_id,
+                    commonl.format_dict_as_str(axes_permutation_dict))
+        try:
+            fork = commonl.fork_function_c(
+                self.process_testcase_static_trampoline,
+                logger, tci,
+                args["axes_permutation_id"],
+                args["axes_permutation_dict"])
+            fork.start()
+            # FIXME: track this so we can kill it upon receipt of exit
+            # if no exceptions, we assume it launched and the
+            # trampoline function will be the one returning results
+        except Exception as e:
+            # ugh -- sth failed, report back as a testcase execution
+            # blockage; remember we are in a subprocess, so we have to
+            # send a message
+            tci.result = tcfl.result_c(blocked = 1)
+            tci.output = """\
+Exception forking static execution
+"""
+            tci.exception = e
+            tci.formatted_traceback = traceback.format_tb(sys.exc_info()[2])
+            logger.info(f"reporting TCI to {self.queue_subprocs_to_main}")
+            self.queue_subprocs_to_main.put({
+                # FORMAT documented in tcfl.discovery.agent_c.tcis_get_from_queue
+                "tcfl.discovery.agent_c.process_testcase_server_spawn*/result": {
+                    "origin": commonl.origin_get(),
+                    "pid": os.getpid(),
+                    "tcis": { tci.file_path: { tci.name: tci } },
+                }
+            })
+
+
+
     def process_testcase_server(self, path: str):
         """
         Stays in the background waiting for commands from the main
@@ -625,9 +757,47 @@ class agent_c:
         logger = log.getChild(f"testcase-server|{path}" )
         logger.info("starting")
         setproctitle.setproctitle(f"testcase-server|{path}")
-        while True:
-            logger.error("FIXME: waiting for commands from agent_c.queue")
-            time.sleep(1)
+        done = False
+        while not done:
+            try:
+                logger.debug(f"queue: waiting for commands from {self.queue}")
+                # sleep a wee when empty before printing some input,
+                # to show some activity
+                msg = self.queue.get(block = True, timeout = 5)
+                logger.info(f"queue: got command [{type(msg)}] '{msg}' from {self.queue}")
+                # each message is a dictionary of commands, keyed by
+                # command name, which we execute in order; they have
+                # been issued by the likes of
+                # tcfl.orchestrate.executor_c. The values are usually
+                # dictionaries too, with arguments
+                if not isinstance(msg, dict):
+                    logger.error(
+                        f"BUG: unknown message type {type(msg)}; expected dict;"
+                        " usually a bug in someone calling queue.put():"
+                        " it shall put a dictionary of dictionaries"
+                        " per tcfl.discovery.agent_c.tcis_get_from_queue()"
+                        " (eg: { 'cmd': {} }")
+                    continue
+                for msg_k, msg_v in msg.items():
+                    if msg_k == "exit":
+                        logger.info("exiting per 'exit' message")
+                        # FIXME: kill subprocesses if any from
+                        # tracking above in spawns
+                        done = True
+                        break
+                    elif msg_k == "tcfl.discovery.agent_c.process_testcase_server_spawn_static":
+                        self._process_testcase_server_spawn_static(logger, msg_v)
+                    else:
+                        logger.error(
+                            f"BUG? unknown message [{type(msg)}] '{msg}'")
+            except queue.Empty as e:	# queue.get() will raise on empty
+                logger.info("queue is empty, looping")
+            except EOFError:		# we should be done via exit message
+                logger.warning("BUG? exiting the irregular way")
+                break
+            except Exception as e:	# general errors, we keep going
+                logger.warning("ignoring exception: %s", e,
+                               exc_info = commonl.debug_traces)
         logger.warning("finishing")
 
 
@@ -692,8 +862,21 @@ class agent_c:
         # server to spawn processes when the orchestrator tells us to.
         for tci in tcis:
             logger.info(f"scanning found testcase {tci}")
-        self.queue.put({ "discovery_result": tcis })
+
+        self.queue_subprocs_to_main.put({
+            "tcfl.discovery.agent_c.process_testcase_server_discovery/result": {
+                "origin": commonl.origin_get(),
+                "pid": os.getpid(),
+                "tcis": tcis,
+            }
+        })
         logger.info("reported %d testcases to main process", len(tcis))
+        # now we use this process (remember this is a for from the
+        # main process) to store which tcis have been discovered by
+        # it; process_testcase_server() will use to discriminate which
+        # messages are for this process
+        self.tcis = tcis
+        self.tcis_count = len(tcis)
         self.process_testcase_server(path)
 
 
@@ -762,34 +945,117 @@ class agent_c:
             log.warning(f"{path}: invalid file type")
             result.blocked += 1
 
-    def tcis_get_from_queue(self):
+
+    def _tcis_get_from_result_msg(self, tcis: dict, msg: dict):
+        # When a result message is received, parse it out, verify it
+        # and update the tcis method with the tcis reported.
+        #
+        # Each message looks like
+        #
+        ## {
+        ##     "origin": commonl.origin_get(),
+        ##     "pid": os.getpid(),
+        ##     "tcis": { FILENAME: { SUBCASE: tci } },
+        ## }
+        #
+        tcis_received = msg.get('tcis', {})
+
+        if tcis_received:
+            tcis.update(tcis_received)
+        log.info(f"received {len(tcis_received)} from result message")
+
+
+
+    def tcis_get_from_queue(self, log = log):
+        #
+        # Loop reading messages (until there are no more) from the
+        # discovery agent's queue that is enabled to receive messages
+        # from all the testcase servers.
+        #
+        # When a testcase runs and has a result to report, it reports
+        # sending a message to this queue.
+        #
+        # Each message is dictionary keyed by string; the value is a
+        # dictionary keyed by string of values; fields origin and pid
+        # are mandatory.
+        #
+        ## {
+        ##     "MESAGETYPE": {
+        ##         "origin": str:WHEREORIGINATED,
+        ##         "pid": int:PIDTHATEMITTEDIT,
+        ##         ...
+        ##  (eg)  "tcis": { FILENAME: { SUBCASE: tci } },
+        ##         ...
+        ##     }
+        ## }
         tcis = {}
         while True:
             try:
-                msg = self.queue.get(block = False, timeout = 1)
+                # sleep a wee when empty before printing some input,
+                # to show some activity
+                msg = self.queue_subprocs_to_main.get(block = True, timeout = 5)
+                log.debug("got message from queue %s: %s",
+                          self.queue_subprocs_to_main, msg)
                 if not isinstance(msg, dict):
                     log.error(
                         f"BUG: unknown message type {type(msg)}; expected dict")
                     continue
+
                 for msg_k, msg_v in msg.items():
-                    if msg_k == "discovery_result":
-                        log.info(f"add from discovery_result {msg_v}")
-                        tcis.update(msg_v)
+
+                    if not isinstance(msg_v, dict):
+                        log.error(
+                            f"BUG: unknown payload type '{type(msg_v)}' for message"
+                            f" '{msg_k}'; expected dict")
+                        continue
+
+                    origin = msg_v.get("origin", None)
+                    if not origin:
+                        log.error(f"BUG? missing origin in message {msg}")
+                    else:
+                        origin = "origin:n/a"
+
+                    pid = msg_v.get("pid", None)
+                    if not pid:
+                        log.error(f"BUG? missing pid in message {msg}")
+                    else:
+                        pid = "PID:n/a"
+
+                    # A testcase server forked off a suprocess to scan
+                    # (testcase server); it did run, possibly spawning
+                    # more subprocesses and then collecting then; then
+                    # the specific testcase server issues this message
+                    # to report what was found before going into
+                    # server mode
+                    # tcfl.discovery.agent_c._process_find_in_file()
+                    if msg_k == "tcfl.discovery.agent_c.process_testcase_server_discovery/result":
+                        self._tcis_get_from_result_msg(tcis, msg_v)
+
+                    # a testcase server forked off a suprocess to run
+                    # a testcase (testcase server); it did run, and we
+                    # got some results
+                    elif msg_k == "tcfl.discovery.agent_c.process_testcase_server_spawn*/result":
+                        self._tcis_get_from_result_msg(tcis, msg_v)
+
                     else:
                         log.error(
-                            f"BUG: unknown message type {type(msg)}")
-            except queue.Empty as e:	# queue.get() will raise on empty
+                            f"BUG: unknown message '{msg_k}' from PID {pid} @{origin}")
+
+            except queue.Empty:	# queue.get() will raise on empty
                 break
         return tcis
+
+
 
     def tcis_update_from_queue(self) -> dict:
         tcis_by_filename = self.tcis_get_from_queue()
         # This is a dict keyed by filename which contains a dicy keyed
         # by testcasename of each individual testcase information
         for filename, tcid in tcis_by_filename.items():
-            # FIXME: verify we are getting the right format of info
-            # here
-            log.error(f"{filename}: queue received {tcid=}")
+            # FIXME: we need to change the tcid to include not only
+            # file name, name but also hashid (encoding APID, TG and
+            # invocation copy --since we can be running a TC in more
+            # than one TG and on each TG more than once)
             for _tc_name, tci in tcid.items():
                 log.error(f"{filename}/{_tc_name}: queue received {tci=}")
                 tci_existing = self.tcis[filename].get(tci.name, None)
@@ -982,6 +1248,26 @@ class agent_c:
             self.tcis_count += len(tcid)
         log.warning("testcase scan has finished")
 
+    def stop(self, timeout: int = 10):
+        ts0 = time.time()
+        while self.proc_by_filename:
+            ts = time.time()
+            if ts - ts0 > timeout:
+                break
+            # tell all the testcase process servers to exit
+            self.queue.put({ "exit": {} })
+            for name, p in list(self.proc_by_filename.items()):
+                if isinstance(p, commonl.fork_c) and not p.is_alive():
+                    log.info(f"{name}: process server exited")
+                    del p
+                    del self.proc_by_filename[p]
+            time.sleep(0.05)	# give it some time to die
+
+        # if anything left, forcibly kill it
+        for name, p in list(self.proc_by_filename.items()):
+            if isinstance(p, commonl.fork_c) and p.is_alive():
+                log.info(f"{name}: process server forcibly terminated")
+                p.terminate()
 
 
 _subsystem_setup = False

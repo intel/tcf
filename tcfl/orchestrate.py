@@ -252,6 +252,7 @@ import requests
 import requests.exceptions
 
 import tcfl
+import tcfl.discovery
 import tcfl.tc
 import commonl
 
@@ -322,19 +323,7 @@ class cache_c(collections.OrderedDict):
 
 # FIXME: create general dict_to_str k:v[, k:v]...
 def groups_to_str(groups: dict[str]) -> str:
-    """
-    Creates a name out of a list of gropus
-
-    :param list[str]: dictionary keyed by groupname, values being
-      lists of names
-
-    :returns str: formatted string `GROUP:TARGET,TARGET,... GROUP:TARGET,TARGET,...`
-    """
-    # FIXME: move to commonl.format_dict_as_str()
-    l = []
-    for name, target_list in groups.items():
-        l.append(f"{name}:{','.join(target_list)}")
-    return ' '.join(l)
+    raise NotImplemented("use commnl.format_dict_as_string")
 
 
 
@@ -428,6 +417,12 @@ class executor_c(contextlib.AbstractContextManager):
       boolean expression to filter testcases that want to be
       included in execution.
 
+    :param tcfl.discovery.agent_c testcase_discovery_agent: (optional)
+      testcase discovery agent object to use. If not given, one will
+      be created.
+
+      If created by this, it will be stopped upon executor destruction
+
     Other params as of :class:`tcfl.targets.discovery_agent_c`, are
     meant to refine the targets that will be used.
 
@@ -510,6 +505,8 @@ class executor_c(contextlib.AbstractContextManager):
                  testcase_paths: list[str] = None,
                  testcase_manifests: list[str] = None,
                  testcase_filter_spec: str = None,
+                 testcase_discovery_agent: tcfl.discovery.agent_c = None,
+                 target_discovery_agent: tcfl.targets.discovery_agent_c = None,
                  **kwargs
                  ):
 
@@ -554,21 +551,38 @@ class executor_c(contextlib.AbstractContextManager):
         # (so far only the trgets one is) and into a discovery agent
         tcfl.servers.subsystem_setup()
 
-        self.target_discovery_agent = tcfl.targets.discovery_agent_c(
-            # no projections here, we need all the fields for orchestration
-            *args, **kwargs)
-
-
         # this is confusing, shall remove tcfl.testcases
         tcfl.discovery.subsystem_setup(
             logdir = logdir,
             tmpdir = tmpdir,
             remove_tmpdir = remove_tmpdir)
 
-        self.target_discovery_agent.update_start()	# get it rolling
-        self.testcase_discovery_agent = tcfl.discovery.agent_c()
+        if testcase_discovery_agent != None:
+            assert isinstance(testcase_discovery_agent,
+                              tcfl.discovery.agent_c), \
+                f"testcase_discovery_agent: expected None or instance" \
+                f" of tcfl.discovery.agent_c; got {type(testcase_discovery_agent)}"
+            self.testcase_discovery_agent = testcase_discovery_agent
+            self.testcase_discovery_agent_owned = False
+        else:
+            self.testcase_discovery_agent = tcfl.discovery.agent_c(
+                # no projections here, we need all the fields for orchestration
+                *args, **kwargs)
+            self.testcase_discovery_agent_owned = True
 
-        # FIXME: split to run/complete
+        if target_discovery_agent != None:
+            assert isinstance(target_discovery_agent,
+                              tcfl.targets.discovery_agent_c), \
+                f"target_discovery_agent: expected None or instance" \
+                f" of tcfl.targets.discovery_agent_c; got {type(target_discovery_agent)}"
+            self.target_discovery_agent = target_discovery_agent
+        else:
+            self.target_discovery_agent = tcfl.targets.discovery_agent_c()
+
+    # FIXME: move all starting here to run()
+
+            self.target_discovery_agent.update_start()	# get it rolling
+
         self.testcase_discovery_agent.run(
             paths = testcase_paths,
             manifests = testcase_manifests,
@@ -761,15 +775,17 @@ class executor_c(contextlib.AbstractContextManager):
         # Schedule running the static portion of a testcase
         #
         # This is the part that only cares about knowing the Axis
-        # Permutation it will run on and does need no targets
+        # Permutation it will run on and does need no targets. It
+        # only executes the configre_* and build_* sections of a
+        # testcase.
         #
         #
-        log.info(f"discovering axes")
+        log.info("discovering axes")
         ap_count = 0
         for axes_permutation_id, axes_permutation_dict in self._testcase_axes_iterate(tci, log):
-            # axes_permutation_dict is a dictionary of { AXISNAME: VALUE }, which
-            # come from values in the inventory or fed in by the user
-            # as a parameter)
+            # axes_permutation_dict is a dictionary of { AXISNAME:
+            # VALUE }, which come from values in the inventory or fed
+            # in by the user as a parameter)
             ap_descr = commonl.format_dict_as_str(axes_permutation_dict)
             apid_log = log.getChild(f"APID#{axes_permutation_id}")
             if tci.axes_permutations > 0 and ap_count >= tci.axes_permutations:
@@ -777,21 +793,63 @@ class executor_c(contextlib.AbstractContextManager):
                                " to knob *axes_permutations*")
                 break
             apid_log.info(
-                f"scheduling run on axes permutation {ap_descr}")
-            # FIXME: now we have an axes permutation -- tell the
-            # testcase server to spawn on this APID and then run
-            # static
-            # - how do we reach the server?
+                f"scheduling run on axes permutation {ap_descr} to"
+                f" queue {self.testcase_discovery_agent.queue}")
+            tci_run_apid = tc_run_c(
+                tci, axes_permutation_id, axes_permutation_dict)
+
+            # As the testcase servers to spawn a subprocess to handle
+            # this execution.
+            #
             # - this is APID/static execution; once APID execution is done,
             #   we can go dynamic
             # - FIXME: start allocation before APID/static is done
             #   controlling via variable
-            tci_run_apid = tc_run_c(
-                tci, axes_permutation_id, axes_permutation_dict)
-            # FIXME: set this in some sort of static per APID so we
-            # can easily tell when we can start dybamic?
+            #
+            # The processes are waiting from an execution started by
+            # tcfl.discovery.agent_c.run(); we send them a message
+            # over the queue they are all listening on.
+            self.testcase_discovery_agent.queue.put({
+                # this is picked by the testcase servers in
+                # tcfl.discovery.agent_c.process_testcase_server() and
+                # they discriminate on tci to determine which one runs
+                "tcfl.discovery.agent_c.process_testcase_server_spawn_static": {
+                    "tci": tci,
+                    "axes_permutation_id": axes_permutation_id,
+                    "axes_permutation_dict": axes_permutation_dict,
+                }
+            })
             self._tc_pending(tci_run_apid, apid_log)
             ap_count += 1
+        if ap_count == 0:	# we could find no axis
+            # FIXME: split this in three cases
+            # tci will have target_roles if targets
+            # - tc requires targets, none found: filtered out? bug? bad axes spec?
+            # - tc requires targets, some found: bug? bad axes spec?
+            # - tc static, bug? bad axes spec?
+            raise tcfl.blocked_e(
+                "can't find where to run! (no axis to spin on)",
+                {
+                    "tci": tci.__dict__,
+                    "help": """\
+A testcase needs axes to be spun on. Each axis has possible values and
+for each, an execution of the testcase is done.
+
+If this an static testcase, it uses no remote targets and by default they are
+given the *default_axis* axis which only has the value
+*default_axis_value*.
+
+If this testcase declares needing to run on targets; the axis
+and their values are by default gotten from targets. There might be no
+targets.
+
+Getting this error can also mean the axis might have been overriden by
+mistake usig the @tcfl.axes() decorator to an invalid value.
+
+You can use *tcf info TCFILE* to find what are the axes for the
+testcase that I have been able to extract.
+"""
+                    })
         return ap_count
 
 
@@ -854,23 +912,58 @@ class executor_c(contextlib.AbstractContextManager):
                 # tci.name contains the filename also, so we don't get
                 # a child of log_filename because it'd repeat
                 log_tci = logger.getChild(tci.name)
+                # the static execution of a test case runs with no
+                # targets and it only executes the configure_* and
+                # build_* phases.
                 self._run_testcase_spawn_static(tci, log_tci)
+
+        logger.error(f"DEBUG {self.testcases_pending=}")
+        logger.error(f"DEBUG {self.testcases_running=}")
+
 
         while True:
             ts = time.time()
             if not self.testcases_pending and not self.testcases_running:
-                logger.error(f"no testcases pending nor running; done")
+                logger.error("no testcases pending nor running; done")
                 break
 
-            logger.error(f"FIXME: not implemented")
+            # hat trick! we listen for results on the on the
+            # self.testcase_discovery_agent.queue_subprocs_to_main
+            # queue, WHICH is being used by the testcase processes
+            # spun by the testcase servers to report results.
+            logger.info(f"queue: getting commands"
+                        f" @+{ts-ts0:.1f}s/{period_keepalive}s"
+                        f" from {self.testcase_discovery_agent.queue_subprocs_to_main}")
+
+            tcis = self.testcase_discovery_agent.tcis_get_from_queue(log = logger)
+
+            for filename, tcid in tcis.items():
+                for name, tci in tcid.items():
+                    found = False
+                    # { FILENAME: [ tcis ] }
+                    for tcil in list(self.testcases_pending.values()):
+                        if tci in tcil:
+                            found = True
+                            self.testcases_pending[tci.file_path].remove(tci)
+                            if not self.testcases_pending[tci.file_path]:
+                                del self.testcases_pending[tci.file_path]
+                            self.testcases_completed[tci.file_path].append(tci)
+                    for tcil in list(self.testcases_running.values()):
+                        if tci in tcil:
+                            found = True
+                            self.testcases_running[tci.file_path].remove(tci)
+                            if not self.testcases_running[tci.file_path]:
+                                del self.testcases_running[tci.file_path]
+                            self.testcases_completed[tci.file_path].append(tci)
+                    if not found:
+                        logger.error(f"BUG? {tci=} not found in pending/running lists")
 
             # first send the keepalives, it's way more critical
-            logger.error(f"INFO pulsing at +{ts-ts0:.1f}s, period {period_keepalive}s")
             if ts - ts0 > period_keepalive:
                 self._execute_keepalive()
                 ts0 = ts
 
-            time.sleep(period_keepalive/5)
+            time.sleep(period_keepalive/3)
 
         self._execute_exit()
 
@@ -1071,6 +1164,7 @@ class executor_c(contextlib.AbstractContextManager):
         self.result += tci.result
 
 
+    # FIXME: add verbe, rename to _tc_pending_add()
     def _tc_pending(self, tci: tcfl.tc_info_c, log):
         log.info(f"marked pending for APID ")
 
@@ -2353,9 +2447,13 @@ class executor_c(contextlib.AbstractContextManager):
 
 
 
-    def shutdown(self):
+    def stop(self):
         self._execute_exit()
-        self.log.error(f"DEBUG shutdown() not properly implemented, unify with wait_for_done")
+        if self.testcase_discovery_agent_owned:
+            # stop so it kills subprocesses
+            self.testcase_discovery_agent.stop()
+        # target discovery agent needs no stopping
+        self.log.error("DEBUG shutdown() not properly implemented, unify with wait_for_done")
 
 
     def _debug_run(self, testcase):
