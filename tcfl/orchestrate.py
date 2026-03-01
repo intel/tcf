@@ -934,23 +934,31 @@ testcase that I have been able to extract.
             tcis = self.testcase_discovery_agent.tcis_get_from_queue(log = logger)
 
             for filename, tcid in tcis.items():
+                logger.error(f"{filename}: received {len(tcid)} TCIs")
                 for name, tci in tcid.items():
+                    logger.error(f"{filename}/{name}: received TCIs {tci=}")
                     found = False
                     # { FILENAME: [ tcis ] }
                     for tcil in list(self.testcases_pending.values()):
                         if tci in tcil:
+                            # this was a pending testcase, but now it says it's done
                             found = True
                             self.testcases_pending[tci.file_path].remove(tci)
                             if not self.testcases_pending[tci.file_path]:
                                 del self.testcases_pending[tci.file_path]
                             self.testcases_completed[tci.file_path].append(tci)
+                            # update the overall execution result
+                            self.result += tci.result
                     for tcil in list(self.testcases_running.values()):
                         if tci in tcil:
+                            # this was a running testcase, but now it says it's done
                             found = True
                             self.testcases_running[tci.file_path].remove(tci)
                             if not self.testcases_running[tci.file_path]:
                                 del self.testcases_running[tci.file_path]
                             self.testcases_completed[tci.file_path].append(tci)
+                            # update the overall execution result
+                            self.result += tci.result
                     if not found:
                         logger.error(f"BUG? {tci=} not found in pending/running lists")
 
