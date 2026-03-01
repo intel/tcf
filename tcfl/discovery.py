@@ -674,6 +674,7 @@ Exception forking static execution
         finally:
             # report result back to the discovery agent
             # tcfl.discovery.agent_c.tcis_get_from_queue()
+            # FIXME: this logger shall be specific to the APID that is running this, now the message is too generic
             logger.info(f"reporting TCI to {self.queue_subprocs_to_main}")
             self.queue_subprocs_to_main.put({
                 "tcfl.discovery.agent_c.process_testcase_server_spawn*/result": {
@@ -962,7 +963,7 @@ Exception forking static execution
 
         if tcis_received:
             tcis.update(tcis_received)
-        log.info(f"received {len(tcis_received)} from result message")
+        log.info(f"received {len(tcis_received)} result message from subprocess")
 
 
 
@@ -994,7 +995,7 @@ Exception forking static execution
                 # sleep a wee when empty before printing some input,
                 # to show some activity
                 msg = self.queue_subprocs_to_main.get(block = True, timeout = 5)
-                log.debug("got message from queue %s: %s",
+                log.debug("queue from subprocs: got message from %s: %s",
                           self.queue_subprocs_to_main, msg)
                 if not isinstance(msg, dict):
                     log.error(
@@ -1042,16 +1043,22 @@ Exception forking static execution
                             f"BUG: unknown message '{msg_k}' from PID {pid} @{origin}")
 
             except queue.Empty:	# queue.get() will raise on empty
+                log.info(
+                    "queue from subprocs: empty, finishing collection run")
                 break
+        log.info(
+            f"queue from subprocs: returning info about {len(tcis)} TCIs")
         return tcis
 
 
 
     def tcis_update_from_queue(self) -> dict:
         tcis_by_filename = self.tcis_get_from_queue()
-        # This is a dict keyed by filename which contains a dicy keyed
+        # This is a dict keyed by filename which contains a dict keyed
         # by testcasename of each individual testcase information
+        # FIXME: unify this with the hanling in tcfl.orghestrate_executor_c.run()
         for filename, tcid in tcis_by_filename.items():
+            log.info(f"{filename}: has {len(tcid)} TCIs")
             # FIXME: we need to change the tcid to include not only
             # file name, name but also hashid (encoding APID, TG and
             # invocation copy --since we can be running a TC in more
@@ -1060,10 +1067,11 @@ Exception forking static execution
                 log.error(f"{filename}/{_tc_name}: queue received {tci=}")
                 tci_existing = self.tcis[filename].get(tci.name, None)
                 if tci_existing:
-                    log.error(f"{filename}/{_tc_name}: merging onto existing {tci_existing=}")
-                    log.error(f"{filename}/{_tc_name}: DEBUG {tci.output=}")
+                    log.info(f"{filename}/{_tc_name}: merging onto existing {tci_existing=}")
+                    log.info(f"{filename}/{_tc_name}: DEBUG {tci.output=}")
                     tci_existing.merge_from(tci)
                 else:
+                    log.info(f"{filename}/{_tc_name}: new {tci_existing=}")
                     self.tcis[filename][tci.name] = tci
         return tcis_by_filename
 
