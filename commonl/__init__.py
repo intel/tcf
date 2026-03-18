@@ -934,7 +934,18 @@ class fs_cache_c():
             self.fsdb = base_type(self.cache_dir)
 
     def lock(self):
-        return filelock.FileLock(self.cache_lockfile)
+        # implement a timeout for the locks if a file exists in the
+        # cache_dir named TIMEOUT that contains a number
+        # Hopefully, this will stop a race condition we're seeing in
+        # certain acces nodes.
+        timeout = -1
+        timeout_file = os.path.join(self.cache_dir, "TIMEOUT")
+        try:
+            with open(timeout_file) as f:
+                timeout = float(f.read().strip())
+        except FileNotFoundError:
+            pass
+        return filelock.FileLock(self.cache_lockfile, timeout = timeout)
 
     def set_unlocked(self, field, value, ex = None):
         """
@@ -1080,6 +1091,14 @@ class fs_cache_c():
             return self.get_unlocked(field, default, max_age,
                                      include_timestamp)
 
+    # list of files for the cleanup process to
+    # leave alone and ignore
+    lru_cleanup_ignore = {
+        "lockfile",
+        "TIMEOUT",
+        "THREAD_LOCAL",
+    }
+
     def lru_cleanup_unlocked(self, max_entries):
         """
         Delete the oldest in a list of entries that are used as a cache
@@ -1095,7 +1114,9 @@ class fs_cache_c():
         fields_by_timestamp = collections.defaultdict(set)
 
         for field in self.fsdb.keys():
-            if field == "lockfile":
+            # if one of the files in this list is found,
+            # ignore it and move on
+            if field in self.lru_cleanup_ignore:
                 continue
 
             try:
