@@ -1220,6 +1220,19 @@ class server_c:
                 # replace IPv4 or IPv6, because other code will
                 # puke on .s and :s
                 aka = address.replace(".", "_").replace(":", "_")
+
+            # HACK: sometimes reverse address lookup is misconfigured
+            # and instead of returning a full name it returns...trash;
+            # workaround it by using the hostname
+            if name.count(".") == 0:
+                log_sd.info(f"reverse lookup for {hostname} yields {name}:"
+                            " seems sus: no domain name part; using original")
+                name = hostname
+
+            if f"https://{name}:{seed_port}" in servers:
+                # if we added this by name, justr ignore it
+                log_sd.info(f"reverse lookup {name}: skipping, already added")
+                continue
             server = cls(
                 f"https://{name}:{seed_port}",
                 origin = f"{origin} -> DNS address {address} for" \
