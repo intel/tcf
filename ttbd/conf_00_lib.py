@@ -745,7 +745,11 @@ def target_add_to_vlan_interconnects(
 
     :param str switch_port_spec: specification of the port (in switch
       specific format) in which the cable for the interface with MAC
-      address given in *mac_addr* argument is connectde into the switch.
+      address given in *mac_addr* argument is connected into the switch.
+
+      If this is over multiple ports, separate them with commas FIXME:
+      this is a hack that works with ttbl.router.cisco_c.vlan_create()
+      which joins port info with commas
 
       This is used to allow those ports to access the VLAN when
       created.
