@@ -195,13 +195,26 @@ class interface(ttbl.tt_interface):
             target.log.debug("created target's server req")
 
             subprocess.run(
-                f"openssl x509 -req -in server.req -CA ca.cert -CAkey ca.key"
+                "openssl x509 -req -in server.req -CA ca.cert -CAkey ca.key"
                 f" -set_serial 100 -extensions server -days 1460 -outform PEM"
                 f" -out server.cert -sha256".split(),
                 timeout = 10,
                 check = True, cwd = cert_path,
                 stdout = subprocess.PIPE, stderr = subprocess.STDOUT)
             target.log.debug("created target's server cert")
+
+            # the Diffie-Helmen pem curves are used for some apps (eg:
+            # openvpn),
+            # -dsaparam: so it takes less than potentially minutes
+            # https://security.stackexchange.com/a/95184; since we
+            # create a whole new cert authority for each allocation,
+            # this shall be fine.
+            subprocess.run(
+                "openssl dhparam -dsaparam -quiet -out dh.pem 2048".split(),
+                timeout = 30,
+                check = True, cwd = cert_path,
+                stdout = subprocess.PIPE, stderr = subprocess.STDOUT)
+            target.log.debug("created target's server dh.pem")
         except subprocess.CalledProcessError as e:
             target.log.error(f"command {' '.join(e.cmd)} failed: " + e.output.decode('ascii'))
             raise
@@ -269,6 +282,17 @@ class interface(ttbl.tt_interface):
             cert_path = os.path.join(target.state_dir, "certificates")
             cert_client_path = os.path.join(target.state_dir, "certificates_client")
             self._setup_maybe(target, cert_path, cert_client_path)
+
+            if name == "ca":
+                # they want the certificate authority
+                ca_path = os.path.join(target.state_dir, "certificates", "ca.cert")
+                with open(ca_path) as certf:
+                    return dict({
+                        "name": name,
+                        "created": False,
+                        "cert": certf.read(),
+                    })
+
 
             client_key_path = os.path.join(cert_client_path, name + ".key")
             client_req_path = os.path.join(cert_client_path, name + ".req")

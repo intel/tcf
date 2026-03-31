@@ -43,15 +43,25 @@ def _cmdline_certs_get(cli_args: argparse.Namespace):
             target.certs.get(cli_args.name, save = cli_args.save,
                              key_path = cli_args.prefix + ".key",
                              cert_path = cli_args.prefix + ".key")
-            print(f"downloaded client certificate key"
-                  f" -> {cli_args.prefix}.{{key,cert}}",
-                  file = sys.stderr)
+            if cli_args.name != "ca":
+                print(f"downloaded client certificate key"
+                      f" -> {cli_args.prefix}.{{key,cert}}",
+                      file = sys.stderr)
+            else:
+                print(f"downloaded root-of-trust certificate"
+                      f" -> {cli_args.prefix}.cert",
+                      file = sys.stderr)
         else:
             target.certs.get(cli_args.name, save = cli_args.save)
             if cli_args.save:
-                print(f"downloaded client certificate key"
-                      f" -> {target.id}.{cli_args.name}.{{key,cert}}",
-                      file = sys.stderr)
+                if cli_args.name != "ca":
+                    print(f"downloaded client certificate key"
+                          f" -> {target.id}.{cli_args.name}.{{key,cert}}",
+                          file = sys.stderr)
+                else:
+                    print(f"downloaded root-of-trust certificate"
+                          f" -> {target.id}.{cli_args.name}.cert",
+                          file = sys.stderr)
             else:
                 logging.warning("certificates not downloaded (see --save)")
 
@@ -91,7 +101,8 @@ def cmdline_setup(argsp):
     tcfl.ui_cli.args_verbosity_add(ap)
     tcfl.ui_cli.args_targetspec_add(ap, targetspec_n = 1)
     ap.add_argument("name", metavar = "NAME", action = "store",
-                    type = str, help = "Name of certificate to create")
+                    type = str, help = "Name of certificate to create; use"
+                    " 'ca' to get the certificate authority (no key)")
     ap.add_argument("--save", "-s", action = "store_true", default = False,
                     help = "Save the certificates")
     ap.add_argument("--prefix", "-p", metavar = "PREFIX", action = "store",

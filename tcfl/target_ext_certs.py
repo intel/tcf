@@ -71,7 +71,8 @@ class extension(tc.target_extension_c):
         if save and key_path == None:
             key_path = f"{self.target.id}.{name}.key"
 
-        if key_path:
+        if key_path and 'key' in r:
+	    # if we are asking for CA, there is no ca.key we can get
             with open(key_path, "w") as keyf:
                 keyf.write(r['key'])
             self.target.report_info(f"CERT {name} key -> {key_path}", dlevel = 2)
