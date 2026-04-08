@@ -792,7 +792,8 @@ def linux_ifname_by_mac(target, mac_addr: str) -> str:
     ##2: enp1s0: <NO-CARRIER,BROADCAST,MULTICAST,UP> mtu 1500 qdisc mq state DOWN mode DEFAULT group default qlen 1000\    link/ether 98:4f:ee:00:68:51 brd ff:ff:ff:ff:ff:ff
     ##3: bootnet: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc mq state UP mode DEFAULT group default qlen 1000\    link/ether 40:a6:b7:66:38:a0 brd ff:ff:ff:ff:ff:ff\    altname enp129s0\    altname ens5
     ##4: ens11: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc mq state UP mode DEFAULT group default qlen 1000\    link/ether 40:a6:b7:8d:92:60 brd ff:ff:ff:ff:ff:ff\    altname enp56s0
-    output = target.shell.run("ip -o link", output = True)
+    # | cat -> disable colouring
+    output = target.shell.run("ip -o link | cat", output = True)
     mac_addr = mac_addr.lower()
     for line in output.splitlines():
         line = line.strip().lower()
