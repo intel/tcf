@@ -23,22 +23,22 @@ import ttbl
 import ttbl.router
 
 
-# FIXME: this should be in ttbl
+# FIXME: this should be in ttbl.vlan
 class vlan_pci(ttbl.power.impl_c):
-    """Power controller to implement networks on the server side.
+    """Power controller to manage the server side of NUTs (private test networks)
 
     This allows to:
 
     - connect a server to a test network (NUT) to provide services
       suchs as DHCP, HTTP, network tapping, proxying between NUT and
-      upstream networking, etc
+      upstream networking, VPN endpoints, etc
 
     - connect virtual machines running inside virtual networks in the
       server to physical virtual networks.
 
     This behaves as a power control implementation that when turned:
 
-    - on: sets up the interfaces, brings them up, start capturing
+    - on: sets up the interfaces, brings them up
 
     - off: stops all the network devices, making communication impossible.
 
@@ -51,6 +51,10 @@ class vlan_pci(ttbl.power.impl_c):
 
        >>> bridge_ifname = "nw30"
 
+
+    See *Fixture Setup* below for more information on things that come
+    from the inventory.
+
     **Configuration**
 
     Example configuration (see :ref:`naming networks <bp_naming_networks>`):
@@ -60,11 +64,12 @@ class vlan_pci(ttbl.power.impl_c):
     >>> ttbl.config.interconnect_add(
     >>>     target,
     >>>     tags = {
+    >>>         'mac_addr': '02:61:00:00:00:01:',
+    >>>         "bridge_ifname": "nwa",
     >>>         'ipv4_addr': '192.168.97.1',
     >>>         'ipv4_prefix_len': 24,
     >>>         'ipv6_addr': 'fd:99:61::1',
     >>>         'ipv6_prefix_len': 104,
-    >>>         'mac_addr': '02:61:00:00:00:01:',
     >>>     })
 
     Now QEMU targets (for example), can declare they are part of this
@@ -170,8 +175,10 @@ class vlan_pci(ttbl.power.impl_c):
       of the *nwa* power control rail. Thus, when powered on, it will
       bring the network up up and also turn on the network switch.
 
-    - add the tag *vlan* to also be a member of an ethernet VLAN
-      network (requires also a *mac_addr*):
+    - If the target has properties *vlan*, *vlan_id* or
+      *interfaces.power.COMPONENT.vlan_id* set to a valid 802.1Q VLAN ID
+      (2 - 4095), then the system will configure an interface so it
+      uses said VLAN in the network (requires also a *mac_addr*):
 
       >>> target = ttbl.test_target("nwa")
       >>> target.interface_add("power", ttbl.power.interface(vlan_pci()))
@@ -188,6 +195,16 @@ class vlan_pci(ttbl.power.impl_c):
 
       in this case, all packets in the interface described by MAC addr
       *a0:ce:c8:00:18:73* with tag *30*.
+
+    - If the target has property
+      *interfaces.power.COMPONENT.vlan_tap*, it will create TAP
+      interfaces that can be used for (eg) OpenVPN servers:
+
+      - (boolean) *True*: just create a tap interface called
+        *IFNAME.t*
+
+      - (str) *NAME1 [NAME2 [...]]]*: creates tap interfaces called
+        *IFNAME.NAME1*,  *IFNAME.NAME2* ...
 
     - lastly, for each target connected to that network, update it's
       tags to indicate it:
@@ -211,7 +228,7 @@ class vlan_pci(ttbl.power.impl_c):
     kept separated <separated_networks>`.
 
     """
-    def __init__(self, bridge_ifname = None):
+    def __init__(self, bridge_ifname: str = None):
         if bridge_ifname != None:
             assert isinstance(bridge_ifname, str) \
                 and len(bridge_ifname) <= self.IFNAMSIZ, \
@@ -224,115 +241,34 @@ class vlan_pci(ttbl.power.impl_c):
         ttbl.power.impl_c.__init__(self)
 
 
+
     # linux/include/if.h
     IFNAMSIZ = 16
 
 
-    def _if_rename(self, target):
-        if self.bridge_ifname:
-            bridge_ifname = self.bridge_ifname
-        else:
-            bridge_ifname = target.id
 
-        if 'mac_addr' in target.tags:
-            # We do have a physical device, so we are going to first,
-            # rename it to match the IC's name (so it allows targets
-            # to find it to run IP commands to attach to it)
-            ifname = commonl.if_find_by_mac(target.property_get('mac_addr'))
-            if ifname == None:
-                raise ValueError("Cannot find network interface with MAC '%s'"
-                                 % target.property_get('mac_addr'))
-            if ifname != bridge_ifname:
-                subprocess.check_call([ "ip", "link", "set", ifname, "down" ])
-                subprocess.check_call([
-                    "ip", "link", "set", ifname, "name",
-                    "b" + bridge_ifname
-                ])
+    def on(self, target, component: str):
 
+        # let's make them all bridge -- since most models need it to
+        # be able to plug a VM into it anyway
 
-
-    @staticmethod
-    def _get_mode(target):
-        if 'vlan' in target.tags and 'mac_addr' in target.tags:
-            # we are creating ethernet vlans, so we do not own the
-            # device exclusively and will create new links
-            return 'vlan'
-        elif 'vlan' in target.tags and 'mac_addr' not in target.tags:
-            raise RuntimeError("vlan ID specified without a mac_addr")
-        elif 'mac_addr' in target.tags:
-            # we own the device exclusively
-            return 'physical'
-        else:
-            return 'virtual'
-
-
-
-    def on(self, target, _component):
         if self.bridge_ifname != None:
             bridge_ifname = self.bridge_ifname
         else:
             bridge_ifname = "b" + target.id
-        # Bring up the lower network interface; lower is called
-        # whatever (if it is a physical device) or _bNAME; bring it
-        # up, make it promiscuous
-        mode = self._get_mode(target)
-        if mode == 'vlan':
-            vlan_id = target.property_get(
-                "vlan_id",
-                target.property_get("vlan"))
+        vlan_ifname = None
+        physical_ifname = None
+        tap_ifname = None
 
-            # our lower is a physical device, our upper is a device
-            # which till tag for eth vlan %(vlan)
-            ifname = commonl.if_find_by_mac(target.property_get('mac_addr'),
-                                            physical = True)
-            if not commonl.if_present(bridge_ifname):
-                # Do create the new interface only if not already
-                # created, otherwise daemons that are already running
-                # will stop operating
-                # This function might be being called to restablish a
-                # half baked operating state.
-                subprocess.check_call([
-                    "/usr/sbin/ip", "link", "add",
-                    "link", ifname, "name", bridge_ifname,
-                    "type", "vlan", "id", str(vlan_id),
-                    #" protocol VLAN_PROTO"
-                    #" reorder_hdr on|off"
-                    #" gvrp on|off mvrp on|off loose_binding on|off"
-                ])
-                subprocess.check_call([	# bring lower up
-                    "/usr/sbin/ip", "link", "set", "dev", ifname,
-                    "up", "promisc", "on"
-                ])
-        elif mode == 'physical':
-            ifname = commonl.if_find_by_mac(target.property_get('mac_addr'))
-            subprocess.check_call([	# bring lower up
-                "/usr/sbin/ip", "link", "set", "dev", ifname, "up",
-                "promisc", "on"
+
+        target.log.info(f"{component}: creating network bridge {bridge_ifname}")
+        if not commonl.if_present(bridge_ifname):	# idempotent as much as possible
+            subprocess.check_call([
+                "/usr/sbin/ip", "link", "add", "name", bridge_ifname,
+                "type", "bridge",
             ])
-            self._if_rename(target)
-        elif mode == 'virtual':
-            # We create a bridge, to serve as lower
-            if not commonl.if_present(bridge_ifname):
-                # Do create the new interface only if not already
-                # created, otherwise daemons that are already running
-                # will stop operating
-                # This function might be being called to restablish a
-                # half baced operating state.
-                commonl.if_remove_maybe(bridge_ifname)
-                subprocess.check_call([
-                    "/usr/sbin/ip", "link", "add", "name", bridge_ifname,
-                    "type", "bridge"
-                ])
-                subprocess.check_call([	# bring lower up
-                    "/usr/sbin/ip", "link", "set", "dev", bridge_ifname,
-                    "up", "promisc", "on",
-                ])
-        else:
-            raise AssertionError("Unknown mode %s" % mode)
 
         # Configure the IP addresses for the top interface
-        subprocess.check_call([		# clean up existing address
-            "/usr/sbin/ip", "add", "flush", "dev", bridge_ifname ])
         subprocess.check_call([		# add IPv6
             # if this fails, check Network Manager hasn't disabled ipv6
             # sysctl -a | grep disable_ipv6 must show all to 0
@@ -346,11 +282,96 @@ class vlan_pci(ttbl.power.impl_c):
             "dev", bridge_ifname
         ])
 
-        # Bring up the top interface, which sets up ther outing
-        subprocess.check_call([
+        mac_addr = target.property_get('mac_addr', None)
+        if mac_addr != None:
+            physical_ifname = commonl.if_find_by_mac(
+                target.property_get('mac_addr'), physical = True)
+
+            vlan_id = target.property_get(	# do we request a VLAN?
+                f"interfaces.power.{component}.vlan_id",
+                target.property_get(
+                    "vlan_id",
+                    target.property_get(
+                        "vlan", None)))
+
+            if vlan_id:
+                # Create a new interface for the vlan; we don't call
+                # it vlanNUMBER because the interface names are short
+                # (max 16) - -info comes in ip link anyway
+                vlan_ifname = f"{bridge_ifname}.v"
+                target.log.info(f"{component}: attaching VLAN NIC "
+                                f" {mac_addr}/{vlan_ifname} for VLAN {vlan_id}"
+                                f" to {bridge_ifname}")
+                if not commonl.if_present(vlan_ifname):	# idempotent as much as possible
+                    subprocess.check_call([		# create vlan interface
+                        "/usr/sbin/ip", "link", "add",
+                        "link", physical_ifname, "name", vlan_ifname,
+                        "type", "vlan", "id", str(vlan_id),
+                    ])
+                subprocess.check_call([		# bring up vlan
+                    "/usr/sbin/ip", "link", "set", "dev", vlan_ifname,
+                    "up", "promisc", "on",
+                ])
+                subprocess.check_call([		# attach vlan to bridge
+                    "/usr/sbin/ip", "link", "set", vlan_ifname,
+                    "master", bridge_ifname
+                ])
+            else:
+                target.log.info(f"{component}: attaching NIC"
+                                f" {mac_addr}/{physical_ifname}"
+                                f" to {bridge_ifname}")
+                subprocess.check_call([		# attach physical to bridge
+                    "/usr/sbin/ip", "link", "set", physical_ifname,
+                    "master", bridge_ifname
+                ])
+
+            subprocess.check_call([		# bring up physical
+                "/usr/sbin/ip", "link", "set", "dev", physical_ifname,
+                "up", "promisc", "on"
+            ])
+
+        taps = target.property_get(	# do we request a TAP for whatever?
+            f"interfaces.power.{component}.vlan_taps", None)
+
+        def _mktap(tapname):
+            tap_ifname = f"{bridge_ifname}.{tapname}"
+            target.log.info(f"{component}: attaching TAP {tap_ifname} "
+                            f" to {bridge_ifname}")
+            if not commonl.if_present(tap_ifname):	# idempotent as much as possible
+                subprocess.check_call([		# create tap interface
+                    "/usr/sbin/ip", "tuntap", "add", tap_ifname, "mode", "tap" ])
+            subprocess.check_call([		# bring up the tap
+                "/usr/sbin/ip", "link", "set", "dev", tap_ifname,
+                "up", "promisc", "on",
+            ])
+            subprocess.check_call([		# add to the bridge
+                "/usr/sbin/ip", "link", "set", tap_ifname,
+                "master", bridge_ifname
+            ])
+
+
+        if taps == True:
+            _mktap("tap")
+        else:
+            assert isinstance(taps, str), \
+                f"interfaces.power.{component}.vlan_taps: expected string or bool, got {type(taps)}"
+            for tapname in taps.split():
+                commonl.verify_str_safe(
+                    tapname, safe_chars = string.ascii_letters + string.digits,
+                    name = "TAP device name suffix")
+                assert len(tapname) <= 5, \
+                    f"{tapname}: TAP device name suffix has to be 5 characters or less"
+                assert tapname != "v", \
+                    f"{tapname}: TAP device name suffix can't be 'v', reserved"
+                _mktap(tapname)
+
+
+        target.log.info(f"{component}: bringing up tap {bridge_ifname}")
+        subprocess.check_call([			# bring bridge up
             "/usr/sbin/ip", "link", "set", "dev", bridge_ifname,
-            "up", "promisc", "on"
+            "up", "promisc", "on",
         ])
+        return
 
 
 
@@ -359,34 +380,25 @@ class vlan_pci(ttbl.power.impl_c):
             bridge_ifname = self.bridge_ifname
         else:
             bridge_ifname = "b" + target.id
-        # remove the top level device
-        mode = self._get_mode(target)
-        if mode == 'physical':
-            # bring down the lower device
-            ifname = commonl.if_find_by_mac(target.property_get('mac_addr'))
-            subprocess.check_call([
-                # flush the IP addresses, bring it down
-                "/usr/sbin/ip", "add", "flush", "dev", ifname
-            ])
-            subprocess.check_call([
-                # flush the IP addresses, bring it down
-                "/usr/sbin/ip", "add", "flush", "dev", ifname
-            ])
-            subprocess.check_call([
-                "/usr/sbin/ip", "link", "set", "dev", ifname,
-                "down", "promisc", "off"
-            ])
-        elif mode == 'vlan':
-            commonl.if_remove_maybe(bridge_ifname)
-            # nothing; we killed the upper and on the lwoer, a
-            # physical device we do nothing, as others might be using it
-            pass
-        elif mode == 'virtual':
-            commonl.if_remove_maybe(bridge_ifname)
-        else:
-            raise AssertionError("Unknown mode %s" % mode)
+        vlan_id = target.property_get(
+            "vlan_id",
+            target.property_get("vlan", None))
 
-        target.fsdb.set('power_state', 'off')	# FIXME: COMPAT/remove
+        # just delete the interfaces, since it clears up the state
+        subprocess.call([ "/usr/sbin/ip", "link", "del", bridge_ifname ])
+        # if we have created subinterfaces for tap and vlan, just wild
+        # try to delete them; if we didn't it'll just fail and we can
+        # ignore it
+        subprocess.call([ "/usr/sbin/ip", "link", "del", f"{bridge_ifname}.v" ])
+
+        taps = target.property_get(	# do we request a TAP for whatever?
+            f"interfaces.power.{component}.vlan_taps", None)
+        if taps == True:
+            subprocess.call([ "/usr/sbin/ip", "link", "del", f"{bridge_ifname}.tap" ])
+        else:
+            for tapname in taps.split():
+                subprocess.call([ "/usr/sbin/ip", "link", "del", f"{bridge_ifname}.{tapname}" ])
+        return
 
 
 
@@ -411,16 +423,7 @@ class vlan_pci(ttbl.power.impl_c):
         if not os.path.isdir("/sys/class/net/" + bridge_ifname):
             return False
 
-        mode = self._get_mode(target)
-        # FIXME: check bNWNAME exists and is up
-        if mode == 'vlan':
-            pass
-        elif mode == 'physical':
-            pass
-        elif mode == 'virtual':
-            pass
-        else:
-            raise AssertionError("Unknown mode %s" % mode)
+        # FIXME: check tap and vlan are created?
 
         # Verify IP addresses are properly assigned
         addrs = netifaces.ifaddresses(bridge_ifname)
