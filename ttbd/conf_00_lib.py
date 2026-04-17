@@ -479,9 +479,9 @@ def target_vlan_add(nw_name: str,
                     ipv6_addr: str, ipv6_prefix_len: int,
                     switch_class: ttbl.router.router_c = ttbl.router.cisco_c,
                     bridge_ifname: str = None,
+                    network: str = None,
                     tftp: bool = True):
-    """
-    Creates a target that implements an interconnect/network using 802.1Q VLAN
+    """Creates a target that implements an interconnect/network using 802.1Q VLAN
 
     It is recommended to use low VLAN ids (eg: 2-9) since:
 
@@ -549,14 +549,31 @@ def target_vlan_add(nw_name: str,
 
       >>> ipv6_prefix_len = 104
 
-    :param str bridge_ifname: Name for the network interface in
-      the server that will represent a connection to the VLAN.
+    :param str bridge_ifname: (optional; default same as *network*)
+      Name for the network interface in the server that will represent
+      a connection to the VLAN.
 
       This is normally set to the target name, but if it is too
       long (more than 16 characters), it will fail. This allows to
       set it to anything else.
 
       >>> bridge_ifname = "nw30"
+
+
+    :param str network: (optional; default same as *nw_name*) Name for
+      the network.
+
+      This is useful when a test network has to span multiple NUTs
+      managed by *ttbd*; for example you might have VLAN2 in three
+      different switches SW{1,2,3} and they are all the same L2 space
+      and they would be represented in three different servers as
+
+      - SW1-vlan2
+      - SW2-vlan2
+      - SW3-vlan2
+
+      since they are the same network, set the property *network* in
+      the three of them to "vlan2"
 
     :param bool tftp: (optional; default *True*) enable TFTP
       services in the VLAN
@@ -664,6 +681,13 @@ def target_vlan_add(nw_name: str,
         server_url = f"http://{ipv4_addr}:{port}"
         server_url6 = f"http://{ipv6_addr}:{port}"
 
+    if network == None:
+        network = nw_name
+    # FIXME: verify network
+    if bridge_ifname == None:
+        bridge_ifname = network
+    # FIXME: verify bridge_ifname
+
     # create vlans on power-on
     # destroy vlans on power-off, release -> power interface powers off on
     # release if off_on_release is defined
@@ -674,6 +698,8 @@ def target_vlan_add(nw_name: str,
             # FIXME: add bitrate info
             "mac_addr": mac_addr,
             "vlan": vlan_id,
+            "bridge_ifname": bridge_ifname,
+            "network": network,
             "ipv4_addr": ipv4_addr,
             "ipv4_prefix_len": ipv4_prefix_len,
             'ipv6_addr': ipv6_addr,
