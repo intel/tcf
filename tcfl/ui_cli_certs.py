@@ -39,31 +39,32 @@ logger = logging.getLogger("ui_cli_certs")
 def _cmdline_certs_get(cli_args: argparse.Namespace):
 
     def _certs_get(target, cli_args):
-        if cli_args.prefix and cli_args.save:
-            target.certs.get(cli_args.name, save = cli_args.save,
-                             key_path = cli_args.prefix + ".key",
-                             cert_path = cli_args.prefix + ".key")
-            if cli_args.name != "ca":
-                print(f"downloaded client certificate key"
-                      f" -> {cli_args.prefix}.{{key,cert}}",
-                      file = sys.stderr)
-            else:
-                print(f"downloaded root-of-trust certificate"
-                      f" -> {cli_args.prefix}.cert",
-                      file = sys.stderr)
-        else:
-            target.certs.get(cli_args.name, save = cli_args.save)
-            if cli_args.save:
-                if cli_args.name != "ca":
+        for cert_name in cli_args.name:
+            if cli_args.prefix and cli_args.save:
+                target.certs.get(cert.name, save = cli_args.save,
+                                 key_path = cli_args.prefix + ".key",
+                                 cert_path = cli_args.prefix + ".key")
+                if cert_name != "ca":
                     print(f"downloaded client certificate key"
-                          f" -> {target.id}.{cli_args.name}.{{key,cert}}",
+                          f" -> {cli_args.prefix}.{{key,cert}}",
                           file = sys.stderr)
                 else:
                     print(f"downloaded root-of-trust certificate"
-                          f" -> {target.id}.{cli_args.name}.cert",
+                          f" -> {cli_args.prefix}.cert",
                           file = sys.stderr)
             else:
-                logging.warning("certificates not downloaded (see --save)")
+                target.certs.get(cert_name, save = cli_args.save)
+                if cli_args.save:
+                    if cert_name != "ca":
+                        print(f"downloaded client certificate key"
+                              f" -> {target.id}.{cert_name}.{{key,cert}}",
+                              file = sys.stderr)
+                    else:
+                        print(f"downloaded root-of-trust certificate"
+                              f" -> {target.id}.{cert_name}.cert",
+                              file = sys.stderr)
+                else:
+                    logging.warning("certificates not downloaded (see --save)")
 
     return tcfl.ui_cli.run_fn_on_each_targetspec(
         _certs_get, cli_args, cli_args,
@@ -100,7 +101,7 @@ def cmdline_setup(argsp):
                           help = "Create and get a client certificate")
     tcfl.ui_cli.args_verbosity_add(ap)
     tcfl.ui_cli.args_targetspec_add(ap, targetspec_n = 1)
-    ap.add_argument("name", metavar = "NAME", action = "store",
+    ap.add_argument("name", metavar = "NAME", action = "store", nargs = "+",
                     type = str, help = "Name of certificate to create; use"
                     " 'ca' to get the certificate authority (no key)")
     ap.add_argument("--save", "-s", action = "store_true", default = False,
