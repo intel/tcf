@@ -462,6 +462,9 @@ class cisco_c(router_c):
             # set the port to mode trunk, so multiple VLANs can be
             # routed over it.
             "switchport mode trunk",
+            # ensure trunk ports can access all vlans, since we use
+            # them to provide services to all of them
+            "switchport trunk allowed vlan all",
             # FIXME: we need to be able to pass extra commands
             "no shut",	# actully enable it
             # done!
