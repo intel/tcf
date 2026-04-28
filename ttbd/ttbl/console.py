@@ -1135,6 +1135,7 @@ class serial_pc(ttbl.power.socat_pc, generic_c):
                 target, self.usb_serial_number,
                 f"instrumentation.{self.upid_index}.usb_serial_number")
             # spec is BUSNAME,SPEC
+            bus_name_spec = None
             if self.bus_driver_bind != None:
                 bus_name_spec = device_resolver.spec_get()[0].split(",")[0]
             if self.bus_driver_bind == [] \
