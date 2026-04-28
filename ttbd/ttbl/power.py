@@ -4101,7 +4101,7 @@ def create_pc_from_spec(power_spec, **kwargs):
         return ttbl.raritan_emx.pci(
             "https://" + pdu_hostname, int(pdu_port), password = pdu_password,
             https_verify = False, **kwargs)
-    if isinstance(power_spec, ttbl.power.impl_c):
+    if isinstance(power_spec, impl_c):
         return power_spec
     raise RuntimeError(f"power_spec: unknown type {type(power_spec)}")
 
@@ -4123,7 +4123,7 @@ def factory(device_spec: str, **kwargs):
     - can we ping hostname to guesstimate its class?
 
     """
-    if isinstance(device_spec, ttbl.power.impl_c):
+    if isinstance(device_spec, impl_c):
         return device_spec
     assert isinstance(device_spec, str)
 
