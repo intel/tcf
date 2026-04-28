@@ -3907,7 +3907,9 @@ class windows_service_over_ssh_c(impl_c):
             f"timeout: expected a positive number, got [{type(timeout)}] {timeout}"
         assert isinstance(max_log_size, int) and max_log_size > 0, \
             f"max_log_size: expected a positive integer, got [{type(max_log_size)}] {max_log_size}"
-        ttbl.power.impl_c.__init__(self, *args, **kwargs)
+        assert isinstance(ssh_mux, bool), \
+            f"ssh_mux: expected bool, got {type(ssh_mux)}"
+        impl_c.__init__(self, *args, **kwargs)
         self.service_name = service_name
         self.device_spec = device_spec
         self.user_orig, self.password_orig, self.hostname_orig = \
@@ -3927,6 +3929,7 @@ class windows_service_over_ssh_c(impl_c):
         self.ssh_port = 22
         self.timeout = timeout
         self.max_log_size = max_log_size
+        self.ssh_mux = ssh_mux
         hostname_nopasswd = f"{self.user_orig}@{self.hostname_orig}"
         self.upid_set(f"SSH to {hostname_nopasswd}",
                       hostname = hostname_nopasswd,
