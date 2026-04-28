@@ -4044,37 +4044,46 @@ class windows_service_over_ssh_c(impl_c):
 
 
     def off(self, target, component):
-        self._ssh_run(target, component, [ "cmd", "/C", "sc", "stop", self.service_name ])
+        try:
+            self._ssh_run(target, component, [ "cmd", "/C", "sc", "stop", self.service_name ])
+        except Exception as e:
+            target.log.error(f"{self.service_name}: error turning off; IGNORING {e}",
+                             {  "exception": e.__dict__ })
 
 
     def get(self, target, component):
-        p = self._ssh_run(target, component, [ "cmd", "/C", "sc", "query", self.service_name ])
-        # this shall contain the output
-        #
-        ## SERVICE_NAME: jtagserver
-        ##         TYPE               : 10  WIN32_OWN_PROCESS
-        ##         STATE              : 4  RUNNING
-        ##                                 (STOPPABLE, PAUSABLE, ACCEPTS_SHUTDOWN)
-        ##         WIN32_EXIT_CODE    : 0  (0x0)
-        ##         SERVICE_EXIT_CODE  : 0  (0x0)
-        ##         CHECKPOINT         : 0x0
-        ##         WAIT_HINT          : 0x0
-        #
-        #
-        # let's try to do this w/o regex; it's simple enough it should just work
-        for line in p.stdout.splitlines():
-            if "SERVICE_NAME" in line:
-                if self.service_name not in line:
-                    return None
-            # looking for STATE              : 4  RUNNING
-            if "STATE" in line:
-                if "RUNNING" in line:
-                    return True
-                if "STOPPED" in line:
-                    return False
-        # Can't parse output?
-        target.log.error(f"{self.service_name}: can't parse query output [see logs]")
-        return None
+        try:
+            p = self._ssh_run(target, component, [ "cmd", "/C", "sc", "query", self.service_name ])
+            # this shall contain the output
+            #
+            ## SERVICE_NAME: jtagserver
+            ##         TYPE               : 10  WIN32_OWN_PROCESS
+            ##         STATE              : 4  RUNNING
+            ##                                 (STOPPABLE, PAUSABLE, ACCEPTS_SHUTDOWN)
+            ##         WIN32_EXIT_CODE    : 0  (0x0)
+            ##         SERVICE_EXIT_CODE  : 0  (0x0)
+            ##         CHECKPOINT         : 0x0
+            ##         WAIT_HINT          : 0x0
+            #
+            #
+            # let's try to do this w/o regex; it's simple enough it should just work
+            for line in p.stdout.splitlines():
+                if "SERVICE_NAME" in line:
+                    if self.service_name not in line:
+                        return None
+                # looking for STATE              : 4  RUNNING
+                if "STATE" in line:
+                    if "RUNNING" in line:
+                        return True
+                    if "STOPPED" in line:
+                        return False
+            # Can't parse output?
+            target.log.error(f"{self.service_name}: can't parse query output [see logs]")
+            return None
+        except Exception as e:
+            target.log.error(f"{self.service_name}: error getting state {e}",
+                             {  "exception": e.__dict__ })
+            return None
 
 
 
