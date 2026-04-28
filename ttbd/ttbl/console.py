@@ -610,7 +610,7 @@ class interface(ttbl.tt_interface):
         console_default = target.property_get("interfaces.console.default", None)
         try:
             _impl, name = self.impl_get_by_name(console_default, "console")
-            return default
+            return name
         except IndexError:
             # invalid default, reset it
             console_default = target.property_set("interfaces.console.default", None)
