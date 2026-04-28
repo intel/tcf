@@ -1838,6 +1838,618 @@ class flash_shell_cmd_c(impl2_c):
 
 
 
+class flash_shell_cmd_rpyc_c(impl2_c):
+    """General flashing template that can use a command line tool to
+    flash (possibly in parallel)
+
+    Note this is meant to run command line tools to do the flashing
+    operation; it is able to operate in a remote machine (using RPYC),
+    in which case it will upload the file to the remote machine first.
+
+    :param list(str) cmdline: list of strings composing the command to
+      call; first is the path to the command, that can be overriden
+      with the *path* argument
+
+      >>>  [ "/usr/bin/program", "arg1", "arg2" ]
+
+      all the components have to be strings; they will be templated
+      using *%(FIELD)s* from the target's metadata, including the
+      following fields:
+
+      - *cwd*: directory where the command is being executed
+
+      - *image.TYPE*: *NAME* (for all the images to be flashed, the
+         file we are flashing)
+
+      - *image.#<N>*: *NAME* (for all the images to be flashed, the
+         file we are flashing), indexed by number in declaration order.
+
+        This is mostly used when there is only one image, so we do not
+        need to know the name of the image (*image.#0*).
+
+      - *image_types*: all the image types being flashed separated
+         with "-".
+
+      - *pidfile*: Name of the PID file
+
+      - *logfile_name*: Name of the log file
+
+    :param str cwd: (optional; defaults to "/tmp") directory from
+      where to run the flasher program
+
+    :param str path: (optional, defaults to *cmdline[0]*) path to the
+      flashing program
+
+    :param int max_log_size: (optional; default 65k) maximum size of
+      the log file in bytes; older entries are removed.
+
+    :param tuple rpyc_spec: (optional; default *None*) if specified,
+      tuple of string with a hostname and an integer TCP port where an
+      RPYC server is listening.
+
+      If specified, the flashing command will be run in the remote
+      host. The files to flash will be uploaded to a temporary
+      directory with a name based on the target, the destination and
+      the sha 256 hash of the file (to avoid conflicts).
+
+      An RPYC server is usually created as a separate power component
+      that uses :class:`ttbl.console.ssh_pc` to run an SSH command
+      that starts RPYC in the remote host and creates an encrypted
+      tunnel for the RPYC connection. eg:
+
+      >>> power_rail['redir_rpyc'] = ttbl.console.ssh_pc(
+      >>>     "USER:PASSWORD@HOSTNAME",
+      >>>     crlf = "\r",
+      >>>     shell_cmd = "py /Python311/Scripts/rpyc_classic.py --host 127.0.0.1 -p 5998",
+      >>>     extra_opts = {
+      >>>         "LocalForward#127.0.0.1:23000": "127.0.0.1:5998"
+      >>>     },
+      >>>     extra_tcp_ports = { 23000 }
+      >>> )
+
+      then when powered on, the server's 127.0.0.1:23000 will be
+      redirected to HOSTNAME"s 127.0.0.1:5998, where RPYC is
+      listening over the SSH encrypted connection.
+
+    :param dict env_add: (optional) variables to add to the environment when
+      running the command
+
+
+    :param str log_name: (optional) name to use for the log file;
+      defaults to a name generated from the image types being flashed
+      (flash-IMAGE1-IMAGE2....log); note this means that different
+      files will be generated if you flash different things.
+
+    :param callable cmdline_prepare: (optional) function to call to
+      finish preparing the command line before running it
+
+      >>> def function(cmdline: list, target: test.ttbl_target, env:
+      >>>              dict, context: dict, kws: dict):
+      >>>     cmdline.append("-w", "somevalue")
+
+      - *cmdline*: a list of strings with the component of the
+        command line that will be called. Any modifications to it will
+        be seen and used by the caller.
+
+      - *target*: the target we are working on.
+
+      - *env*: a dictionary of the environment that will be passed to
+        the subprocess; has been prefilled with the current one and
+        anything in *env_add* has been added already. Anything added
+        will be seen and used by the caller.
+
+      - *context*: is a dictionary with execution context info (see
+        :meth:`ttbl.images.impl2_c`).
+
+    """
+    def __init__(self, cmdline, cwd = "/tmp", path = None, env_add = None,
+                 cmdline_for_each_image: list = None,
+                 max_log_size: int = 65 * 1025 * 1024,
+                 rpyc_spec: tuple = None,	# host port
+                 cmdline_prepare: callable = None,
+                 **kwargs):
+        commonl.assert_list_of_strings(cmdline, "cmdline", "arguments")
+        assert cwd == None or isinstance(cwd, str)
+        assert path == None or isinstance(path, str)
+        self.p = None
+        if path == None:
+            path = cmdline[0]
+        self.path = path
+        self.cmdline = cmdline
+        self.cwd = cwd
+        if isinstance(cmdline_for_each_image, str):
+            self.cmdline_for_each_image = [ cmdline_for_each_image ]
+        elif cmdline_for_each_image:
+            commonl.assert_list_of_strings(
+                cmdline_for_each_image, "cmdline_for_each_image", "cmdline")
+            self.cmdline_for_each_image = cmdline_for_each_image
+        else:
+            self.cmdline_for_each_image = []
+        if env_add:
+            commonl.assert_dict_of_strings(env_add, "env_add")
+            self.env_add = env_add
+        else:
+            self.env_add = {}
+        if rpyc_spec:
+            assert isinstance(rpyc_spec, tuple) \
+                and len(rpyc_spec) == 2, \
+                f"rpyc_spec: got {type(rpyc_spec)}; expected tuple (host:str, port:int)"
+            self.rpyc_host = rpyc_spec[0]
+            self.rpyc_port = rpyc_spec[1]
+            assert isinstance(self.rpyc_host, str), \
+                f"rpyc_spec[0]: expected str (hostname), got {type(self.rpyc_host)}"
+            assert isinstance(self.rpyc_port, int) and self.rpyc_port > 0, \
+                f"rpyc_spec[1]: expected int (0 < TCP port < 65536)," \
+                f" got [{type(self.rpyc_port)}] {self.rpyc_port}"
+        else:
+            self.rpyc_host = None
+            self.rpyc_port = None
+        if cmdline_prepare != None:
+            assert callable(cmdline_prepare), \
+                f"cmdline_prepare: expected a callable, got [{type(cmdline_prepare)}] {cmdline_prepare}"
+        self.cmdline_prepare = cmdline_prepare
+        assert isinstance(max_log_size, int) and max_log_size > 0, \
+            f"max_log_size: expected a positive integer, got [{type(max_log_size)}] {max_log_size}"
+        self.max_log_size = max_log_size
+        impl2_c.__init__(self, **kwargs)
+
+
+    @staticmethod
+    def _logf_close(target, context):
+        for key, description in [
+                ('logf_local', 'local log file'),
+                ('logf', 'remote log file'),
+                ('logf_read', 'remote log file for reading'),
+        ]:
+            logf = context.get(key, None)
+            if logf == None:
+                continue
+            target.log.error(f"DEBUG closing {description} {logf.name}")
+            try:
+                logf.close()
+            except Exception as e:
+                target.log.error(f"DEBUG closing {description} {logf.name} failed (ignoring): {e}")
+            del context[key]
+
+
+
+    @staticmethod
+    def _remote_read_maybe(target, context):
+        logf_local = context.get('logf_local', None)
+        if logf_local == None:
+            return
+        logf_read = context['logf_read']
+        ts0 = context['ts0']
+        p = context['p']
+        while data := logf_read.read():
+            ts = time.time()
+            logf_local.write(data)
+            logf_local.flush()
+            for line in data.splitlines():
+                target.log.info("%s: [+%.1fs] flasher PID %s %s output: %s",
+                                context['kws']['image_types'], ts - ts0,
+                                context['remote_s'], p.pid,
+                                line)
+
+
+
+    def flash_start(self, target, images, context):
+
+        kws = target.kws_collect()
+        context['images'] = images
+
+        # it might survive from the previous call, but we want to
+        # recreate it
+        remote = context.get('rpyc_remote', None)
+        if remote != None:
+            del context['rpyc_remote']
+            del remote
+
+        # make sure they are sorted so they are always listed the same
+        image_types = "-".join(sorted(images.keys()))
+        kws['image_types'] = image_types
+        if self.log_name:
+            kws['log_name'] = self.log_name
+        else:
+            # the name is the name of the images we are flashing--this
+            # can get messy, so to control it, set log_name
+            kws['log_name'] = "flash-" + image_types + ".log"
+        # this allows a class inheriting this to set kws before calling us
+        context.setdefault('kws', {}).update(kws)
+        kws = context['kws']
+
+        # ok, create the RPYC connection *and* the modules we all have
+        # to use now in flash_* calls
+        if self.rpyc_host:
+            import rpyc
+            remote_s = context['remote_s'] = \
+                f"RPYC:{self.rpyc_host}:{self.rpyc_port}"
+            target.log.info(
+                "flashing: connecting to RPYC server at %s:%d",
+                self.rpyc_host, self.rpyc_port)
+            remote = rpyc.classic.connect(self.rpyc_host, self.rpyc_port)
+            ros = remote.modules['os']
+            rsubprocess = remote.modules['subprocess']
+            rtempfile = remote.modules['tempfile']
+            cwd = context['cwd'] = kws['cwd'] = "c:/temp"
+
+        else:
+            remote = None
+            remote_s = ""
+            ros = os
+            rsubprocess = context['rsubprocess'] = subprocess
+            rtempfile = tempfile
+            cwd = context['cwd'] = kws['cwd'] = self.cwd % kws
+
+        images_remote = dict(images)
+
+        # Using tempfile.gettempdir() gets the system's tempfile
+        # location for what it is (windows's user dir, unix /tmp
+        # etc) so it gets auto cleaned up.
+        #
+        # And replace backlash with forward because it gets all
+        # messed up, and Python can then fix it if remote is
+        # Windows anyway
+        rtmpdir = rtempfile.gettempdir().replace("\\", "/")
+
+        # handle the files we are are going to flash; if we are doing
+        # remote, upload them to the remote machine.
+        if remote:
+            # we have to upload the files to the remote host; we are
+            # going to upload them to a file named after their
+            # destination and the hash of the content; we are going to
+            # check if it is already there and skip the upload and
+            # reuse it if the hash matches
+            #
+            # also, set kws['image*']
+            count = 0
+            for image_name, image_file in list(images.items()):
+
+                # we keep image name at the end because quartus likes
+                # its extensions at the end (eg .jic, .pof)
+                _, ext = os.path.splitext(image_file)
+
+                if os.path.islink(image_file):
+                    # we might transform some file paths here due to rpyc not
+                    # being able to upload symlinks
+                    image_tmpfile = tempfile.NamedTemporaryFile(
+                        prefix = f"ttbl-flash-{target.id}-{image_name}.",
+                        suffix = "." + ext,
+                        delete = True)
+                    shutil.copy(image_file, image_tmpfile.name,
+                                follow_symlinks = True)
+                    _image_file = image_tmpfile.name
+                else:
+                    _image_file = image_file
+                    image_tmpfile = None
+
+                # get the local hash
+                h = hashlib.sha256()
+                commonl.hash_file(h, _image_file)
+                local_hash = h.hexdigest()[:20]
+
+                # will there be clashes? well, not really since each file
+                # is named per target id, destination and content and only
+                # ONE is supposed to run at the time
+                #
+                if ext:
+                    image_file_remote = f"{rtmpdir}/{target.id}-{local_hash}-{image_name}.{ext}"
+                else:
+                    image_file_remote = f"{rtmpdir}/{target.id}-{local_hash}-{image_name}"
+
+                # get the hash for the remote file, if it exists
+                remote_hash = None
+                try:
+                    # why run like this? because this way the remote
+                    # execution goes all remote and the file data
+                    # isn't sent back and forth. Maybe there is a
+                    # better way. Can't use teleport() bc difference
+                    # in python versions (local vs remote) would whack it.
+                    remote.execute(f"""
+import hashlib
+hash_object = hashlib.sha256()
+with open('{image_file_remote}', 'rb') as f:
+   for chunk in iter(lambda: f.read(8192), b''):
+      hash_object.update(chunk)
+""")
+                    remote_hash = remote.namespace['hash_object'].hexdigest()[:20]
+                except Exception as e:
+                    target.log.warning(
+                        "flashing: can't get info on already uploaded %s in rpyc://%s:%d/%s: %s",
+                        _image_file, self.rpyc_host, self.rpyc_port,
+                        image_file_remote, e)
+                    # remote_hash stays at None, we assume difference
+                    # and re-upload
+
+                if local_hash == remote_hash:
+                    target.log.warning(
+                        "flashing: using already uploaded %s in"
+                        " rpyc://%s:%d/%s (signatures match)",
+                        _image_file,
+                        self.rpyc_host, self.rpyc_port, image_file_remote)
+                else:
+                    target.log.info(
+                        "flashing: uploading %s to rpyc://%s:%d/%s",
+                        _image_file,
+                        self.rpyc_host, self.rpyc_port, image_file_remote)
+                    # https://rpyc.readthedocs.io/en/latest/api/utils_classic.html#rpyc.utils.classic.upload
+                    rpyc.utils.classic.upload(
+                        remote, _image_file, image_file_remote)
+                    target.log.warning(
+                        "flashing: uploaded %s to rpyc://%s:%d/%s",
+                        _image_file,
+                        self.rpyc_host, self.rpyc_port, image_file_remote)
+
+                images_remote[image_name] = image_file_remote
+                kws['image.' + image_name] = image_file_remote
+                kws['image.#%d' % count ] = image_file_remote
+                count += 1
+
+                if image_tmpfile != None:
+                    del image_tmpfile
+
+        else:
+	    # local flashing, no need to upload, just set kws['image*']
+            count = 0
+            for image_name, image in images.items():
+                images_remote[image_name] = image
+                kws['image.' + image_name] = image
+                kws['image.#%d' % count ] = image
+                count += 1
+
+        # we have generated the environment, maybe remote; let's add
+        # whatever the config wants
+        env = dict(ros.environ)
+        if self.env_add:
+            env.update(self.env_add)
+
+        if remote:
+            target.log.error(f"FIXME: kill existing leftover processes?")
+
+
+        # Prepare the log files
+        #
+        # need it so we have kws set before expanding cmdline
+        #
+        # Note this code ca run local commands or remote commands via
+        # RPYC; because of that, the output logging thing is quite a
+        # mess.
+        #
+        # - We can subprocess.open to a (local) file descriptor,
+        #   because we couldn't get it to work maybe future versions
+        #   will
+        #
+        # - We open a file in the machine that runs it (local or
+        #   remote) and we pass the descriptor to it so if it is
+        #   remote we are guaranteed the resource used is the one in
+        #   the host, not a proxyed one.
+        #
+        # - If the running is local, then the log file is already the
+        #   log file we watch, no more to do.
+        #
+        # - If the log file is remote, flash_check_done() will take
+        #   care of copying the bits as they go to the local log file,
+        #   so we can watch progress
+        #
+        # - We keep appending to the log file, so we can see prev
+        #   executions on retries; we cap its size
+        logfile_name = "%(path)s/%(log_name)s" % kws
+        try:
+            commonl.file_truncate_from_end(logfile_name, self.max_log_size)
+        except FileNotFoundError:
+            pass
+        if remote:
+            # remotely we create a log file that we'll read locally
+            # when we call flash_check_done()
+            rlogfile_name = context['rlogfile_name'] = f"{rtmpdir}/{target.id}-flash.log"
+            # open w so the size is capped to a single execution's
+            logf = context['logf'] = remote.builtins.open(rlogfile_name, "w")
+            context['logf_read'] = remote.builtins.open(rlogfile_name, "r")
+            # we always append to this logfile and we have truncated
+            # it above to a max size
+            context['logf_local'] = open(logfile_name, "a")
+        else:
+            logf = context['logf'] = open(logfile_name, "a")
+
+        #
+        # Prepare the command line
+        #
+        # 1. expand the cmdline we are given
+        # 2. add per-image cmdline components
+        # 3. add optional preparation steps from a function given to
+        #    the constructor
+        #
+        # Format each component of the commandline, since they might
+        # have %(KEYWORD)s which are to be expanded from kws
+        cmdline = []
+        count = 0
+        try:
+            for i in self.cmdline:
+                # some older Linux distros complain if this string is unicode
+                try:
+                    cmdline.append(commonl.kws_expand(str(i), kws))
+                except Exception as e:
+                    target.log.error(
+                        "Can't expand commandline component #%d: %s", count, e)
+                    raise
+                count += 1
+            count = 0
+            for cmdline_image in self.cmdline_for_each_image:
+                for image_name, image_file in images_remote.items():
+                    kws_image = dict(kws)
+                    kws_image['image_name'] = image_name
+                    kws_image['image_file'] = image_file
+                    try:
+                        cmdline.append(commonl.kws_expand(cmdline_image, kws_image))
+                    except Exception as e:
+                        target.log.error(
+                            "Can't expand commandline for each image"
+                            " component #%d: %s", count, e)
+                        raise
+            count += 1
+        except KeyError as e:
+            message = "configuration error? can't template command line #%d," \
+                " missing field or target property: %s" % (count, e)
+            target.log.error(message)
+            raise RuntimeError(message)
+
+        if self.cmdline_prepare:
+            self.cmdline_prepare(cmdline, target, env, context, kws)
+
+        cmdline_s = " ".join(cmdline)
+        context['cmdline'] = cmdline
+        context['cmdline_s'] = cmdline_s
+
+        context['ts0'] = ts0 = time.time()
+
+        logf.write(f"""
+
+# New flash started at {time.ctime(ts0)}
+#
+# cmdline: {remote_s} {' '.join(cmdline)}
+#
+
+""")
+        logf.flush()
+
+
+        #
+        # Ok, let's run the flashing command, after all this prep
+        #
+        try:
+            target.log.info("flashing %s image with: %s %s",
+                            image_types, remote_s, " ".join(cmdline))
+            p = context['p'] = rsubprocess.Popen(
+                cmdline, env = env, stdin = None, cwd = cwd,
+                text = True,
+                bufsize = 0,	# output right away, to monitor
+                # we cannot redirect stdout to a local file if we
+                # re doing RPYC, so we are going to hack it -- we tell
+                # it to log to a descriptor, so it works in local and
+                # remote mode. Then in remote mode we'll be reading
+                # that file in flash_check_done() and moving it to the
+                # local file. In local file, we'll just see the local
+                # file and they'll both display in the logging console.
+                stderr = rsubprocess.STDOUT, stdout = logf.fileno())
+        except subprocess.CalledProcessError as e:
+            target.log.error("flashing with %s failed: (%d) %s"
+                             % (cmdline_s, e.returncode, e.output))
+            self._remote_read_maybe(target, context)
+            self._logf_close(target, context)
+            raise
+
+        p.poll()
+        if p.returncode != None:
+            msg = "flashing with %s %s failed to start: (%s->%s) %s" % (
+                remote_s, cmdline_s, p.pid, p.returncode,
+                logfile_name)
+            target.log.error(msg)
+            raise RuntimeError(msg)
+        if not remote:
+            # this is needed so SIGCHLD the process and it doesn't become
+            # a zombie
+            ttbl.daemon_pid_add(p.pid)
+        target.log.debug("%s: flasher PID %s started (%s)",
+                         image_types, p.pid, cmdline_s)
+        return
+
+
+
+    def flash_check_done(self, target, _images: dict, context: dict):
+        self._remote_read_maybe(target, context)
+        p = context.get('p', None)
+        if p == None:
+            return True
+        p.poll()
+        if p.returncode == None:
+            return False
+        else:
+            return True
+        return p.returncode
+
+
+
+    def flash_kill(self, target, _images: dict, context: dict,
+                   msg: str, tag: str = "kill"):
+        ts = time.time()
+        ts0 = context['ts0']
+        p = context.get('p', None)
+        if not p:
+            target.log.debug(
+                "%s: [+%.1fs] flasher::%s: WARNING! no flasher to %s?",
+                context['kws']['image_types'], tag)
+            return None
+        p.poll()
+        returncode = p.returncode	# we'll return it
+        self._remote_read_maybe(target, context)
+
+        # ok, stop nicely then kill and retry killing if anything
+        # seems to have failed, just to be safe
+        target.log.info(
+            "%s: [+%.1fs] flasher::%s: finishing PID %s %s",
+            context['kws']['image_types'], ts - ts0, msg,
+            context.get('remote_s', ''), p.pid)
+        try:
+            p.terminate()
+            time.sleep(0.02)
+            for count in range(10):
+                time.sleep(0.02)
+                if p.poll() == None:
+                    p.kill()
+                else:
+                    break
+        except:
+            try:
+                p.kill()
+            except:
+                pass
+        finally:
+            # now whatever we do, read the rest of the logs that we
+            # might have around
+            self._logf_close(target, context)
+
+            # get rid of all the process descriptors
+            del context['p']
+            del p
+
+            # if this was a remote sessions, close it to avoid leaving
+            # resources hanging
+            remote = context.get('rpyc_remote', None)
+            if remote != None:
+                try:
+                    # order matters; ensure we remove it from the dict
+                    # so it goes out scope and it's garbage collected
+                    # even if the remote.close() fails
+                    del context['rpyc_remote']
+                    remote.close()
+                    del remote
+                except:
+                    pass
+
+        return returncode
+
+
+
+    def flash_post_check(self, target, images, context,
+                         expected_returncode = 0):
+        """
+        Check for execution result.
+
+        :param int expected_returncode: (optional, default 0)
+          returncode the command has to return on success. If *None*,
+          don't check it.
+        """
+        returncode = self.flash_kill(target, None, context, "no message",
+                                     tag = "terminate")
+
+        if expected_returncode != None and returncode != expected_returncode:
+            msg = f"flashing with {context['cmdline_s']} failed, returned {returncode}"
+            target.log.error(msg)
+            return { "message": msg }
+        return
+
+
+
 class quartus_pgm_c(flash_shell_cmd_c):
     """
     Flash using Intel's Quartus PGM tool
