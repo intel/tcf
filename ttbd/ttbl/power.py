@@ -1613,7 +1613,7 @@ class daemon_c(impl_c):
         # because it looks for socat but finds socat1...
         executable = shutil_which_lenient(cmdline[0])
         if executable != cmdline[0]:
-            logging.warning(
+            logging.debug(
                 "converting cmdline %s to realpath: %s",
                 cmdline[0], executable)
             cmdline[0] = executable
