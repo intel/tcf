@@ -970,7 +970,7 @@ def target_runner_progress_tcf_add(target: ttbl.test_target, runner: str):
             "/(?<runid_hashid>[-0-9a-z]+)"                        # the runid
             " +(\\S+)/%(file_path)s"                              # the testcase path after part of the repo name
             " @(\\S*%(targetid)s|local)"                          # the targetid
-            " (?<ellapsed>\\[\\+[\.0-9]+s\\]):"                   # the elapsed timestamp
+            " (?<ellapsed>\\[\\+[\\.0-9]+s\\]):"                  # the elapsed timestamp
             " (?<message>.*)$"                                    # the leftovers
         )
     )
@@ -990,7 +990,7 @@ def target_runner_progress_tcf_add(target: ttbl.test_target, runner: str):
             "/(?<runid_hashid>[-0-9a-z]+)"                        # the runid
             " +(\\S+)/%(file_path)s"                              # the testcase path after part of the repo name
             " @(\\S*%(targetid)s|local)"                          # the targetid
-            " (?<ellapsed>\\[\\+[\.0-9]+s\\]):"                   # the elapsed timestamp
+            " (?<ellapsed>\\[\\+[\\.0-9]+s\\]):"                  # the elapsed timestamp
             " (?<message>.*)$"                                    # the leftovers
         )
     )
@@ -1015,7 +1015,7 @@ def target_runner_progress_tcf_add(target: ttbl.test_target, runner: str):
             " +(\\S+)/%(file_path)s"                              # the testcase path after part of the repo name
             "##(?<subcase>[-_a-zA-Z0-9#]+)"                       # the subcases
             " @(\\S*%(targetid)s|local)"                          # the targetid
-            " (?<ellapsed>\\[\\+[\.0-9]+s\\]):"                   # the elapsed timestamp
+            " (?<ellapsed>\\[\\+[\\.0-9]+s\\]):"                  # the elapsed timestamp
             " (?<message>.*)$"                                    # the leftovers
         )
     )
@@ -1035,7 +1035,7 @@ def target_runner_progress_tcf_add(target: ttbl.test_target, runner: str):
             " +(\\S+)/%(file_path)s"                              # the testcase path after part of the repo name
             "##(?<subcase>[-_a-zA-Z0-9#]+)"                       # the subcases
             " @(\\S*%(targetid)s|local)"                          # the targetid
-            " (?<ellapsed>\\[\\+[\.0-9]+s\\]):"                   # the elapsed timestamp
+            " (?<ellapsed>\\[\\+[\\.0-9]+s\\]):"                  # the elapsed timestamp
             " (?<message>.*)$"                                    # the leftovers
         )
     )
