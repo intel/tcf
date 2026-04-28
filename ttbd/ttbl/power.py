@@ -2733,6 +2733,125 @@ class delay_til_shell_cmd_c(impl_c):
 
 
 
+class delay_til_tcp_port_c(impl_c):
+    """
+    Delayer that waits until a specific TCP port is open on a host.
+
+    :param str hostname: hostname or IP address to check for the TCP port
+    :param int tcp_port: (optional, default 22 SSH) TCP port
+      number to check for
+    :param int timeout_s: (optional, default 60) maximum seconds
+      to wait before giving up
+    :param float poll_period_s: (optional, default 0.5) number of
+      seconds to wait between failed checks
+
+    Rest of argument same as to :class:`ttbl.power.impl_c`.
+
+    Example usage:
+
+    >>> power_rail['host_detector'] = ttbl.power.delay_til_tcp_port_c(hostname)
+    >>> ttbl.ui.inventory_descriptions["interfaces.power.host_detector"] = \
+    >>>   "Detects if the host has powered on and is accessible over" \
+    >>>   " the network by testing the SSH port"
+    """
+    def __init__(
+            self, hostname: str, *args,
+            tcp_port: int = 22,
+            timeout_s: int = 60, poll_period_s: float = 0.5,
+            **kwargs):
+        assert isinstance(hostname, str), \
+            f"hostname: expected string, got {type(hostname)}"
+        assert isinstance(tcp_port, int) and tcp_port > 0 and tcp_port < 65536, \
+            f"tcp_port: expected integer [1, 65535]," \
+            f" got {type(tcp_port)} '{tcp_port}'"
+        assert isinstance(timeout_s, int) and timeout_s > 0, \
+            f"timeout_s: expected positive integer, got {type(timeout_s)} '{timeout_s}'"
+        assert isinstance(poll_period_s, float) and poll_period_s > 0, \
+            f"poll_period_s: expected positive float, got {type(poll_period_s)} '{type(poll_period_s)}'"
+        self.hostname = hostname
+        self.tcp_port = tcp_port
+        self.timeout_s = timeout_s
+        self.poll_period_s = poll_period_s
+        impl_c.__init__(self, *args, **kwargs)
+        self.upid_set(
+            "Detects host is available upon power on via detection on TCP port",
+            hostname = hostname,
+            tcp_port = tcp_port,
+            poll_period_s = poll_period_s,
+            timeout_s = timeout_s,
+        )
+
+
+
+    def _get(self, target: ttbl.test_target, component: str, timeout_s: int):
+        """
+        Polls the TCP port until it accepts a connection.
+        """
+        ts = ts0 = time.time()
+        last_e = None
+        last_r = None
+        # do it like this so we can call it with timeout_s == 0
+        # and it does at least ONE run, which we use it for .get()
+        while ts - ts0 <= timeout_s:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.settimeout(self.poll_period_s)
+                try:
+                    # Attempt to connect to the host:port
+                    result = s.connect_ex(( self.hostname, self.tcp_port ))
+                    if result == 0:
+                        target.log.error(
+                            f"{component}: {self.hostname}:TCP:{self.tcp_port}"
+                            " port is open, considering ON/detected")
+                        return
+                    last_r = result
+                    target.log.error(
+                        f"{component}: {self.hostname}:TCP:{self.tcp_port}"
+                        f" port connection failed with {r}, retrying")
+                except Exception as e:
+                    last_e = e
+                    target.log.error(
+                        f"{component}: {self.hostname}:TCP:{self.tcp_port}"
+                        f" port connection failed with exception {e}, retrying")
+            ts0 = ts
+            time.sleep(self.poll_period_s)
+            ts = time.time()
+
+        if last_e:
+            raise self.power_on_e(
+                f"{component}: {self.hostname}:TCP:{self.tcp_port}"
+                f" timed out waiting {timeout_s}s for TCP port; "
+                f" is the host ON and connected to the network?") from last_e
+        else:
+            raise self.power_on_e(
+                f"{component}: {self.hostname}:TCP:{self.tcp_port}"
+                f" timed out waiting {timeout_s}s for TCP port; "
+                f" is the host ON and connected to the network? {last_r=}")
+
+
+
+    def on(self, target: ttbl.test_target, component: str):
+        return self._get(target, component, self.timeout_s)
+
+
+
+    def off(self, target: ttbl.test_target, component: str):
+        # nothing to do here
+        pass
+
+
+
+    def get(self, target: ttbl.test_target, component: str):
+        try:
+            self._get(target, component, 0)
+            return True
+        except self.power_on_e as e:
+            target.log.info(
+                f"{component}: {self.hostname}:TCP:{self.tcp_port}"
+                f" port connection failed with exception {e}: considering OFF")
+            return False
+
+
+
 class proc_killer_c(impl_c):
     """
     Power component that kills a process when powering on/off and
