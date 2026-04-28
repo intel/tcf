@@ -197,7 +197,7 @@ class vlan_pci(ttbl.power.impl_c):
       *a0:ce:c8:00:18:73* with tag *30*.
 
     - If the target has property
-      *interfaces.power.COMPONENT.vlan_tap*, it will create TAP
+      *interfaces.power.COMPONENT.vlan_taps*, it will create TAP
       interfaces that can be used for (eg) OpenVPN servers:
 
       - (boolean) *True*: just create a tap interface called
@@ -205,6 +205,11 @@ class vlan_pci(ttbl.power.impl_c):
 
       - (str) *NAME1 [NAME2 [...]]]*: creates tap interfaces called
         *IFNAME.NAME1*,  *IFNAME.NAME2* ...
+
+        This is used, for example, to create multiple taps for
+        different usages, like for :class:`ttbl.openvpn.server_c`, to
+        start two servers, one in TCP, another in UDP. See OpenVPN's
+        documentation for an example.
 
     - lastly, for each target connected to that network, update it's
       tags to indicate it:
@@ -350,7 +355,9 @@ class vlan_pci(ttbl.power.impl_c):
             ])
 
 
-        if taps == True:
+        if taps == None:
+            pass		# fine, do nothing :)
+        elif taps == True:
             _mktap("tap")
         else:
             assert isinstance(taps, str), \
