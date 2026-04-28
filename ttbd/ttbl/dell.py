@@ -10,6 +10,7 @@ Drivers for Dell hardware
 
 """
 import commonl
+import re
 
 import ttbl.console
 
@@ -57,12 +58,21 @@ class idrac_console_solssh_c(ttbl.console.ssh_pc):
             hostname,
             command_sequence = [
                 # just wait for a prompt
-                ( "",
-                  "racadm>>" ),
+                (
+                    "",
+                    # well, some people change their prompts and ...sigh prompt
+                    # detection is the worse thing ever; see tcfl.target_ext_shell.py
+                    re.compile(r"(racadm>|.*)> ")
+                    # FIXME: add a reason/explanation in case it fails
+                    # on remediation
+                ),
                 # issue a binary connection command, wait for the
                 # prompt and we are in
-                ( "connect -b com2\r\n",
-                  "WARNING: binary mode!" ),
+                (
+                    "connect -b com2\r\n",
+                    # if this fails, somwething is not configured properly
+                    "WARNING: binary mode!"
+                ),
             ],
             **kwargs)
         # it is reliable on reporting state
