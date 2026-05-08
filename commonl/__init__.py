@@ -1095,11 +1095,13 @@ class fs_cache_c():
     # leave alone and ignore
     lru_cleanup_ignore = {
         "lockfile",
+        "last_cleanup",
         "TIMEOUT",
         "THREAD_LOCAL",
     }
 
-    def lru_cleanup_unlocked(self, max_entries):
+    def lru_cleanup_unlocked(self, max_entries: int,
+                             last_cleanup_time_max_s: int):
         """
         Delete the oldest in a list of entries that are used as a cache
         until only *max_entries* are left
@@ -1107,8 +1109,37 @@ class fs_cache_c():
         :param int max_entries: maximum number of entries which should be
           left
 
+        :param int last_cleanup_time_max_s: maximum number of seconds allowed
+          since last cleanup run
+
         """
         assert isinstance(max_entries, int) and max_entries > 0
+
+        # caller did this already, but we do in case someone did with
+        # the lock held
+        last_cleanup_location = os.path.join(self.fsdb.location, "last_cleanup")
+
+        ts_now = time.time()
+        try:
+            st_info = os.stat(last_cleanup_location)
+            last_cleanup_time_s = ts_now - st_info.st_mtime
+            # We do not want to cleanup if the last cleanup time is less than 0
+            # seconds or less than the time set for last_cleanup_time_max_s
+            if last_cleanup_time_s < 0 or last_cleanup_time_s < last_cleanup_time_max_s:
+                print(
+                    f"DEBUG lru_cleanup_unlocked: skipping;"
+                    f" last happened {last_cleanup_time_s}, less than"
+                    f" {last_cleanup_time_max_s}s ago", file = sys.stderr)
+                return
+            print(f"DEBUG lru_cleanup_unlocked confirming cleanup {last_cleanup_time_s}s ago", file = sys.stderr)
+        except FileNotFoundError:
+            # there is no last_cleanup tag, so...do cleanup
+            ...
+
+        # touch the file to let other threads know we are running cleanup and
+        # they don't jump in and cause contention
+        with open(last_cleanup_location, "w") as f:
+            f.write(str(ts_now))
 
         timestamp_sorted_list = []
         fields_by_timestamp = collections.defaultdict(set)
@@ -1156,10 +1187,15 @@ class fs_cache_c():
         for timestamp in timestamp_sorted_list[:clean_number]:
             for field in fields_by_timestamp[timestamp]:
                 self.fsdb.set(field, None, nested_flat_keyspace = False)
+                
+        # updated time stamp after running cleanup
+        with open(last_cleanup_location, "w") as f:
+            f.write(str(time.time()))
 
 
 
 def lru_cache_disk(path, max_age_s, max_entries, key_maker = None,
+                   last_cleanup_time_max_s: int = 10,
                    exclude_exceptions = None):
     """Decorator to implement an aged LRU memoize pattern (like
     :python:`functools.lru_cache`) in disk to cache value of functions.
@@ -1272,6 +1308,11 @@ def lru_cache_disk(path, max_age_s, max_entries, key_maker = None,
         makedirs_p(path, reason = "cache for lru_cache_disk")
         # need to use files so we can contain pickle stuff
         fn.cache = fs_cache_c(path, base_type = fsdb_file_c)
+        # last cleanup call time for THIS THREAD -- if this turns out
+        # to be too old, we'll call the filesystem one to check if we
+        # have to do a cleanup; this speeds up significantly when
+        # there are a lot of cache misses, since it avoids going to the FS.
+        fn.last_cleanup_ts = 0
         @functools.wraps(fn)
         def wrapper(*args, **kwargs):
             # can't use hash() because it is not stable across runs,
@@ -1286,7 +1327,7 @@ def lru_cache_disk(path, max_age_s, max_entries, key_maker = None,
                 key = mkid(json.dumps(( args, kwargs ), sort_keys = True), 20)
             else:
                 assert callable(key_maker), \
-                    "key_maker: expected callable, got {callable}"
+                    "key_maker: expected callable, got {key_maker}"
                 key = key_maker(*args, **kwargs)
             t = fn.cache.get_unlocked(key, None, max_age = max_age_s)
             value, ex = t
@@ -1301,29 +1342,64 @@ def lru_cache_disk(path, max_age_s, max_entries, key_maker = None,
             # before raising
             if ex != None:
                 raise ex
-            if value == None:
-                # miss! get the return value and set the cache
-                try:
-                    # call before taking the lock, it could be long
-                    r = fn(*args, **kwargs)
-                    with fn.cache.lock():
-                        fn.cache.lru_cleanup_unlocked(max_entries)
-                        fn.cache.set_unlocked(key, r, None)
-                    return r
-                except Exception as e:
-                    if exclude_exceptions != None:
-                        for exception_t in exclude_exceptions:
-                            if isinstance(e, exception_t):
-                                # we are told not to cache this exception
-                                raise
-                    if getattr(e, "cacheable", True) == False:
-                        raise
-                    with fn.cache.lock():
-                        fn.cache.lru_cleanup_unlocked(max_entries)
-                        fn.cache.set_unlocked(key, None, e)
-                    raise
+            do_cleanup = True
+            if value != None:
+                return value		# hit
+            # miss! get the return value and set the cache
+            ts_now = time.time()
+            try:
+                # call before taking the lock, it could be long
+                r = fn(*args, **kwargs)
 
-            return value
+                last_cleanup_time_s = ts_now - fn.last_cleanup_ts
+                if last_cleanup_time_s < 0 \
+                   or last_cleanup_time_s > last_cleanup_time_max_s:
+                    # check if we should cleanup before taking the lock
+                    last_cleanup_location = os.path.join(fn.cache.fsdb.location, "last_cleanup")
+                    try:
+                        st_info = os.stat(last_cleanup_location)
+                        last_cleanup_time_s = ts_now - st_info.st_mtime
+
+                        if last_cleanup_time_s < 0 or last_cleanup_time_s < last_cleanup_time_max_s:
+                            do_cleanup = False
+                        else:
+                            #print(f"DEBUG _lru_cache_disk doing cleanup, last {last_cleanup_time_s}s"
+                            #      f" vs {last_cleanup_time_max_s} max",
+                            #      file = sys.stderr)
+                            ...
+                    except FileNotFoundError as e:
+                        # there is no last_cleanup tag, so...do cleanup
+                        ...
+                else:
+                    do_cleanup = False
+
+                with fn.cache.lock():
+                    if do_cleanup:
+                        fn.cache.lru_cleanup_unlocked(
+                            max_entries,
+                            last_cleanup_time_max_s = last_cleanup_time_max_s)
+                        fn.last_cleanup_ts = ts_now
+                    fn.cache.set_unlocked(key, r, None)
+                # return value we calculated in a missed path
+                return r
+            except Exception as e:
+                if exclude_exceptions != None:
+                    for exception_t in exclude_exceptions:
+                        if isinstance(e, exception_t):
+                            # we are told not to cache this exception
+                            raise
+                if getattr(e, "cacheable", True) == False:
+                    raise
+                with fn.cache.lock():
+                    if do_cleanup:
+                        fn.cache.lru_cleanup_unlocked(
+                            max_entries,
+                            last_cleanup_time_max_s = last_cleanup_time_max_s)
+                        fn.last_cleanup_ts = ts_now
+                    fn.cache.set_unlocked(key, None, e)
+                raise
+
+            # end of embedded function
 
         return wrapper
 
