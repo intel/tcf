@@ -1127,11 +1127,9 @@ class fs_cache_c():
             # seconds or less than the time set for last_cleanup_time_max_s
             if last_cleanup_time_s < 0 or last_cleanup_time_s < last_cleanup_time_max_s:
                 print(
-                    f"DEBUG lru_cleanup_unlocked: skipping;"
                     f" last happened {last_cleanup_time_s}, less than"
                     f" {last_cleanup_time_max_s}s ago", file = sys.stderr)
                 return
-            print(f"DEBUG lru_cleanup_unlocked confirming cleanup {last_cleanup_time_s}s ago", file = sys.stderr)
         except FileNotFoundError:
             # there is no last_cleanup tag, so...do cleanup
             ...
