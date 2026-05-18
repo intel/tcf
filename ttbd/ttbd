@@ -1662,6 +1662,12 @@ local_auth = list()
 #
 if __name__ == "__main__":
 
+    # We have too much read-only global state and "fork" is the only
+    # one that guarantees it; uggh, this needs a serious cleanup. This
+    # only works in Unix, which is fine because *ttbd* requires Linux
+    # anyway at this point.
+    multiprocessing.set_start_method("fork")
+
     # Drop the capabilities we don't really need but that we enabled
     # in the Ambient set so our helpers can inherit them. I might be
     # doing something wrong here, but I can't figure out how to
