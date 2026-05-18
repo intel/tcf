@@ -100,6 +100,39 @@ def config_import_file(filename, namespace = "__main__",
 
     >>> timo.config_import_file("some/path/file.py", "__main__")
 
+    Notes:
+
+    - starting Python 3.14, can't define classes in config files when
+      they are later going to be used in *multiprocessing* because
+      reasons (https://github.com/python/cpython/issues/132898).
+
+      So if you see the initialization process crashing like::
+
+
+        INFO[1644833] power.execute_defer_list():4295: power defer list 'defer 1': executing
+        Process ForkServerProcess-1:
+        Traceback (most recent call last):
+        Process ForkServerProcess-2:
+          File "/usr/lib64/python3.14/multiprocessing/process.py", line 320, in _bootstrap
+            self.run()
+            ~~~~~~~~^^
+          File "/usr/lib64/python3.14/multiprocessing/process.py", line 108, in run
+            self._target(*self._args, **self._kwargs)
+            ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+          File "/usr/lib64/python3.14/concurrent/futures/process.py", line 242, in _process_worker
+            call_item = call_queue.get(block=True)
+          File "/usr/lib64/python3.14/multiprocessing/queues.py", line 120, in get
+            return _ForkingPickler.loads(res)
+                   ~~~~~~~~~~~~~~~~~~~~~^^^^^
+        AttributeError: module '__mp_main__' has no attribute 'qemu_dummy_plugger_c'
+
+      where *qemu_dummy_plugger_c* was a class defined in the
+      configuration file, that's the reason.
+
+      **Fix:** n/a
+
+      **Workaround:** define the class in a module that gets imported
+
     """
 
     logging.log(9, "%s: configuration file being loaded", filename)
