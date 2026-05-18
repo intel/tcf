@@ -1157,6 +1157,25 @@ class test_target(object):
         self.power_off_pre_fns = []
         self.power_off_post_fns = []
 
+
+    # the filelock.FileLock() type is not pickable, so in order for
+    # things to work, we need to recreate it; the __[get|set]state__()
+    # methods allow the pickle modules to get instructions on how to
+    # pickle things they can't natively do.
+    def __getstate__(self):
+        state = self.__dict__.copy()
+        state['lock'] = None
+        return state
+
+
+
+    def __setstate__(self, state):
+        self.__dict__.update(state)
+        state.lock = filelock.FileLock(os.path.join(self.state_dir, "lockfile"),
+                                       timeout = 2)
+
+
+
     @classmethod
     def known_targets(cls):
         """
