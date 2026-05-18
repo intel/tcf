@@ -451,7 +451,13 @@ class interface(ttbl.tt_interface):
             assert impl.explicit in ( None, 'on', 'off', 'both' ), \
                 "power component '%s': impls' explicit value is %s;" \
                 " expected None, 'on', 'off' or 'both'" % (name, impl.implicit)
-            impl.target_setup(target, iface_name, name)
+            try:
+                impl.target_setup(target, iface_name, name)
+            except Exception as e:
+                target.log.error(
+                    f"exception setting up {iface_name} {name}: {e}")
+                raise
+
 
     def _release_hook(self, target, _force):
         # nothing to do on target release
@@ -614,12 +620,10 @@ class interface(ttbl.tt_interface):
                     component_real = component
                 try:
                     state = self._impl_get(impl, target, component_real)
-                except impl.error_e as e:
-                    if not impl.ignore_get_errors:
-                        raise
-                    # if this is an explicit component, ignore any errors
-                    # and just assume we are not using this for real power
-                    # control
+                except Exception as e:
+                    # we got to kinda ignore erors, otherwise we can't
+                    # get state from any component; by reporting None,
+                    # in a way we are telling
                     target.log.error(
                         "%s: ignoring power state error from explicit power component: %s"
                         % (component, e))
@@ -679,12 +683,6 @@ class interface(ttbl.tt_interface):
                             component, e, exc_info = True)
                         continue
                     if e:
-                        # if the call to _get() for the driver got an issue
-                        if not impl.ignore_get_errors:
-                            raise
-                        # if this is an explicit component, ignore any errors
-                        # and just assume we are not using this for real power
-                        # control
                         target.log.error(
                             "%s: ignoring power state error from explicit"
                             " power component: %s: %s",
@@ -4327,7 +4325,8 @@ def execute_defer_list(defer_list: list, name: str, serialize: bool = False,
                             logging.error(
                                 "%s: exception running deferred power-%s"
                                 " operation: %s",
-                                target.id, "on" if state else "off", e)
+                                target.id, "on" if state else "off", e,
+                                exc_info = True)
                             if not soft_failure:
                                 raise
                     # if we end up here, it means the as_completed()
