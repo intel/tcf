@@ -1139,7 +1139,7 @@ class serial_pc(ttbl.power.socat_pc, generic_c):
             if self.bus_driver_bind != None:
                 bus_name_spec = device_resolver.spec_get()[0].split(",")[0]
             if self.bus_driver_bind == [] \
-               or bus_name_spec in self.bus_driver_bind:
+               or ( self.bus_driver_bind and bus_name_spec in self.bus_driver_bind ):
                 #  this yields, eg 1-2:1.0 from /sys/bus/usb/devices/1-2:1.0
                 bus_device = os.path.basename(device_resolver.device_find_by_spec())
                 # now ensure the USB stack probes it we need to se g+w
@@ -1172,6 +1172,8 @@ class serial_pc(ttbl.power.socat_pc, generic_c):
                         time.sleep(0.25)
                 else:
                     raise last_e	# not found, bail
+            else:
+                self.kws['device'] = device_resolver.tty_find_by_spec()
 
         # this publishes what final device we are using at the system
         # level, which helps in diagnosing and is also used by other
