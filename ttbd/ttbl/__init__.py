@@ -1171,8 +1171,8 @@ class test_target(object):
 
     def __setstate__(self, state):
         self.__dict__.update(state)
-        state.lock = filelock.FileLock(os.path.join(self.state_dir, "lockfile"),
-                                       timeout = 2)
+        self.lock = filelock.FileLock(os.path.join(self.state_dir, "lockfile"),
+                                      timeout = 2)
 
 
 
