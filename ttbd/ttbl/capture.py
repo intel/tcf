@@ -186,8 +186,8 @@ class impl_c(ttbl.tt_interface_impl_c):
        their mimetypes. Stream naming convention:
 
         - *default*: default
-        - *log\**: logs about the capture process [optional]
-        - *\**: any other data streams
+        - *log\\**: logs about the capture process [optional]
+        - *\\**: any other data streams
 
     """
     def __init__(self, snapshot, mimetype = None,
