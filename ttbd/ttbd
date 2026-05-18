@@ -130,7 +130,7 @@ def flask_logw_abort(http_code, message, **kwargs):
     response = flask.jsonify({ "_message": message })
     response.status_code = http_code
     raise werkzeug.exceptions.HTTPException(response = response)
-    
+
 def flask_logi_abort(http_code, message, **kwargs):
     logi(message, **kwargs)
     response = flask.jsonify({ "_message": message })
@@ -763,7 +763,7 @@ def _users(userid = None):
             # called for the known_user_list()
             if userid:
                 flask_logi_abort(404, "user '%s' does not exist" % userid)
-                
+
     return flask.jsonify(r)
 
 
@@ -1701,9 +1701,12 @@ if __name__ == "__main__":
         "configuration files (in alphabetic order)")
     arg_parser.add_argument(
         "--server",
-        action = "store", choices = [ "gunicorn", "tornado", "flask" ],
-        default = "tornado",
-        help = "Server implementation to use [%(default)s]")
+        action = "store", choices = [ "gunicorn", "tornado", "flask", "interactive" ],
+        # leave default to None so we can pick from config file
+        help = "Server implementation to use [defaults to *tornado*]."
+        " *interactive* is to be used when running as "
+        " 'python -i ttbd --server=interactive' so you can simulate and"
+        " and inspect whatd happen when loading a configuration.")
     arg_parser.add_argument(
         "--config-file", "-c",
         action = "append", dest = "config_files", metavar = "CONFIG-FILE.py",
@@ -1970,9 +1973,13 @@ if __name__ == "__main__":
     else:
         ssl_key_password = None
 
-    server = args.server
-    if ttbl.config.server != None:
+    # this is done like this so if --server is not given it's taken
+    # from config and overrides config
+    server = getattr(args, "server")
+    if server == None:
         server = ttbl.config.server
+    if server == None:
+        server = "tornado"
 
     if server == "gunicorn":
         import gunicorn
@@ -2172,6 +2179,30 @@ if __name__ == "__main__":
         http_server.start(ttbl.config.processes)
         sd_notify.notify("READY=1")
         IOLoop.instance().start()
+
+    elif server == "interactive":
+        # sometimes stuff is printed in the background, so clear up
+        print("""
+
+
+
+
+
+
+--- I am the ttbd server ---
+
+I was invoked with --server interactive; if you invoked me with python
+-i, I'm done now, you should be in a >>> python prompt now
+
+
+You should have invoked me similarly to:
+
+  $ /usr/bin/python3 -i /usr/bin/ttbd -vv -w production --server interactive
+
+
+
+        """,
+              file = sys.stderr)
 
     else:
         logging.error("serving with flask (DEBUG!)")
