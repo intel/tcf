@@ -36,6 +36,7 @@
       <tr>
         <td>{{ name }}</td>
         <td align = "right">
+        {% if name != 'ca'  %}
           <div class = "tooltip">
             <a href = "/ttb-v2/targets/{{ targetid }}/store/file?file_path=certificates_client/{{ name }}.key"
                download = 'cert-{{ state.alloc }}-{{ targetid }}-{{ name }}.key'
@@ -60,9 +61,24 @@
               </p>
             </span>
           </div>
+        {% else %} {# if name != 'ca' #}
+          <div class = "tooltip">
+            <a href = "/ttb-v2/targets/{{ targetid }}/store/file?file_path=certificates_client/{{ name }}.cert"
+               download = 'cert-{{ state.alloc }}-{{ targetid }}-{{ name }}.cert'
+               style = "text-decoration:none">🖂</a>
+            <span class = "tooltiptext">
+              Download the SSL Certificate Authority
+              <p>
+                On the command line, you can use:
+                <pre><code class="language-bash">$ tcf certs-get {{targetid }} --save {{ name }}</code></pre>
+              </p>
+            </span>
+          </div>
+        {% endif %} {# if name != 'ca' #}
         </td>
 
         <td>
+        {% if name != 'ca'  %} {# can't remove ca's anyway..., this makes it less confusing #}
           <div class = "tooltip">
             <button class = 'warning' onclick = 'js_cert_remove("{{targetid}}", "{{ name }}");'>-</button>
             <span class = "tooltiptext">
@@ -73,6 +89,7 @@
               </p>
             </span>
           </div>
+        {% endif %} {# if name != 'ca' #}
         </td>
       </tr>
       {% endfor %}

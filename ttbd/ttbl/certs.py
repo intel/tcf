@@ -177,6 +177,11 @@ class interface(ttbl.tt_interface):
                 timeout = 10,
                 check = True, cwd = cert_path,
                 stdout = subprocess.PIPE, stderr = subprocess.STDOUT)
+            # copy the CA's certificate (not the CA's key!!!) to the
+            # certificates/ directory so it can be downloaded with the
+            # *store* interface (eg: for UIs, etc) -- since it only
+            # allows downloading from certificate_client/
+            shutil.copy(f"{cert_path}/ca.cert", cert_client_path)
             target.log.debug(f"created target's certificate authority in {cert_path}")
 
             # Now create a server key
@@ -353,6 +358,8 @@ class interface(ttbl.tt_interface):
             if not commonl.verify_str_safe(name, do_raise = False):
                 raise ValueError(
                     "invalid certificate name, only [-_a-zA-Z0-9] allowed")
+            if name == "ca":
+                raise ValueError("cannot remove 'ca' certificate")
             target.timestamp()
             cert_client_path = os.path.join(target.state_dir, "certificates_client")
             self._client_wipe(name, cert_client_path)
@@ -372,4 +379,10 @@ class interface(ttbl.tt_interface):
                             "CERT: unknown file in client directory %s", filename)
                         continue
                     client_certificates.add(name)
+            if client_certificates:
+                # ok, lil'trick -- we only create/initialize the
+                # certificate support when someone creates at least
+                # one certificate; in that case we have a Certificate
+                # Authority--so then list we can download it
+               client_certificates.add('ca')
             return dict(client_certificates = list(client_certificates))
