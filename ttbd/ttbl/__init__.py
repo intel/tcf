@@ -1848,36 +1848,17 @@ class test_target(object):
         we don't allow setting certain properties that could
         shadow tags.
         """
-        if prop in ( 'timestamp', '_alloc.timestamp' ):
-            return self.timestamp_get()
-        r = self.fsdb.get(prop)
-        if r != None:
-            return r
-        # try flat key tags[field.subfield.subfield]
-        r = self.tags.get(prop, None)
-        if r != None:
-            return r
-        # try non-flat key tags[field.subfield.subfield]
-        if '.' in prop:
-            subfields = prop.split(".")
-            d = self.tags
-            fields_left = len(subfields)
-            for field in subfields:
-                fields_left -= 1
-                try:
-                    v = d[field]
-                    if fields_left == 0:	# found it!
-                        return v
-                except TypeError:	# d is not a dictionary
-                    if fields_left == 0:
-                        return v
-                    break
-                except KeyError:	# d is a dict but that key doesn't exist
-                    break
-                if not isinstance(v, dict):
-                    break
-                d = v
-        return default
+        # we get it with to_dict() so it will get a deep dictionary if
+        # we get a top level property from a tree
+        d = self.to_dict([ prop ])
+        if not d:
+            return default
+        # prop might will list of PROP.SUBPROP.SUBSUBPROP, so walk it
+        # so for interfaces.power we want to get [interfaces][power]
+        for _prop in prop.split("."):
+            d = d[_prop]
+        return d
+
 
 
     def property_get_locked(self, who, prop, default = None):
