@@ -609,7 +609,13 @@ class router_manager_c(ttbl.power.impl_c):
         ttbl.power.impl_c.__init__(self, off_on_release = True, **kwargs)
         self.name = "router-manager"
         self.upid_set(f"Manager for router/switch {switch_class}")
-        self.switch_class = switch_class
+        # let this be a class NAME so we can initialize with URLs from
+        # config files that are parameterized
+        if isinstance(switch_class, str):
+            self.switch_class = \
+                ttbl.value_from_str_casting("class:" + switch_class)
+        else:
+            self.switch_class = switch_class
         self.switch_console = switch_console
 
 
