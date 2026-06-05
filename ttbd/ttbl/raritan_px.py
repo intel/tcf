@@ -14,6 +14,7 @@ This interface provides means to power on/off outlets in Raritan PX PDUs
 """
 
 import logging
+import os
 import re
 
 import pexpect
@@ -167,11 +168,12 @@ class pc(ttbl.power.impl_c):
 
         try:
             log.info("opening connection")
+            env = dict(os.environ)
+            env['SSHPASS'] = self.password
             self.p = pexpect.spawn(
                 "sshpass",
                 [
-                    # FIXME: move to environment, leaks in logs, etc
-                    "-p", self.password,
+                    "-e",
                     "ssh",
                     # be verbose (for debugging) and allocate a terminal
                     "-vtt",
@@ -194,6 +196,7 @@ class pc(ttbl.power.impl_c):
                     "-oStrictHostKeyChecking no",
                     f"{self.user}@{self.hostname}"
                 ],
+                env = env,
                 # this timeout seems to overtake the rest we specify
                 # manually, so we set the max, what it takes to get
                 # the Welcome message which is longish
@@ -216,6 +219,9 @@ class pc(ttbl.power.impl_c):
 
         except Exception as e:
             log.info(f"opening connection to {self.user}@{self.hostname} failed: {e}")
+            if self.p:
+                log.info(f"log before: {self.p.before}")
+                log.info(f"log after: {self.p.after}")
             del self.p	# connection died, so clean it up so it is redone
             self.p = None
             raise
@@ -246,7 +252,7 @@ class pc(ttbl.power.impl_c):
 
     def get(self, target: ttbl.test_target, component: str):
         self._resolve(target)
-        log = logging.getLogger(f"target-{target.id}[{target.owner_get()}]|px_ssh|{self.user}@{self.hostname}")
+        log = target.log
         last_e = None
         for _count in range(3):
             try:
