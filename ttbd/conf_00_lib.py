@@ -451,8 +451,12 @@ class vlan_pci(ttbl.power.impl_c):
                 str('0.0.0.0/' + addr['netmask'])).prefixlen
             if prefixlen != target.kws['ipv4_prefix_len']:
                 target.log.info(
-                    "vlan_pci/%s: off because ipv4 prefix is %s; expected %s"
-                    % (bridge_ifname, prefixlen, target.kws['ipv4_prefix_len']))
+                    "vlan_pci/%s: off because ipv4 prefix is %s (%s); expected %s (%s)"
+                    % (bridge_ifname,
+                       prefixlen,
+                       type(prefixlen),
+                       target.kws['ipv4_prefix_len'],
+                       type(target.kws['ipv4_prefix_len'])))
                 return False	                # IPv4 prefix mismatch
 
         if 'ipv6_addr' in target.kws:
