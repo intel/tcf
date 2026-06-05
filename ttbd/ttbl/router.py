@@ -21,6 +21,9 @@ supposed to be up, removing any existing state.
 """
 import json
 import logging
+import os
+import pexpect
+import re
 import requests
 import time
 import traceback
@@ -428,7 +431,7 @@ class cisco_c(router_c):
                                  count, top)
                 time.sleep(0.5)
                 continue
-        
+
 
 
     def server_link_setup(self, target, component):
@@ -573,6 +576,447 @@ class cisco_c(router_c):
             'name': result['body']["TABLE_vlanbriefid"]["ROW_vlanbriefid"]["vlanshowbr-vlanname"],
             'raw': result
         }
+
+
+
+class cisco_catalyst_c(router_c):
+
+    def __init__(self, hostname: str, username: str = None,
+                 password: str = None, logger = None,
+                 port: int = 22, timeout = 20):
+        """
+        Cisco Catalyst IOS-XE configurator
+
+        Uses SSH login to configure the switch and VLANs.
+
+        **Switch setup**
+
+        Needs basic manual config:
+
+        1. connect a serial console at 96008n1 to leftmost console port
+           on left (looking from back) RJ45 port; open serial terminal
+
+        2. connect manager network to the RJ45 on its right
+
+        3. reset (if needed):
+
+           c. power cycle switch to reset, press mode button
+              should go to "infra:" in the serial console prompt; wipe
+              configuration with commands::
+
+                enable   # goes to admin mode
+                write erase
+                delete flash:vlan.dat
+                reload
+
+        4. Enable SSH access; in the serial console:
+
+           a. go admin mode::
+
+                 > enable
+                 # config terminal
+
+              prompt chages to *#(config)*
+
+           b. generate an SSH key and enable SSH::
+
+                (config)# crypto key generate rsa modulus 2048
+                (config)# ip ssh version 2
+
+           c. restrict access to SSH + local login::
+
+                (config)# line vty 0 15
+                (config)#  transport input ssh
+                (config)#  login local
+                (config)#  exit
+
+           d. create user::
+
+               (config)# username USERNAME privilege 15 secret PASSWORD
+               (config)# end
+
+           e. write config::
+
+               # write memory
+
+        5. Test you coan login with a command such as::
+
+             $ /usr/bin/sshpass -p PASSWORD \
+                 ssh -v -o "PubkeyAcceptedAlgorithms +ssh-rsa" \
+                        -o "HostKeyAlgorithms +ssh-rsa" \
+                        -o "KexAlgorithms +diffie-hellman-group14-sha1,diffie-hellman-group-exchange-sha1" \
+                        USERNAME@HOSTNAME
+
+           Note Nexus uses older SSH algorithms, hence why we have to
+           enable them.
+
+        **System setup**
+
+        In Fedora 43 and other >2026 Linux OSs we need to enable SHA1::
+
+          $ sudo update-crypto-policies --set LEGACY
+        """
+        # this sets self.{hostname,username,password} -- note it gets
+        # created every time we use the router_manager_c class, so no
+        # need to extract stuff from the FSDB, since the manager does
+        router_c.__init__(self, hostname, username, password, logger)
+        self.timeout = timeout
+        self.port = port
+        self.p = None
+
+
+    # - # superuser
+    # - > normal user
+    # - \s?: sometimes it ends in space, sometimes doesn't
+    prompt_regex = re.compile(rb'^([A-Za-z0-9._()-]+(?:\(config[^\)]*\))?[#>])\s?$', re.MULTILINE)
+
+
+
+    class exception(RuntimeError):
+        pass
+
+    # yes, this is global to the class -- why? because we want, if
+    # possible, to keep the connection open until it closes on its own
+    # so we don't take for ever to bring it up--this can be a problem
+    # if two threads are trying to connect; however, the server is
+    # multiprocess, not multithread
+    #
+    # Ideally this needs to be a changed to a SERVER that would handle
+    # connection to this switch with a single connection and everyone
+    # would talk to it. SSH mastering could work, but the context of
+    # each connection is the killer here, since they are not atomic
+    # commands.
+    ssh_connections = {}
+
+    def _open_maybe(self):
+
+        # by default, inventory
+        # instrumentation.{self.upid_index}.hostname will always be
+        # set to USER@HOSTNAME:OUTLET, whatever we configured; we
+        # censored whatever password it had. So if splitting yields an
+        # empty password but the rest of the fields are the same, we
+        # need to redo with self.device_spec
+        password = commonl.password_get(self.hostname, self.username, self.password)
+
+        self.p = self.ssh_connections.get(
+            ( self.hostname, self.username, password ),
+            None)
+
+        if self.p:
+            try:
+                self.logger.info("reuse previous connection: checking if possible")
+                self.p.send(b"\r")
+                self.p.expect(self.prompt_regex)
+                self.logger.info("reusing previous connection: found prompt")
+                return
+            except Exception as e:
+                self.p = None
+                self.logger.info(f"reopening connection because {e}")
+                self.ssh_connections[( self.hostname, self.username, password )] = None
+
+        try:
+            self.logger.info("opening connection")
+            env = dict(os.environ)
+            env['SSHPASS'] = self.password
+            self.p = pexpect.spawn(
+                "sshpass",
+                [
+                    "-e",	# use SSHPASS env
+                    "ssh",
+                    # be verbose (for debugging) and allocate a terminal
+                    "-vtt",
+                    "-p", str(self.port),
+                    # We place the control file for the shared
+                    # connection in /var/cache/ttbd-production/ssh-NAME-HOSTNAME.control;
+                    # this way is shared by all targets that same the
+                    # same PDU and username to it.
+                    #
+                    # IF DISABLED IT WILL OVERWHELM THE PDU WITH CONNECTIONS
+                    "-oControlMaster no",
+                    f"-oControlPath {ttbl.test_target.files_path}/ssh-{self.username}-{self.hostname}.control",
+                    # old SSH impl in the switch requires old algorithms
+                    "-o", "PubkeyAcceptedAlgorithms +ssh-rsa",
+                    #"-oHostKeyAlgorithms +ssh-rsa,ssh-dss",
+                    "-o", "HostKeyAlgorithms +ssh-rsa",
+                    "-o", "KexAlgorithms +diffie-hellman-group14-sha1,diffie-hellman-group-exchange-sha1",
+                    # we can't do any of this registering, so we
+                    # disable it so SSH doesn't ask for it
+                    # interactively and makes a mess
+                    "-oUserKnownHostsFile /dev/null",
+                    "-oCheckHostIP no",
+                    "-oStrictHostKeyChecking no",
+                    f"{self.username}@{self.hostname}"
+                ],
+                env = env,
+                # this timeout seems to overtake the rest we specify
+                # manually, so we set the max, what it takes to get
+                # the Welcome message which is longish
+                timeout = 30)
+            self.p.expect(
+                # this comes because we run ssh with -v, helps catch connection done
+                b"debug1: Entering interactive session",
+                # original prompt message takes longish
+                timeout = 30)
+            self.logger.info("found welcome message")
+            self.p.send(b'\r')
+            self.p.expect(self.prompt_regex)
+            self.logger.info("found prompt")
+            # disable pagination
+            self._cmd("ter len 0")
+            self.ssh_connections[( self.hostname, self.username, password )] = self.p
+            return
+
+        except Exception as e:
+            self.logger.info(f"opening connection to {self.username}@{self.hostname} failed: {e}")
+            if self.p:
+                self.logger.info(f"log before: {self.p.before}")
+                self.logger.info(f"log after: {self.p.after}")
+            del self.p	# connection died, so clean it up so it is redone
+            self.ssh_connections[( self.hostname, self.username, password )] = None
+            self.p = None
+            raise
+
+    # output for errors starts with "% " at the beginning of the line
+    error_regex = re.compile(b"^% ", re.MULTILINE)
+
+    def _expect(self, expectation, timeout: int = 5):
+        try:
+            self.logger.info(f"expecting {expectation}")
+            self.p.expect(expectation, timeout = timeout)
+            if self.error_regex.search(self.p.after):
+                raise RuntimeError(
+                    f"{self.hostname}: command failed: {self.p.after}"
+                )
+            return self.p.match.group(0)
+        except pexpect.exceptions.EOF as e:
+            self.logger.info(f"didn't find (EOF): {expectation}")
+            del self.p	# connection died, so clean it up so it is redone
+            self.p = None
+            raise self.exception(
+                f"{self.username}@{self.hostname}: connection died; is it on?") \
+                from e
+        except pexpect.exceptions.TIMEOUT as e:
+            self.logger.info(f"didn't find (TIMEOUT): {expectation}")
+            raise self.exception(
+                f"{self.username}@{self.hostname}: timeout ({timeout}s)"
+                f" receiving '{expectation}'") from e
+
+
+
+    def _cmd(self, command, expect = None,):
+        r = b""
+        self.p.send(command + "\r")
+        if expect:
+            r = self._expect(expect)
+        else:
+            r = self.p.before
+        while True:
+            try:
+                # keep reading the prompt until it times out;
+                # otherwise sometimes it gets out of sync; prompt
+                # regexing is hard
+                self.p.expect(self.prompt_regex, timeout = 0.1)
+                if not r:
+                    r += self.p.before
+                self.logger.debug("received prompt %s", r)
+            except pexpect.exceptions.TIMEOUT:
+                # can't read a prompt no more, prolly we are at it
+                break
+        self.logger.debug("%s@%s: command output %s", self.username, self.hostname, r)
+        return r
+
+
+
+    def _sequence_run(self, *args, **kwargs):
+        dl = []
+        count = -1
+        command_list = []
+        for what in args:
+            count += 1
+            _what = commonl.kws_expand(what, kwargs)
+            self.logger.info("running command #%d: %s", count, _what)
+            self._cmd(_what)
+            self.logger.info("ran command #%d: %s", count, _what)
+
+
+
+    def _copy_running_config_retrying(self):
+        #
+        # Tells the switch to copy running config to startup (so
+        # if we restart, the state is the same)
+        #
+        # Note sometimes this fails because another op like this
+        # is in progress; sleep, retry.
+        #
+        # Assumes switch console is in conf mode
+
+        top = 4
+        count = 0
+        while True:
+            count += 1
+            try:
+                self._cmd(
+                    # make this permanent we nee \r\r because Nexus
+                    # doesn't have a way to override con
+                    "copy run start\r\r",
+                    "[OK]")
+                return
+            except RuntimeError as e:
+                if count >= top:
+                    self.logger.error("copy running-config: retried %d "
+                                      "times, giving up", count)
+                    raise
+                self.logger.info("copy running-config: retrying %d/%d: %s",
+                                 count, top, e)
+                time.sleep(0.5)
+                continue
+
+
+
+    def server_link_setup(self, target, component):
+        """
+        Setup the server's connection to the switch
+
+        This is used to configure anything in the switch needed
+        for the ttbd server to access any VLAN created in the
+        switch.
+
+        It might be run multiple times, so it has to be idempotent
+        and do no effect
+
+        In Cisco 9k series, we need to set the port to be layer2
+        trunk mode (switchport; switchport mode trunk)
+        """
+
+
+
+        server_switch_port = target.tags.get("server.switch_port", None)
+        if not server_switch_port:
+            return
+
+        self._open_maybe()
+        self._sequence_run(
+            "config terminal",
+            # select the interface/port where the server is
+            # connected
+            f"int {server_switch_port}",
+            "shutdown",	# disable it while we reconfigure
+            # convert from layer 3 -> layer2 switching (vs
+            # noswitchport that converts to layer 3)
+            "switchport",
+            # set the port to mode trunk, so multiple VLANs can be
+            # routed over it.
+            "switchport mode trunk",
+            # ensure trunk ports can access all vlans, since we use
+            # them to provide services to all of them
+            "switchport trunk allowed vlan all",
+            # FIXME: we need to be able to pass extra commands
+            "no shut",	# enable it
+            # done!
+            "exit",	# exit int config
+            'exit'      # exit config
+        )
+        self._copy_running_config_retrying()
+
+
+    def vlan_create(self, vlan_id, vlan_name, switch_ports):
+        self._open_maybe()
+
+        sequence = [
+            "conf terminal",
+            # wipe first
+            f"no vlan {vlan_id}",
+            f"vlan {vlan_id}",
+            f"name {vlan_name}",
+            "exit"
+        ]
+        if switch_ports:
+            # allow acces only to certain ports
+            sequence += [
+                # select all affected ports--use f'{i}' so we
+                # support both int and str transparently
+                f"int {','.join(f'{i}' for i in switch_ports)}",
+                # For untagged traffic use layer2, access can do a
+                # single VLAN
+                "switchport",
+                "switchport mode access",
+                f"switchport access vlan {vlan_id}",
+                # For tagged traffic; disabled for now because we
+                # can't get both untagged and tagged modes to work
+                # and we prefer untagged since it is easier to
+                # work with on the OS side
+                #f"switchport mode trunk",
+                #f"switchport trunk allowed vlan {vlan_id}",
+                # enable the ports
+                "no shut",
+                "exit",	# exit port config
+            ]
+        sequence += [
+            'exit'	# exit conf terminal
+        ]
+        self._sequence_run(*sequence)
+        self._copy_running_config_retrying()
+
+
+
+    def vlan_destroy(self, vlan_id, vlan_name):
+        self._open_maybe()
+        if self.vlan_get(vlan_id):
+            # since this has to copy the running config, do it only if
+            # the vlan is there.
+            self._sequence_run(
+                "conf terminal",
+                # wipe first
+                f"no vlan {vlan_id}",
+                "exit",
+            )
+            self._copy_running_config_retrying()
+
+
+
+    def vlan_get(self, vlan_id):
+        # False would do
+        #
+        ## PROMPT#show vlan id 3
+        ## VLAN id 3 not found in current VLAN database
+        #
+        # True is for something like
+        #
+        ## #show vlan id 3
+        ##
+        ## VLAN Name                             Status    Ports
+        ## ---- -------------------------------- --------- -------------------------------
+        ## 3    VLAN0003                         active    Gi1/0/24
+        ##
+        ## VLAN Type  SAID       MTU   Parent RingNo BridgeNo Stp  BrdgMode Trans1 Trans2
+        ## ---- ----- ---------- ----- ------ ------ -------- ---- -------- ------ ------
+        ## 3    enet  100003     1500  -      -      -        -    -        0      0
+        ##
+        ## Remote SPAN VLAN
+        ## ----------------
+        ## Disabled
+        ##
+        ## Primary Secondary Type              Ports
+        ## ------- --------- ----------------- ------------------------------------------
+        ##
+        ## PROMPT#
+        ##
+        #
+        try:
+            self._open_maybe()
+            o = self._cmd(f"show vlan id {vlan_id}")
+            # We only do a VLAN at the time, so this works to detect
+            if b'VLAN Name' in o:
+                return True
+            elif b"not found in current" in o:
+                return False
+            else:
+                self.log.warning("unknown output to show vlan id: %s", o)
+                return None
+        except Exception as e:
+            self.log.exception("exception running 'show vlan id': %s",
+                               e, exc_info = True)
+            return None
 
 
 
