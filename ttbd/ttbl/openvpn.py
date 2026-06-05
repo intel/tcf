@@ -9,7 +9,10 @@ Power control module to start OpenVPN services when a network is powered on
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 """
 
+import os
+import socket
 import subprocess
+import zipfile
 
 import ttbl.power
 
@@ -26,6 +29,9 @@ class server_c(ttbl.power.daemon_c):
       and reliable, TCP allows hopping firewalls.
 
       Note the client needs to be configured to do one or the other
+
+    :param str openvpn_host: (optional; defaults to the value of the
+      *host* global variable)
 
     :param str tap_suffix: (*optional*, default *tap*)
 
@@ -56,6 +62,23 @@ class server_c(ttbl.power.daemon_c):
       nwx.interface_impl_add(
            "console", "log-openvpn-tcp",
            ttbl.console.logfile_c("openvpn-openvpn_tcp.log"))
+
+
+    Add description information to it so people know how to connect::
+
+      nwx.property_set("interfaces.power.openvpn_udp.description", \"\""\
+      OpenVPN connection over <a href = "/ttb-v2/targets/%(id)s/store/file?file_path=certificates_client/openvpn-%(_alloc.id)s-%(id)s-udp.zip">UDP</a>:
+
+      <pre>
+        $ /usr/bin/openvpn --client \\
+           --dev tap --proto udp4 \\
+           --remote  %(interfaces.power.openvpn_tcp.openvpn_port)s %(interfaces.power.openvpn_tcp.openvpn_port)d \\
+           --ca <a href = "/ttb-v2/targets/%(id)s/store/file?file_path=certificates_client/ca.cert" download = "cert-%(_alloc.id)s-%(id)s-ca.cert">cert-%(_alloc.id)s-%(id)s-ca.cert</a> \\
+           --cert <a href = "/ttb-v2/targets/%(id)s/store/file?file_path=certificates_client/openvpn.cert" download = "cert-%(_alloc.id)s-%(id)s-openvpn.cert">cert-%(_alloc.id)s-%(id)s-openvpn.cert</a> \\
+           --key <a href = "/ttb-v2/targets/%(id)s/store/file?file_path=certificates_client/openvpn.key" download = "cert-%(_alloc.id)s-%(id)s-openvpn.key">cert-%(_alloc.id)s-%(id)s-openvpn.key</a> \\
+           --verb 1
+      </pre>
+      \"\"\")
 
 
     It creates two L2 bridges using TAP, one over TCP, another over
@@ -141,10 +164,14 @@ class server_c(ttbl.power.daemon_c):
 
     """
 
-    def __init__(self, openvpn_port: int = 1194, openvpn_path: str = None,
-                 ip_protocol: str = "udp", tap_suffix: str = "tap"):
+    def __init__(self,
+                 openvpn_host: str = None, openvpn_port: int = 1194,
+                 ip_protocol: str = "udp", tap_suffix: str = "tap",
+                 openvpn_path: str = None):
         assert ip_protocol in [ "udp", "tcp" ], \
             f"ip_protocol: expected *udp* or *tcp*; got {ip_protocol}"
+        if openvpn_host != None:
+            assert isinstance(openvpn_host, str)
         assert isinstance(openvpn_port, int) \
             and openvpn_port > 2 and openvpn_port < 65536, \
             f"openvpn_port: expected int 2-65536, got [{type(openvpn_port)}] '{openvpn_port}'"
@@ -153,6 +180,7 @@ class server_c(ttbl.power.daemon_c):
             self.openvpn_path = self.openvpn_path
         else:
             self.openvpn_path = openvpn_path
+        self.openvpn_host = openvpn_host
         self.openvpn_port = openvpn_port
         self.ip_protocol = ip_protocol
         cmdline = [
@@ -195,11 +223,91 @@ class server_c(ttbl.power.daemon_c):
 
 
 
+    def _allocate_hook(self, target, iface_name, allocdb):
+        # This is called when the target is allocated
+        # Note we don't have the component name in here
+        #
+        # We want to use this to create a CONFIGURATION package for
+        # connecting to OpenVPN in a zip file, that can be downloaded
+        # by the user easily
+
+        # 1. ensure we have the openvpn certs and the CA (see comments
+        #    in the code below about the order)
+        # 2. generate .openvpn file
+        # 3. pack it up in a zip, make it avaialable in the
+        #    certificates_client directory, so it can be easily
+        #    downloaded with the store interface
+
+        # Ensure a certificate for OpenVPN is available
+        iface_cert = getattr(target, "certs", None)
+        if iface_cert == None:
+            raise RuntimeError(
+                f"{target.id}: does not support SSL certificates!"
+                " Configuration BUG?")
+        iface_cert.put_certificate(target, ttbl.who_daemon(),
+                                   { "name": "openvpn" }, None, None)
+
+        # we do this after the call to ensure we have certificates so
+        # this path for sure is available
+        cert_client_path = os.path.join(target.state_dir, "certificates_client")
+        cert_path = os.path.join(target.state_dir, "certificates")
+        openvpn_host = target.property_get(f"interfaces.{iface_name}.openvpn_tcp.openvpn_host")
+        if openvpn_host == None: 	# not specified in properties, default
+            openvpn_host = self.openvpn_host
+        if openvpn_host == None:
+            openvpn_host = socket.getfqdn()
+        with open(f"{cert_client_path}/{target.id}-{allocdb.allocid}-{self.ip_protocol}.openvpn", "w") as f:
+            f.write(f"""\
+# Generated by ttbl.openvpn.server_c._allocate_hook() when {target.id}1
+# is configured
+#
+# tcf.git/ttbd/ttbl/openvpn.py
+
+# - Avoids conflicts if multiple VPNs run simultaneously or previous
+#   sessions haven’t fully cleaned up
+# - More NAT-friendly
+nobind
+
+client
+dev tap
+proto {self.ip_protocol}
+# host to connect to; can also be obtained from inventory
+remote {openvpn_host} {self.openvpn_port}
+ca cert-{allocdb.allocid}-{target.id}-ca.cert
+cert cert-{allocdb.allocid}-{target.id}-openvpn.cert
+key cert-{allocdb.allocid}-{target.id}-openvpn.key
+verb 1
+""")
+
+        # Pack it up
+        with zipfile.ZipFile(f"{cert_client_path}/openvpn-{allocdb.allocid}-{target.id}-{self.ip_protocol}.zip", "w") as zipf:
+            zipf.write(f"{cert_client_path}/{target.id}-{allocdb.allocid}-{self.ip_protocol}.openvpn",
+                       arcname = f"{self.ip_protocol}.openvpn")
+            zipf.write(f"{cert_path}/ca.cert",
+                       arcname = f"cert-{allocdb.allocid}-{target.id}-ca.cert")
+            zipf.write(f"{cert_client_path}/openvpn.cert",
+                       arcname = f"cert-{allocdb.allocid}-{target.id}-openvpn.cert")
+            zipf.write(f"{cert_client_path}/openvpn.key",
+                       arcname = f"cert-{allocdb.allocid}-{target.id}-openvpn.key")
+
+
+
     def target_setup(self, target, iface_name, component):
         target.property_set(f"interfaces.{iface_name}.{component}.openvpn_protocol",
                             self.ip_protocol)
+        openvpn_host = target.property_get(f"interfaces.{iface_name}.{component}.openvpn_host")
+        if openvpn_host == None: 	# not specified in properties, default
+            openvpn_host = self.openvpn_host
+            if openvpn_host == None:
+                openvpn_host = socket.getfqdn()
+            target.property_set(f"interfaces.{iface_name}.{component}.openvpn_host",
+                                openvpn_host)
         target.property_set(f"interfaces.{iface_name}.{component}.openvpn_port",
                             self.openvpn_port)
+        # FIXME: quick hack -- we should have
+        # ttbl.power.tt_interface._allocate_hook iterate over
+        # registered components
+        target.allocate_hooks[f'{iface_name}#{component}'] = self._allocate_hook
 
 
 
@@ -234,3 +342,9 @@ class server_c(ttbl.power.daemon_c):
         iface_cert.put_certificate(target, ttbl.who_daemon(),
                                    { "name": "openvpn" }, None, None)
         ttbl.power.daemon_c.on(self, target, component)
+        # when we restart the server, the certificate paths might get
+        # wiped, so re-do the generating of the connection package.
+        with target.lock:
+            # ok, just a copy is fine
+            allocdb = target._allocdb_get()
+        self._allocate_hook(target, "power", allocdb)
