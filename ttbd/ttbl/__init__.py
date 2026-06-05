@@ -13,37 +13,22 @@ by subclassing. See as examples :class:`ttbl.console.interface` or
 :class:`ttbl.power.interface`.
 
 """
-import bisect
 import collections
 import contextlib
 import errno
-import fcntl
 import filelock
 import glob
 import ipaddress
 import json
 import logging
-import numbers
 import os
 import pprint
-import random
 import re
-import shutil
-import signal
-import socket
-import string
-import subprocess
-import sys
-import tempfile
 import threading
 import time
-import traceback
-import types
 import urllib.parse
 import warnings
 
-import __main__
-import requests
 import serial
 import serial.tools.list_ports
 import usb.util
