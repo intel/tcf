@@ -20,6 +20,7 @@ Command line and logging helpers
 import argparse
 import base64
 import bisect
+import builtins
 import codecs
 import collections
 import contextlib
@@ -1218,7 +1219,7 @@ class fs_cache_c():
         for timestamp in timestamp_sorted_list[:clean_number]:
             for field in fields_by_timestamp[timestamp]:
                 self.fsdb.set(field, None, nested_flat_keyspace = False)
-                
+
         # updated time stamp after running cleanup
         with open(last_cleanup_location, "w") as f:
             f.write(str(time.time()))
@@ -2671,12 +2672,20 @@ def password_get(domain, user, password):
     :param str password: a password obtained from the user or a
       configuration setting; can be *None*. If the *password* is
 
+      In a URL form, some characters will mess up with the
+      interpretation of the parts in a
+      *USERNAME:PASSWORD@HOSTNAME:PORT* format. Use a FILE:, KEYRING:
+      or ENV: format as much as you can.
+
       - *KEYRING[:DOMAIN[:USER]]* will ask the keyring for the
         password for domain *DOMAIN* for username *USER*; if *DOMAIN*
         or *USER* are not specified, they are taken from the arguments.
 
-      - *FILE=PATH* (or *FILE:PATH*) will read the password from
+      - *FILE:PATH* (or *FILE=PATH*) will read the password from
         filename *PATH*.
+
+        in the *PATH*, the / character will/can mess with parsing of
+        URLs, so use %% for a /.
 
       - *ENV:DOMAIN* (or *ENV:DOMAIN*) will read the password from
         an environment variable called DOMAIN_PASSWORD
@@ -2755,6 +2764,8 @@ def password_get(domain, user, password):
 
     if password.startswith("FILE:"):
         _, filename = password.split(":", 1)
+        # hack to allow specifying slashes in URLs and for them to parse ok.
+        filename = filename.replace("%%", "/")
         return _file_get(filename)
 
     if password.startswith("FILE="):
@@ -2828,6 +2839,294 @@ def url_remove_user_pwd(url):
     if url.path:
         _url += url.path
     return _url
+
+
+
+def value_from_str_casting(arg_value: str, split_char: str = ":"):
+    """
+    Convert a value from a string, casting it to an specific type
+
+    :param str arg_value: an spec of the type *[TYPE:]VALUE*; type is
+      any of:
+
+      - b|bool convert to boolean; *true* any case evals to *True*;
+        otherwise *False*.
+
+      - i|int convert to base 10 integer
+
+      - f|float convert to base 10 float
+
+      - s|str convert to string (this allows to specify strings that
+        include the separation character :)
+
+      - c|class|o|object convert to a Python object; if it includes a
+        module prefix (eg: for *o:something.another.bleh*, the module
+        *something.another* will be imported first)
+
+    :returns: the object if conversion is valid or exists
+
+    Examples:
+
+      i:4 -> 4 as integer
+      int:4 -> 4 as integer
+
+      f:5.04
+      float:5.04 -> 5.04 float
+
+      class:module1.submodule2.classname -> type *classname*
+        in module *module1.submodule2*
+
+      o:os.path.isfile -> function *os.path.isfile*
+
+    """
+    if split_char in arg_value:
+        type_str, value_str = arg_value.split(split_char, 1)
+        if type_str in ('bool', 'b'):
+            value = value_str.lower() == 'true'
+        elif type_str in ( 'int', 'i' ):
+            value = int(value_str)
+        elif type_str in ( 'float', 'f' ):
+            value = float(value_str)
+        elif type_str in ( 'str', 's' ):
+            value = value_str
+        elif type_str in ( 'class', 'c', 'object', 'o' ):
+            value = getattr(builtins, type_str, None)
+            if value == None:	# might be a custom type
+                try:
+                    module_name, class_name = value_str.rsplit(".", 1)
+                    module = importlib.import_module(module_name)
+                    return getattr(module, class_name)
+                except Exception as e:
+                    raise ValueError(
+                        f"can't find type/object '{arg_value}': {e}") \
+                        from e
+        else:
+            raise ValueError(
+                f"unsupported type {type_str} for argument {arg_value}")
+    else:
+        value = arg_value
+    return value
+
+
+
+def flat_dict_to_nested_casting(flat_dict: dict):
+    """
+    Convert a dictionary of flat key-values to a nested dictionary,
+    casting the values as specified
+
+    :param dict flat_dict: dictionary keyed by string of string values
+
+       key *some.key.key2* value *float:3* will be converted to
+       *['some']['key']['key2'] = 3*
+
+       FIXME: values have to be a list of the value -- weird
+
+    :returns dict: nested dictionary of native python types
+    """
+    assert_dict_key_strings(flat_dict, "flat dict entries")
+    d = {}
+    for k, v in flat_dict.items():
+        # something.another.andanother -> [ something, another, andanother ]
+        fields = k.split(".")
+        _d = d		# we'll use this to iterate
+        for field in fields[:-1]:
+            if field not in _d:		# create non-existent field
+                _d[field] = {}
+            elif type(_d[field]) != dict:	# override non-dict field
+                _d[field] = {}
+            _d = _d[field]		# iterate to next level down
+
+        if len(v) != 1:
+            raise ValueError(
+                f"BUG? argument {k} has multiple values: {v}")
+
+        _d[fields[-1]] = value_from_str_casting(v[0])
+    return d
+
+
+
+def factory(device_spec: str, base_type = None,
+            scheme_map: dict = None, **kwargs):
+    """
+    Create an object of a type given by a URL
+
+    The scheme is mapped to the class/type, the netloc is passed as
+    first argument, the path (if given) as *path* kwarg and any
+    parameter as extra *kwargs*; types are casted if specified.
+
+    :param str device_spec: a URL specification such as::
+
+        CLASSNAME://[TYPE!]NETLOC/[PATH]?[PARAMETER1=[TYPE1:]VALUE1[&PARAMETER2=[TYPE2:]VALUE2][...]]]]")
+
+      - CLASSNAME: a class that can be instantiated
+
+      - NETLOC: will be passed as first argument (if present)
+
+        for no netloc, do three forward slashes, like *scheme:///path?param1=value1*
+
+       if *[TYPE!]* is present, the NETLOC is casted to that type.
+
+      - PATH: if given is passed as kwarg *path*
+
+      - Any parameters after *?* are casted (if TYPE specified and passed as kwargs)
+
+        Parameters are in a flat nested dictionary, so "top.field1 =
+        int:3" and "top.field2 = 'string2'" would map to
+
+        >>> top = { "field1": 3, "field2" = 'string2' }
+
+    :param dict kwargs: other args to the constructor
+
+    :param dict scheme_map: (optional, default none) map of class
+       names, so *NAME* can be mapped to *SOMEOTHERNAME*., eg:
+
+       >>> scheme_map = {
+       >>>     "shortclass": "some.module.someclass",
+       >>>     "shortclass2": "some.othermodule.someclass2",
+       >>>     ...
+       >>> }
+
+
+    Example:
+
+    >>> commonl.factory("mymodule.myclass://somename?key=band&thing.d=dparam&thing.e=int:3")
+
+    would return the result of calling::
+
+       mymodule.myclass(somename, key = "band",
+                        thing = { "d": "dparam", "e": 3 })
+
+    """
+
+    if scheme_map == None:
+        scheme_map = {}
+
+    # scheme's can't contain _, which we use a lot in classes, so we
+    # take - for that, because we can't have - in class names.
+
+    if '://' in device_spec:
+        scheme, rest = device_spec.split("://", 1)
+        scheme = scheme_map.get(scheme, scheme)
+        if "_" in scheme:
+            scheme_patched = scheme.replace("_", "-")
+            device_spec = scheme_patched + "://" + rest
+
+    parsed_url = urllib.parse.urlparse(device_spec)
+
+    # In the past we had to do this manually because urlparse would
+    # get confused with all the colons in the password side
+
+    # classname://
+    scheme = parsed_url.scheme.replace("-", "_")
+    if '.' in scheme:
+        # ensure the module is imported
+        import importlib
+        # a.b.c.d -> a.b.c
+        modulename, classname_short = scheme.rsplit(".", 1)
+        module = importlib.import_module(modulename)
+    else:
+        import __main__
+        module = __main__
+        classname_short = scheme
+    class_type = getattr(module, classname_short)
+    # is this a valid object? needs to derive from the right class
+    if base_type and not issubclass(class_type, base_type):
+        raise ValueError(
+            f"class '{class_type}' does not derive from '{base_type}'")
+
+    arguments = urllib.parse.parse_qs(
+        parsed_url.query,
+        # if no value, this will be translated to bool True
+        keep_blank_values = True,
+        # set a reasonable limit to avoid errors or attacks
+        max_num_fields = 30)
+    # arguments looks like
+    ## {
+    ##    'parameter1': ['ddd'],
+    ##    'parameter2': ['bool:true'],
+    ##    'parameter3': ['int:3'],
+    ##    'parameter4': ['']
+    ## }
+    parsed_kwargs = flat_dict_to_nested_casting(arguments)
+    if parsed_url.path:
+        parsed_kwargs['path'] = parsed_url.path
+
+    # now instantiate; the first argument, the netloc we always pass
+    # straight away as first arg; the others are passed as k=v
+    parsed_args = []
+    if parsed_url.netloc:
+        # can't use value_from_str_casting(parsed_url.netloc) here
+        # because when we specified a netwlork location such as
+        # USERNAME:PASSWOR@SOMEWHERE, etc...it gets confusing
+        parsed_args.append(
+            value_from_str_casting(
+                parsed_url.netloc, split_char = '!'))
+
+    return class_type(
+        *parsed_args,
+        **parsed_kwargs,
+        **kwargs)
+
+
+
+def factory_from_specs(specs: dict, scheme_map: dict = None,
+                       allowed: dict = None,
+                       log = logging):
+    """
+    Create a list object based on their factory specs
+
+
+    :param dict specs: dict keyed by a string of factory
+      specifications, as specified by :func:`commonl.factory`
+
+    :param dict scheme_map: (optional, default none) map of scheme
+      names to class names; useful to shorten them in the specs, eg:
+
+        >>> scheme_map = {
+        >>>     "shortclass": "some.module.someclass",
+        >>>     "shortclass2": "some.othermodule.someclass2",
+        >>>     ...
+        >>> }
+
+    :param dict allowed: (optional, default none) dict of allowed
+      specs that can be created, keyed by a (compiled) regex, value
+      being a description.
+
+        >>> allowed = {
+        >>>     re.compile(r"^mymodule\.myclass://.*$"): "myclass is allowed",
+        >>> }
+
+    :param log: a logger to log the creation of the objects; default
+      is the logging module
+    """
+    assert_dict_key_strings(specs, "driver specifications")
+    impls = {}
+    if allowed != None:
+        count = -1
+        for k, v in allowed.items():
+            assert isinstance(k, re.Pattern), \
+                f"allowed[{count}]: expected key as compiled regex of" \
+                " factory URLs allowed; got {type(key)}"
+            assert isinstance(v, str), \
+                f"allowed[{count}]: expected string value; got {type(v)}"
+    for name, spec in specs.items():
+        # this takes a DRIVERNAME://ARG?PARAM1=VAL1...and instantiates
+        # a driver from it
+        if allowed:
+            for spec_regex, description in allowed.items():
+                if spec_regex.match(spec):
+                    log.info(f"{name}: creating instance of {spec} allowed"
+                             f" [{description}]")
+                    break
+            else:
+                raise ValueError(
+                    f"rejecting creation of {spec}: not in the allowed list")
+        else:
+            log.info(f"{name}: creating instance of {spec}")
+        impls[name] = factory(spec, scheme_map = scheme_map)
+        log.info(f"{name}: created '{impls[name]}' from {spec}")
+    return impls
+
 
 
 def field_needed(field, projections):
