@@ -93,7 +93,7 @@
             <div class = "tooltip">
               {{ component }}
               <span class = "tooltiptext">
-                {{ description }}
+                {{ description | safe }}	{# | safe needed if we want it to interpret HTML #}
               </span>
             </div>
             {% else %}
