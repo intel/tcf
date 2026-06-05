@@ -161,6 +161,9 @@ class pc(ttbl.power.daemon_c):
             path,
             "--auth-server",
             "--keep-in-foreground",
+            # do not read /etc/resolv.conf, since this will cause
+            # loops and deadlocks
+            "--no-resolv",
             "--pid-file=%(path)s/dnsmasq.pid",
             "--dhcp-leasefile=%(path)s/dnsmasq.leases",
             "--conf-file=%(path)s/dnsmasq.conf",
@@ -205,7 +208,7 @@ class pc(ttbl.power.daemon_c):
         # FIXME: parallelize for many
         dhcp_hosts = collections.defaultdict(dict)
         for target in ttbl.config.targets.values():
-            interconnects = target.tags.get('interconnects', {})
+            interconnects = target.property_get('interconnects', {})
             # iterate interconnects this thing connects to
             for interconnect_id, interconnect in interconnects.items():
                 if interconnect_id != ic.id:
@@ -368,12 +371,14 @@ class pc(ttbl.power.daemon_c):
                 # next fields can be in the target or fall back to the
                 # values from the interconnect
                 kws = target.kws
-                bsps = target.tags.get('bsps', {}).keys()
+                bsps = target.property_get('bsps', {}).keys()
                 if bsps:
                     # take the first BSP in sort order...yeah, not a
                     # good plan
                     bsp = sorted(bsps)[0]
                     kws['bsp'] = bsp
+                else:
+                    bsp = None
                 ttbl.pxe.tag_get_from_ic_target(kws, 'pos_http_url_prefix', ic, target)
                 ttbl.pxe.tag_get_from_ic_target(kws, 'pos_nfs_server', ic, target)
                 ttbl.pxe.tag_get_from_ic_target(kws, 'pos_nfs_path', ic, target)
@@ -398,8 +403,9 @@ class pc(ttbl.power.daemon_c):
                     # override with anything the target declares in config
                     arch = None
                     boot_filename = None
-                    if 'pos_tftp_boot_filename' in target.tags:
-                        boot_filename = target.tags['pos_tftp_boot_filename']
+                    boot_filename = target.property_get('pos_tftp_boot_filename', None)
+                    if boot_filename:
+                        pass
                     elif bsp in ttbl.pxe.architectures:
                         arch = ttbl.pxe.architectures[bsp]
                         arch_name = bsp
