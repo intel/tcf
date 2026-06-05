@@ -1413,41 +1413,47 @@ class test_target(object):
                              "if it is local, declare it before the targets "
                              "using it" % real_name)
         for key, val in list(data.items()):
-            # FIXME: verify duped addresses
-            if key in ["ipv4_addr", "ipv6_addr"]:
-                proto = key.replace("_addr", "")
-                # Just to verify if it checks as an address
-                _ic_addr = ipaddress.ip_address(str(val))
-                net = ipaddress.ip_network(
-                    str(val + "/" + str(data[proto + "_prefix_len"])),
-                    strict = False)
-                if ic:
-                    _ic_addr = ic.tags[key]
-                    ic_net = ipaddress.ip_network(
-                        str(_ic_addr + "/"
-                                + str(ic.tags[proto + "_prefix_len"])),
+            try:
+                # FIXME: verify duped addresses
+                if key in ["ipv4_addr", "ipv6_addr"]:
+                    proto = key.replace("_addr", "")
+                    # Just to verify if it checks as an address
+                    _ic_addr = ipaddress.ip_address(str(val))
+                    net = ipaddress.ip_network(
+                        str(val + "/" + str(data[proto + "_prefix_len"])),
                         strict = False)
-                    if ic_net != net:
-                        logging.warning(
-                            "%s: IP address %s for interconnect %s is outside "
-                            "of the interconnect's network %s (vs %s)" % (
-                                self.id, val, name, ic_net, net))
-            if key == "ipv4_prefix_len":
-                val = int(val)
-                assert val > 0 and val < 32, \
-                    "%s: invalid IPv4 prefix len %d for interconnect %s " \
-                    "(valid valuess are 1-31)" % (self.id, val, name)
-            if key == "ipv6_prefix_len":
-                val = int(val)
-                assert val > 0 and val < 128, \
-                    "%s: invalid IPv6 prefix len %s for interconnect %s " \
-                    "(valid values are 1-127)" % (self.id, val, name)
-            if key == "vlan":
-                val = int(val)
-                assert val >= 0 and val < 4096, \
-                    "vlan %d is outside of the valid values 0-4095" % val
-                assert 'mac_addr' in data, \
-                    "vlan specified without a mac_addr"
+                    if ic:
+                        _ic_addr = ic.tags[key]
+                        ic_net = ipaddress.ip_network(
+                            str(_ic_addr + "/"
+                                    + str(ic.tags[proto + "_prefix_len"])),
+                            strict = False)
+                        if ic_net != net:
+                            logging.warning(
+                                "%s: IP address %s for interconnect %s is outside "
+                                "of the interconnect's network %s (vs %s)" % (
+                                    self.id, val, name, ic_net, net))
+                if key == "ipv4_prefix_len":
+                    val = int(val)
+                    assert val > 0 and val < 32, \
+                        "%s: invalid IPv4 prefix len %d for interconnect %s " \
+                        "(valid valuess are 1-31)" % (self.id, val, name)
+                if key == "ipv6_prefix_len":
+                    val = int(val)
+                    assert val > 0 and val < 128, \
+                        "%s: invalid IPv6 prefix len %s for interconnect %s " \
+                        "(valid values are 1-127)" % (self.id, val, name)
+                if key == "vlan":
+                    val = int(val)
+                    assert val >= 0 and val < 4096, \
+                        "vlan %d is outside of the valid values 0-4095" % val
+                    assert 'mac_addr' in data, \
+                        "vlan specified without a mac_addr"
+            except Exception as e:
+                self.log.error(f"exception verifing interconnect {name} {data=}: {e}")
+                raise
+
+
 
     def _tags_verify(self):
         if 'bsp_models' in self.tags:
