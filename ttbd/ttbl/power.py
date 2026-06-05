@@ -4350,3 +4350,11 @@ def execute_defer_list(defer_list: list, name: str, serialize: bool = False,
             _config['daemon'] = daemon_orig
 
     logging.warning("power defer list '%s': executed", name)
+
+
+# this is fed to commonl.factory*()
+factory_scheme_map = {
+    "raritan_px": "ttbl.raritan_px.pc",
+    "raritan_emx": "ttbl.raritan_emx.pc",
+    "dlwps7": "ttbl.pc.dlwps7",
+}
