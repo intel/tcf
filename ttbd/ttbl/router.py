@@ -42,7 +42,7 @@ class router_c:
         self.password = None
         if hostname:
             self.username, self.password, self.hostname = \
-                commonl.split_user_pwd_hostname(hostname)
+                commonl.split_user_pwd_hostname(hostname, expand_password = False)
         # override username and password from args, if present
         if username:
             self.username = username
@@ -333,10 +333,11 @@ class cisco_c(router_c):
             self.logger.info("command #%d: %s", count, _what)
             count += 1
         try:
+            password = commonl.password_get(self.hostname, self.username, self.password)
             r = requests.post(
                 f'https://{self.hostname}/ins', json = dl,
                 headers = {'content-type':'application/json-rpc'},
-                auth = ( self.username, self.password ),
+                auth = ( self.username, password ),
                 verify = False
             )
             self.logger.info(f"execution r {r}")
