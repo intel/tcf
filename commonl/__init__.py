@@ -37,6 +37,7 @@ import json
 import logging
 import multiprocessing
 import numbers
+import operator
 import os
 import pickle
 import random
@@ -3386,6 +3387,41 @@ def flat_keys_to_dict(d):
         _key_rep(tr, key, key, d[key])
 
     return tr
+
+
+
+def dict_get_by_key(d: dict, key, value,
+                    eqf = operator.__eq__):
+    """
+    Given a dictionary of dictionaries, return the first level
+    dictionary that has a key that matches a value
+
+    :param dict key: a dictionary of dictionaries, eg:
+
+      >>> d =  { 1: { "a": "1a", "b": "1b" }, 2: { "a": "2a", "b": "2b" }, }
+
+    :param key: the key to match, eg:
+
+       >>> key = "b"
+
+    :param value: the value to match in the key, eg:
+
+       >>> value = "2b"
+
+
+    :param callable eq: (optional, defaults to equality) comparsion function
+
+    :returns dict: subdictionary that contains a key that matches value, eg:
+
+       >>> { "a": "2a", "b": "2b" }
+
+    """
+    for subd in d.values():
+        if key in subd and eqf(subd[key], value):
+            return subd
+    return None
+
+
 
 
 class tls_prefix_c(object):
