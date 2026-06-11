@@ -4200,6 +4200,13 @@ def _execute_action(target: ttbl.test_target, state: bool, soft_failure: bool):
     # executes a power action based on the state variable
     if state == None:
         return
+    if isinstance(state, numbers.Number):
+        target.log.warning(
+            "ttbl.power._execute_action(): waiting {state:.1}s",)
+        time.sleep(state)
+        target.log.warning(
+            "ttbl.power._execute_action(): waited {state:.1}s",)
+        return
     try:
         target.log.warning(
             "ttbl.power._execute_action(): powering %s",
@@ -4253,7 +4260,7 @@ def defer(target: ttbl.test_target, state: bool,
       powered on, *False* for powered off, *None* for don't do anything.
 
     """
-    assert state == None or isinstance(state, bool), \
+    assert state == None or isinstance(state, ( bool, numbers.Number )), \
         "state: expected bool or None; got {type(state)}"
 
     if defer_list == None:
