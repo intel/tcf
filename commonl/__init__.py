@@ -2947,8 +2947,7 @@ def flat_dict_to_nested_casting(flat_dict: dict):
 
 def factory(device_spec: str, base_type = None,
             scheme_map: dict = None, **kwargs):
-    """
-    Create an object of a type given by a URL
+    """Create an object of a type given by a URL
 
     The scheme is mapped to the class/type, the netloc is passed as
     first argument, the path (if given) as *path* kwarg and any
@@ -2960,11 +2959,18 @@ def factory(device_spec: str, base_type = None,
 
       - CLASSNAME: a class that can be instantiated
 
+        if *CLASSNAME* is *alias*, then the return value will be
+        tuple *( CLASSNAME, NETLOC )*
+
       - NETLOC: will be passed as first argument (if present)
 
         for no netloc, do three forward slashes, like *scheme:///path?param1=value1*
 
-       if *[TYPE!]* is present, the NETLOC is casted to that type.
+        if *[TYPE!]* is present, the NETLOC is casted to that type; it
+        needs to be be used (eg: prefixing *str!*) to force parsing as
+        a string when a port is specified in a *NETLOC* such as::
+
+           HOSTNAME:PORT
 
       - PATH: if given is passed as kwarg *path*
 
@@ -2986,6 +2992,8 @@ def factory(device_spec: str, base_type = None,
        >>>     ...
        >>> }
 
+
+    :returns: object instance of the given class or tuple if alias
 
     Example:
 
@@ -3018,7 +3026,10 @@ def factory(device_spec: str, base_type = None,
 
     # classname://
     scheme = parsed_url.scheme.replace("-", "_")
-    if '.' in scheme:
+    if scheme == "alias":
+        # [1:] -> remove leading / in path
+        return ( parsed_url.netloc, parsed_url.path[1:] )
+    elif '.' in scheme:
         # ensure the module is imported
         import importlib
         # a.b.c.d -> a.b.c
@@ -3154,6 +3165,7 @@ def field_needed(field, projections):
         return None		# we do not need this field
     else:
         return field	# no list, have it
+
 
 
 def dict_to_flat(d, projections = None, sort = True, empty_dict = False,
