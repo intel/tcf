@@ -25,6 +25,15 @@ _count = 0
 state_path = None
 upload_max_size = 16 * 1024 * 1024
 
+
+#: Run the startup power up sequence in serial or parallel (default)
+#:
+#: When running the startup power up sequence, do it in serial or
+#: parallel mode; some configurations require sequencing, and to
+#: simplify at the expense of startup performance, it's just easiert to
+#: serialize it.
+power_startup_serialize = False
+
 #: Maximum duration to service a request time (in seconds)
 #:
 #: All the calls in ttbd are synchronous; we let the underlaying code
