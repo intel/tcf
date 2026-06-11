@@ -25,6 +25,7 @@ import os
 import pexpect
 import re
 import requests
+import threading
 import time
 import traceback
 
@@ -663,6 +664,7 @@ class cisco_catalyst_c(router_c):
         self.timeout = timeout
         self.port = port
         self.p = None
+        self.p_lock = threading.Lock()
 
 
     # - # superuser
@@ -673,6 +675,9 @@ class cisco_catalyst_c(router_c):
 
 
     class exception(RuntimeError):
+        pass
+
+    class command_e(exception):
         pass
 
     # yes, this is global to the class -- why? because we want, if
@@ -702,11 +707,17 @@ class cisco_catalyst_c(router_c):
             ( self.hostname, self.username, password ),
             None)
 
-        if self.p:
+        if self.p != None:
             try:
                 self.logger.info("reuse previous connection: checking if possible")
-                self.p.send(b"\r")
-                self.p.expect(self.prompt_regex)
+                self.p.send(b"\x03")	# send a Ctrl-C to clear and get prompt
+                try:	# flush as much as we find
+                    r = self.p.expect(b".*", timeout = 0.1)
+                    self.logger.info(f"reuse previous connection: flushed {r}B")
+                except pexpect.exceptions.TIMEOUT:
+                    self.logger.info("reuse previous connection: done flushing")
+                self.p.send(b"\x03")	# send a Ctrl-C to clear and get prompt
+                self.p.expect(self.prompt_regex, timeout = 0.1)
                 self.logger.info("reusing previous connection: found prompt")
                 return
             except Exception as e:
@@ -731,8 +742,8 @@ class cisco_catalyst_c(router_c):
                     # this way is shared by all targets that same the
                     # same PDU and username to it.
                     #
-                    # IF DISABLED IT WILL OVERWHELM THE PDU WITH CONNECTIONS
-                    "-oControlMaster no",
+                    # IF DISABLED IT WILL OVERWHELM WITH CONNECTIONS
+                    "-oControlMaster auto",
                     f"-oControlPath {ttbl.test_target.files_path}/ssh-{self.username}-{self.hostname}.control",
                     # old SSH impl in the switch requires old algorithms
                     "-o", "PubkeyAcceptedAlgorithms +ssh-rsa",
@@ -759,20 +770,21 @@ class cisco_catalyst_c(router_c):
                 timeout = 30)
             self.logger.info("found welcome message")
             self.p.send(b'\r')
-            self.p.expect(self.prompt_regex)
-            self.logger.info("found prompt")
+            r = self._expect_prompt(b"")
+            self.logger.info(f"found prompt: {r}")
             # disable pagination
             self._cmd("ter len 0")
             self.ssh_connections[( self.hostname, self.username, password )] = self.p
             return
 
         except Exception as e:
+
             self.logger.info(f"opening connection to {self.username}@{self.hostname} failed: {e}")
             if self.p:
                 self.logger.info(f"log before: {self.p.before}")
                 self.logger.info(f"log after: {self.p.after}")
             del self.p	# connection died, so clean it up so it is redone
-            self.ssh_connections[( self.hostname, self.username, password )] = None
+            #self.ssh_connections[( self.hostname, self.username, password )] = None
             self.p = None
             raise
 
@@ -783,9 +795,9 @@ class cisco_catalyst_c(router_c):
         try:
             self.logger.info(f"expecting {expectation}")
             self.p.expect(expectation, timeout = timeout)
-            if self.error_regex.search(self.p.after):
-                raise RuntimeError(
-                    f"{self.hostname}: command failed: {self.p.after}"
+            if self.error_regex.search(self.p.before):
+                raise self.command_e(
+                    f"{self.hostname}: command failed: {self.p.before}"
                 )
             return self.p.match.group(0)
         except pexpect.exceptions.EOF as e:
@@ -802,27 +814,43 @@ class cisco_catalyst_c(router_c):
                 f" receiving '{expectation}'") from e
 
 
-
-    def _cmd(self, command, expect = None,):
-        r = b""
-        self.p.send(command + "\r")
-        if expect:
-            r = self._expect(expect)
-        else:
-            r = self.p.before
+    def _expect_prompt(self, r):
+        count = -1
         while True:
+            count += 1
             try:
                 # keep reading the prompt until it times out;
                 # otherwise sometimes it gets out of sync; prompt
                 # regexing is hard
                 self.p.expect(self.prompt_regex, timeout = 0.1)
-                if not r:
-                    r += self.p.before
-                self.logger.debug("received prompt %s", r)
+                r += self.p.before
+                self.logger.info("prompt received[%d]: %s", count, r)
+                self.logger.info("prompt received[%d]: after: %s", count, self.p.after)
             except pexpect.exceptions.TIMEOUT:
+                self.logger.info("prompt received[%d]: exiting", count)
                 # can't read a prompt no more, prolly we are at it
                 break
-        self.logger.debug("%s@%s: command output %s", self.username, self.hostname, r)
+        if self.error_regex.search(r):
+            raise self.command_e(
+                f"{self.hostname}: command failed: {r}"
+            )
+        return r
+
+
+
+    def _cmd(self, command, expect = None,):
+        r = b""
+        self.p.send(command + "\r")
+        self.logger.info("%s@%s: sent command: %s",
+                         self.username, self.hostname, command)
+        if expect:
+            r = self._expect(expect)
+            self.logger.info("%s@%s: found response %s",
+                             self.username, self.hostname, expect)
+        else:
+            r = self.p.before
+        r = self._expect_prompt(r)
+        self.logger.info("%s@%s: command output %s", self.username, self.hostname, r)
         return r
 
 
@@ -859,12 +887,49 @@ class cisco_catalyst_c(router_c):
                     # make this permanent we nee \r\r because Nexus
                     # doesn't have a way to override con
                     "copy run start\r\r",
-                    "[OK]")
+                    # backslash, so expect doesn't thing it's a regex
+                    "\[OK\]")
                 return
             except RuntimeError as e:
                 if count >= top:
                     self.logger.error("copy running-config: retried %d "
                                       "times, giving up", count)
+                    raise
+                self.logger.info("copy running-config: retrying %d/%d: %s",
+                                 count, top, e)
+                time.sleep(0.5)
+                continue
+
+
+
+    def _copy_running_config_retrying(self):
+        #
+        # Tells the switch to copy running config to startup (so
+        # if we restart, the state is the same)
+        #
+        # Note sometimes this fails because another op like this
+        # is in progress; sleep, retry.
+        #
+        # Assumes switch console is in conf mode
+
+        top = 4
+        count = 0
+        while True:
+            count += 1
+            try:
+                self._cmd(
+                    # make this permanent we nee \r\r because Nexus
+                    # doesn't have a way to override con
+                    "copy run start\r\r",
+                    # backslash, so expect doesn't thing it's a regex
+                    "\[OK\]")
+                return
+            except RuntimeError as e:
+                if count >= top:
+                    self.logger.error("copy running-config: retried %d "
+                                      "times, giving up", count)
+                    raise
+                if self.p == None:	# connection died, bump it up
                     raise
                 self.logger.info("copy running-config: retrying %d/%d: %s",
                                  count, top, e)
@@ -888,93 +953,118 @@ class cisco_catalyst_c(router_c):
         trunk mode (switchport; switchport mode trunk)
         """
 
-
-
         server_switch_port = target.tags.get("server.switch_port", None)
         if not server_switch_port:
             return
 
-        self._open_maybe()
-        self._sequence_run(
-            "config terminal",
-            # select the interface/port where the server is
-            # connected
-            f"int {server_switch_port}",
-            "shutdown",	# disable it while we reconfigure
-            # convert from layer 3 -> layer2 switching (vs
-            # noswitchport that converts to layer 3)
-            "switchport",
-            # set the port to mode trunk, so multiple VLANs can be
-            # routed over it.
-            "switchport mode trunk",
-            # ensure trunk ports can access all vlans, since we use
-            # them to provide services to all of them
-            "switchport trunk allowed vlan all",
-            # FIXME: we need to be able to pass extra commands
-            "no shut",	# enable it
-            # done!
-            "exit",	# exit int config
-            'exit'      # exit config
-        )
-        self._copy_running_config_retrying()
+        @commonl.retry_cb_tries(
+            ( pexpect.exceptions.ExceptionPexpect, RuntimeError, self.exception ),
+            tries = 4,
+            header = "server_link_setup: ", logger = self.logger.info)
+        def _server_link_setup():
+            self._open_maybe()
+            self._sequence_run(
+                "config terminal",
+                # select the interface/port where the server is
+                # connected
+                f"int {server_switch_port}",
+                "shutdown",	# disable it while we reconfigure
+                # convert from layer 3 -> layer2 switching (vs
+                # noswitchport that converts to layer 3)
+                "switchport",
+                # set the port to mode trunk, so multiple VLANs can be
+                # routed over it.
+                "switchport mode trunk",
+                # ensure trunk ports can access all vlans, since we use
+                # them to provide services to all of them
+                "switchport trunk allowed vlan all",
+                # FIXME: we need to be able to pass extra commands
+                "no shut",	# enable it
+                # done!
+                "exit",	# exit int config
+                'exit'      # exit config
+            )
+            self._copy_running_config_retrying()
+
+        with self.p_lock:
+            _server_link_setup()
+
 
 
     def vlan_create(self, vlan_id, vlan_name, switch_ports):
-        self._open_maybe()
 
-        sequence = [
-            "conf terminal",
-            # wipe first
-            f"no vlan {vlan_id}",
-            f"vlan {vlan_id}",
-            f"name {vlan_name}",
-            "exit"
-        ]
-        if switch_ports:
-            # allow acces only to certain ports
-            sequence += [
-                # select all affected ports--use f'{i}' so we
-                # support both int and str transparently
-                f"int {','.join(f'{i}' for i in switch_ports)}",
-                # For untagged traffic use layer2, access can do a
-                # single VLAN
-                "switchport",
-                "switchport mode access",
-                f"switchport access vlan {vlan_id}",
-                # For tagged traffic; disabled for now because we
-                # can't get both untagged and tagged modes to work
-                # and we prefer untagged since it is easier to
-                # work with on the OS side
-                #f"switchport mode trunk",
-                #f"switchport trunk allowed vlan {vlan_id}",
-                # enable the ports
-                "no shut",
-                "exit",	# exit port config
+        @commonl.retry_cb_tries(
+            ( pexpect.exceptions.ExceptionPexpect, RuntimeError, self.exception ),
+            tries = 4,
+            header = "vlan_create: ", logger = self.logger.info)
+        def _vlan_create():
+            self._open_maybe()
+
+            sequence = [
+                "conf terminal",
+                # wipe first
+                f"no vlan {vlan_id}",
+                f"vlan {vlan_id}",
+                f"name {vlan_name}",
             ]
-        sequence += [
-            'exit'	# exit conf terminal
-        ]
-        self._sequence_run(*sequence)
-        self._copy_running_config_retrying()
+            if switch_ports:
+                # allow acces only to certain ports
+                sequence += [
+                    # select all affected ports--use f'{i}' so we
+                    # support both int and str transparently
+                    f"int range {', '.join(f'{i}' for i in switch_ports)}",
+                    # For untagged traffic use layer2, access can do a
+                    # single VLAN
+                    "switchport",
+                    "switchport mode access",
+                    f"switchport access vlan {vlan_id}",
+                    # For tagged traffic; disabled for now because we
+                    # can't get both untagged and tagged modes to work
+                    # and we prefer untagged since it is easier to
+                    # work with on the OS side
+                    #f"switchport mode trunk",
+                    #f"switchport trunk allowed vlan {vlan_id}",
+                    # enable the ports
+                    "no shut",
+                    "exit",	# exit port config
+                ]
+            sequence += [
+                'exit'	# exit conf terminal
+            ]
+            self._sequence_run(*sequence)
+            self._copy_running_config_retrying()
+            return
+
+        with self.p_lock:
+            _vlan_create()
 
 
 
     def vlan_destroy(self, vlan_id, vlan_name):
-        self._open_maybe()
-        if self.vlan_get(vlan_id):
-            # since this has to copy the running config, do it only if
-            # the vlan is there.
-            self._sequence_run(
-                "conf terminal",
-                # wipe first
-                f"no vlan {vlan_id}",
-                "exit",
-            )
-            self._copy_running_config_retrying()
+
+        @commonl.retry_cb_tries(
+            ( pexpect.exceptions.ExceptionPexpect, RuntimeError, self.exception ),
+            tries = 4,
+            header = "vlan_destroy: ", logger = self.logger.info)
+        def _vlan_destroy():
+            self._open_maybe()
+            if self._vlan_get(vlan_id) != None:
+                # since this has to copy the running config, do it only if
+                # the vlan is there.
+                self._sequence_run(
+                    "conf terminal",
+                    # wipe first
+                    f"no vlan {vlan_id}",
+                    "exit",
+                )
+                self._copy_running_config_retrying()
+
+        with self.p_lock:
+            _vlan_destroy()
 
 
 
-    def vlan_get(self, vlan_id):
+    def _vlan_get(self, vlan_id):
         # False would do
         #
         ## PROMPT#show vlan id 3
@@ -1004,19 +1094,39 @@ class cisco_catalyst_c(router_c):
         #
         try:
             self._open_maybe()
-            o = self._cmd(f"show vlan id {vlan_id}")
-            # We only do a VLAN at the time, so this works to detect
-            if b'VLAN Name' in o:
-                return True
-            elif b"not found in current" in o:
-                return False
-            else:
-                self.log.warning("unknown output to show vlan id: %s", o)
-                return None
+            bad_count = 0
+            while True:
+                o = self._cmd(f"show vlan id {vlan_id}")
+                # We only do a VLAN at the time, so this works to detect
+                if b'VLAN Name' in o:
+                    return True
+                elif b"not found in current" in o:
+                    return None		# None for not found, that's the API
+                else:
+                    bad_count += 1
+                    if bad_count > 10:
+                        self.logger.warning("unknown output to show vlan id; reached max count, returning None state: %s", o)
+                        return None
+                    self.logger.warning("unknown output to show vlan id: %s", o)
+                    continue
         except Exception as e:
-            self.log.exception("exception running 'show vlan id': %s",
-                               e, exc_info = True)
+            self.logger.exception("exception running 'show vlan id': %s",
+                                  e, exc_info = True)
             return None
+
+
+
+    def vlan_get(self, vlan_id):
+
+        @commonl.retry_cb_tries(
+            ( pexpect.exceptions.ExceptionPexpect, RuntimeError, self.exception ),
+            tries = 4,
+            header = "vlan_get: ", logger = self.logger.info)
+        def _vlan_get_retry():
+            return self._vlan_get(vlan_id)
+
+        with self.p_lock:
+            return _vlan_get_retry()
 
 
 
@@ -1082,7 +1192,8 @@ class router_manager_c(ttbl.power.impl_c):
         hostname = console.kws['hostname']
         router = self.switch_class(
             hostname, username = username, password = password,
-            logger = target.log
+            logger = target.log.logger.getChild("switch")
+            #logger = target.log.info,
         )
         return router
 
@@ -1187,7 +1298,7 @@ class vlan_manager_c(ttbl.power.impl_c):
         hostname = console.kws.get('hostname', None)
         router = self.switch_class(
             hostname, username = username, password = password,
-            logger = target.log
+            logger = target.log.logger.getChild("switch")
         )
         return router
 
@@ -1210,13 +1321,25 @@ class vlan_manager_c(ttbl.power.impl_c):
             allocdb.target_info_reload()
             for itr_target_name, itr_target in allocdb.targets_all.items():
                 # the switch port is stored in the property
-                # interconnects.NETWORKNAME.switch_port, so get
+                # interconnects.NETWORKNAME[__QUALIFIER].switch_port, so get
                 # that
                 #switch_port = self._target_property_get(
-                switch_port = itr_target.property_get(
-                    f"interconnects.{target.id}.switch_port")
-                if switch_port:
-                    switch_ports.add(switch_port)
+                interconnect_data = itr_target.property_get("interconnects")
+                for ic_name, ic_data in interconnect_data.items():
+                    if "__" in ic_name:
+                        # this is
+                        # interconnects.NETWORKNAME[__QUALIFIER] for
+                        # multiple connections from a single target to
+                        # the same network
+                        _ic_name, qualifier = ic_name.split("__", 1)
+                    else:
+                        _ic_name, qualifier = ic_name, None
+                    if _ic_name == target.id:
+                        switch_port = ic_data.get("switch_port", None)
+                        if switch_port:
+                            target.log.info(
+                                f"adding port {switch_port} for {ic_name}")
+                            switch_ports.add(switch_port)
         target.log.info("allowed switch_ports: %s", switch_ports)
 
         # ok, we have all the info now, create the vlan using the
