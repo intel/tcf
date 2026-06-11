@@ -1124,20 +1124,28 @@ def target_qemu_pos_add(target_name,
     # them as it takes as parameter the console name to read off/write
     # the QEMU generated cmdline in
     # STATE_DIR/console-NAME.{read,write}
-    ssh_pc = ttbl.console.ssh_pc("root@" + ipv4_addr)
-    upid = dict(qemu_pc.upid)
-    del upid['name_long']
-    ssh_pc.upid_set(qemu_pc.name, **upid)
+    if nw_name:
+        ssh_pc = ttbl.console.ssh_pc("root@" + ipv4_addr)
+        upid = dict(qemu_pc.upid)
+        del upid['name_long']
+        ssh_pc.upid_set(qemu_pc.name, **upid)
     consolel = []
     for console in consoles:
         consolel.append(
             ( console, console_pc )
         )
+    if nw_name:
+        consolel += [
+            ( "ssh0", ssh_pc ),
+        ]
     consolel += [
-        ( "ssh0", ssh_pc ),
         ( "default",  consolel[0][0] ),
-        ( "preferred",  "ssh0" ),
     ]
+    if nw_name:
+        consolel += [
+            ( "preferred",  "ssh0" ),
+        ]
+
     target.interface_add("console", ttbl.console.interface(*consolel))
     # store interface needed for adding the capture interface
     target.interface_add("store", ttbl.config._iface_store)
@@ -1187,14 +1195,15 @@ def target_qemu_pos_add(target_name,
         tags = tags
     )
 
-    target.add_to_interconnect(		# Network support
-        nw_name,
-        dict(
-            ipv4_addr = ipv4_addr, ipv4_prefix_len = 24,
-            ipv6_addr = ipv6_addr, ipv6_prefix_len = 104,
-            mac_addr = mac_addr,
+    if nw_name:
+        target.add_to_interconnect(		# Network support
+            nw_name,
+            dict(
+                ipv4_addr = ipv4_addr, ipv4_prefix_len = 24,
+                ipv6_addr = ipv6_addr, ipv6_prefix_len = 104,
+                mac_addr = mac_addr,
+            )
         )
-    )
 
     # Setup the POS parameters
     # we can override the defaults when calling this function
