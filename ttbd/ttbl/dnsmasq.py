@@ -58,6 +58,15 @@ class pc(ttbl.power.daemon_c):
     the dnsmasq daemon will then resolve those names from queries from
     the targets.
 
+    A target might have multiple connections to an interconnect,
+    declaring such information in the inventory entry
+    *interconnects.INTERCONNECTNAME__QUALIFIER* (vs
+    *interconnects.INTERCONNECTNAME* for the main connection)
+
+    For extra connections declared, target TARGETNAME it will
+    identified by dnsmasq with entries TARGETNAME.INTERCONNECTNAME and
+    TARGETNAME-QUALIFIER.INTERCONNECTNAME.
+
     For example: the server configures the interconnect *nwa*, to
       which it has physical access on a given interface on IP address
       192.168.97.1 (as configured in the interconnect's tags)::
@@ -117,7 +126,7 @@ class pc(ttbl.power.daemon_c):
 
     These will be taken in the following order:
 
-    - *TARGET.interconnects.ICNAME.FIELD*
+    - *TARGET.interconnects.ICNAME[__QUALIFIER].FIELD*
     - *IC.FIELD*
 
     The following are recognized:
@@ -211,28 +220,36 @@ class pc(ttbl.power.daemon_c):
             interconnects = target.property_get('interconnects', {})
             # iterate interconnects this thing connects to
             for interconnect_id, interconnect in interconnects.items():
-                if interconnect_id != ic.id:
+                if "__" in interconnect_id:
+                    _interconnect_id, qualifier = interconnect_id.split("__", 1)
+                    qualifier = f"-{qualifier}"
+                else:
+                    _interconnect_id = interconnect_id
+                    qualifier = ""
+                if _interconnect_id != ic.id:
                     continue
                 addrs = []
                 mac_addr = interconnect.get('mac_addr', None)
                 if mac_addr:
-                    dhcp_hosts[target]['mac_addr'] = mac_addr
+                    dhcp_hosts[( target, qualifier)]['mac_addr'] = mac_addr
                 ipv4_addr = interconnect.get('ipv4_addr', None)
                 if ipv4_addr:
-                    dhcp_hosts[target]['ipv4_addr'] = ipv4_addr
+                    dhcp_hosts[( target, qualifier)]['ipv4_addr'] = ipv4_addr
                     addrs.append(ipv4_addr)
                 ipv6_addr = interconnect.get('ipv6_addr', None)
                 if ipv6_addr:
-                    dhcp_hosts[target]['ipv6_addr'] = ipv6_addr
+                    dhcp_hosts[( target, qualifier)]['ipv6_addr'] = ipv6_addr
                     addrs.append(ipv6_addr)
                 if addrs:
                     # Create a file for each target that will connect to
                     # this interconnect
-                    with open(os.path.join(dirname, target.id), "w+") as f:
+                    # If the interconnect name was ICNAME__QUALIFIER,
+                    # we append -QUALIFIER to the name
+                    with open(os.path.join(dirname, target.id + qualifier), "w+") as f:
                         for addr in addrs:
                             f.write("%s\t%s %s.%s\n" % (addr,
-                                                        target.id,
-                                                        target.id, ic.id))
+                                                        target.id + qualifier,
+                                                        target.id + qualifier, ic.id))
         # Create a configuration file
         #
         # configl has all the options with template values which we
@@ -353,11 +370,11 @@ class pc(ttbl.power.daemon_c):
                 f.write(config % ic.kws + "\n")
 
             # For each target we know can connect, create a dhcp-host entry
-            for target, data in dhcp_hosts.items():
+            for ( target, qualifier ), data in dhcp_hosts.items():
                 infol = [
                     # we set a tag after the host name to match a
                     # host-specific dhcp-option line to it
-                    "set:" + target.id,
+                    "set:" + target.id + qualifier,
                     data['mac_addr']
                 ]
                 if 'ipv4_addr' in data:
@@ -365,12 +382,13 @@ class pc(ttbl.power.daemon_c):
                 if 'ipv6_addr' in data:
                     # IPv6 addr in [ADDR] format, per man page
                     infol.append("[" + data['ipv6_addr'] + "]")
-                infol.append(target.id)
+                infol.append(target.id + qualifier)
                 infol.append("infinite")
                 f.write("dhcp-host=" + ",".join(infol) + "\n")
                 # next fields can be in the target or fall back to the
                 # values from the interconnect
-                kws = target.kws
+                kws = dict(target.kws)
+                kws['qualifier'] = qualifier
                 bsps = target.property_get('bsps', {}).keys()
                 if bsps:
                     # take the first BSP in sort order...yeah, not a
@@ -392,7 +410,7 @@ class pc(ttbl.power.daemon_c):
                 # a unified source.
 
                 f.write(
-                    "dhcp-option=tag:%(id)s,option:root-path,%(pos_nfs_server)s:%(pos_nfs_path)s,soft,nfsvers=4\n"
+                    "dhcp-option=tag:%(id)s%(qualifier)s,option:root-path,%(pos_nfs_server)s:%(pos_nfs_path)s,soft,nfsvers=4\n"
                     % kws)
 
                 # If the target declares a BSP (at this point of the
@@ -420,37 +438,37 @@ class pc(ttbl.power.daemon_c):
                         kws, 'default_route', ic, target, True)
                     if default_route == False:
                         # this means NO default route
-                        f.write("dhcp-option=tag:%(id)s," % kws
+                        f.write("dhcp-option=tag:%(id)s%(qualifier)s," % kws
                                 + "option:router\n")
                     elif default_route == True:
                         pass		# default router behaviour
                     else:
-                        f.write("dhcp-option=tag:%(id)s," % kws
+                        f.write("dhcp-option=tag:%(id)s%(qualifier)s," % kws
                                 + f"option:router,{default_route}\n")
 
                     default_route6 = ttbl.pxe.tag_get_from_ic_target(
                         kws, 'default_route6', ic, target, True)
                     if default_route6 == False:
                         # this means NO default route
-                        f.write("dhcp-option=tag:%(id)s," % kws
+                        f.write("dhcp-option=tag:%(id)s%(qualifier)s," % kws
                                 + "option6:router\n")
                     elif default_route6 == True:
                         pass		# default router behaviour
                     else:
-                        f.write("dhcp-option=tag:%(id)s," % kws
+                        f.write("dhcp-option=tag:%(id)s%(qualifier)s," % kws
                                 + f"option:router6,{default_route6}\n")
 
                     if boot_filename:
                         f.write(
-                            "dhcp-option=tag:%(id)s," % kws
+                            "dhcp-option=tag:%(id)s%(qualifier)s," % kws
                             + "option:bootfile-name," + boot_filename + "\n")
                     if ic_ipv4_addr:
                         f.write(
-                            "dhcp-option=tag:%(id)s," % kws
+                            "dhcp-option=tag:%(id)s%(qualifier)s," % kws
                             + "option:tftp-server," + ic_ipv4_addr + "\n")
                     if ic_ipv6_addr:
                         f.write(
-                            "dhcp-option=tag:%(id)s," % kws
+                            "dhcp-option=tag:%(id)s%(qualifier)s," % kws
                             + "option:tftp-server," + ic_ipv6_addr + "\n")
                     else:
                         raise RuntimeError(

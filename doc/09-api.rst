@@ -182,6 +182,18 @@ Common metadata
   here naming the interconnect. Note the interconnect might be in
   another server, not necessarily in the same server as the target is.
 
+  If a target has multiple connections to an interconnect, they need
+  to be described with multiple entries with a qualifier, so they can
+  be distinguished::
+
+    interconnects.ICNAME.mac_addr: MACADDR_A
+    interconnects.ICNAME__nic2.mac_addr: MACADDR_B
+    interconnects.ICNAME__bmc.mac_addr: MACADDR_C
+    interconnects.ICNAME__kvm.mac_addr: MACADDR_D
+
+  Different modules will use it later to (eg ttbl.dnsmasq) create
+  names in networks such as TARGETID-bmc.ICNAME, etc.
+
   Each interconnect might have the following (or other fields) with
   address assignments, etc:
 
@@ -206,6 +218,13 @@ Common metadata
 
   - *ipv4_prefix_len* (int): length in bits of the network portion of
     the IPv6 address
+
+  - *network_name* (str): name of the network this interconnect
+    connects to; this normally matches the interconnect name, but it
+    might not when this is spanning multiple servers.
+
+    When spanning multiple servers, this interconnect shall be named,
+    eg *SWITCHNAME-NETWORKNAME* and this field *NETWORKNAME*.
 
 - *idle_power_off* (int): seconds the target will be idle before the
   system will automatically power it off (if 0, it will never be
