@@ -167,7 +167,8 @@ class server_c(ttbl.power.daemon_c):
     def __init__(self,
                  openvpn_host: str = None, openvpn_port: int = 1194,
                  ip_protocol: str = "udp", tap_suffix: str = "tap",
-                 openvpn_path: str = None):
+                 openvpn_path: str = None,
+                 **kwargs):
         assert ip_protocol in [ "udp", "tcp" ], \
             f"ip_protocol: expected *udp* or *tcp*; got {ip_protocol}"
         if openvpn_host != None:
@@ -215,7 +216,8 @@ class server_c(ttbl.power.daemon_c):
         ]
         ttbl.power.daemon_c.__init__(
             self, cmdline, precheck_wait = 0.5, mkpidfile = False,
-            pidfile = "%(path)s/openvpn-%(component)s.pid")
+            pidfile = "%(path)s/openvpn-%(component)s.pid",
+            **kwargs)
         self.upid_set(
             f"OpenVPN server on {ip_protocol}#{openvpn_port} server",
             ip_protocol = ip_protocol,
