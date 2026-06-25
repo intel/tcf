@@ -4200,12 +4200,13 @@ def _execute_action(target: ttbl.test_target, state: bool, soft_failure: bool):
     # executes a power action based on the state variable
     if state == None:
         return
-    if isinstance(state, numbers.Number):
+    # @#@$@#@#@$ bools identify as numbers...
+    if not isinstance(state, bool) and isinstance(state, numbers.Number):
         target.log.warning(
-            "ttbl.power._execute_action(): waiting {state:.1}s",)
+            f"ttbl.power._execute_action(): waiting {state}s",)
         time.sleep(state)
         target.log.warning(
-            "ttbl.power._execute_action(): waited {state:.1}s",)
+            f"ttbl.power._execute_action(): waited {state}s",)
         return
     try:
         target.log.warning(
@@ -4217,6 +4218,9 @@ def _execute_action(target: ttbl.test_target, state: bool, soft_failure: bool):
             target.power.put_off(target, ttbl.who_daemon(), {}, {}, None)
     except Exception as e:
         if soft_failure == False:
+            target.log.error(
+                "ttbl.power._execute_action(): power %s failure: %s",
+                "on" if state == True else "off", e, exc_info = True)
             raise
         target.log.warning(
             "ttbl.power._execute_action(): ignoring power %s failure: %s",
