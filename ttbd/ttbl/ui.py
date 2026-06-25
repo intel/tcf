@@ -585,7 +585,13 @@ def _target(targetid):
     # FIXME: these two are always the same, we shall be able to
     # coalesce them
     inventory = target.to_dict(list())
-    kws = target.kws_collect()
+    # use a missing dict, so that when we expand fields that don't
+    # exist for any reason we just get a default value expanded
+    # instead of raising an exception; since we are using templates
+    # from the user to expand all this, they migh specify things that
+    # are not there or the life cycles of the fields might be different
+    kws = commonl.dict_missing_c(dict())
+    kws = target.kws_collect(kws = kws)
 
     # get owner
     owner = target.owner_get()
