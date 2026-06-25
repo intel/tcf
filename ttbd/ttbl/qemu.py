@@ -712,22 +712,58 @@ class pc(ttbl.power.daemon_c,
         #   drivers/ethernet/Kconfig.smsc911x:13:config ETH_NIC_MODEL$
         #   drivers/ethernet/Kconfig.stellaris:15:config ETH_NIC_MODEL$
         #   drivers/ethernet/Kconfig.e1000:16:config ETH_NIC_MODEL$
-        for tap, if_name in target.fsdb.get_as_dict("tuntap-*").items():
-            # @tap is tuntap-NETWORK, the property set by
-            # powe rail component network_tap_pc.
-            _, ic_name = tap.split("-", 1)
-            mac_addr = target.tags['interconnects'][ic_name]['mac_addr']
+        interconnect_data = target.property_get("interconnects")
+
+        bridge_names_allocation = set()
+
+        # Collect the list of targets in the group we have been
+        # allocated with; if there are interconnects, they will expose
+        # a field "bridge_ifname" that is the network interface this
+        # VM needs to tap into to be able to tap to that
+        # network. Collect the list of those names.
+        with target.lock:
+            allocdb = target._allocdb_get()
+            target_names = allocdb.get("group_allocated").split(",")
+            for target_name_itr in target_names:
+                target_itr = ttbl.test_target.get(target_name_itr)
+                bridge_ifname = target_itr.property_get("bridge_ifname")
+                bridge_names_allocation.add(bridge_ifname)
+
+        # Now list what information we have for interconnects that
+        # this VM shall connect to. Deduce the name of the bridge they
+        # need to use and if it is in the list of networks that we
+        # have access to per-the allocation, assume we need to connect
+        # to it and set up taps and the config for it to show up as a
+        # network interface in the VM.
+        for ic_name, ic_data in interconnect_data.items():
+            # get from interconnetcs[NWNAME] or interconnects[*]["network_name"]
+            network_name = ic_data.get("network_name", ic_name)
+            # if there is no explicit bridge name, use the network name
+            bridge_name = ic_data.get("bridge_ifname", network_name)
+            if bridge_name not in bridge_names_allocation:
+                target.log.info(f"not attaching network {network_name}: not in allocation")
+                continue
+            mac_addr = ic_data['mac_addr']
             model = commonl.name_make_safe(
                 target.fsdb.get("qemu-model-" + ic_name,
                                 target.fsdb.get("qemu-model",
                                                 self.nic_model)))
+            # be a pain... FIXME: unify with network_tap_pc._validate_component()
+            if_name = f"{bridge_name}.{target.id}"
+            if len(if_name) >= 15:	# Linux's max network interface name is 15
+                # so we do tHASH
+                if_name = f"{bridge_name}.{commonl.mkid(if_name, 6)}"
             self.cmdline_extra += [
                 "-device",
                 #
                 # romfile= UNSET for using virtio-net
                 #  - https://wiki.syslinux.org/wiki/index.php?title=Development/Testing
                 #    Workaround using virtio
-                f"{model},netdev={ic_name},mac={mac_addr},romfile=",
+                #
+                # update: if we specify romfile= with e1000, it
+                #         doesn't work, so we just remove it
+                f"{model},netdev={ic_name},mac={mac_addr}",
+                #f"{model},netdev={ic_name},mac={mac_addr},romfile=",
                 "-netdev",
                 f"tap,id={ic_name},script=no,ifname={if_name}"
             ]
@@ -876,6 +912,7 @@ class plugger_c(ttbl.things.impl_c):
         return target.fsdb.get("interfaces.things." + thing.id + ".plugged", False)
 
 
+
 class network_tap_pc(ttbl.power.impl_c):
     """Creates a tap device and attaches it to an interconnect's network
     device
@@ -883,7 +920,10 @@ class network_tap_pc(ttbl.power.impl_c):
     A target declares connectivity to one or more interconnects; when
     this object is instantiated as part of the power rail:
 
-    Parameters as to :class:ttbl.power.impl_c.
+    :param list(str) if_names: list of names of interfaces to attach
+      to
+
+    Other parameters as to :class:ttbl.power.impl_c.
 
     >>> target.interface_add(
     >>>     "power",
@@ -927,8 +967,13 @@ class network_tap_pc(ttbl.power.impl_c):
     the interface.
 
     """
-    def __init__(self, **kwargs):
+    def __init__(self, if_names: list = None, **kwargs):
         ttbl.power.impl_c.__init__(self, **kwargs)
+        if if_names != None:
+            commonl.assert_list_of_strings(if_names, "if_names", "if_name")
+            self.if_names = if_names
+        else:
+            self.if_names = []
         self.upid_set(
             "Virtual network over tun/tap device",
             name = "tuntap",
@@ -948,24 +993,72 @@ class network_tap_pc(ttbl.power.impl_c):
                 % component)
         _, ic_name = component.split("-", 1)
         # ensure target is a member of icname
-        if ic_name not in target.tags.get('interconnects', {}):
+
+        # FIXME: make it so we can
+        # call it the networkname, so we don't have SWITCH-NW in the
+        # name
+        interconnect_data = target.property_get("interconnects")
+        ic_data = interconnect_data.get(ic_name, None)
+        if ic_data == None:
+            # look into network_name
+            for ic_name_itr, ic_data in interconnect_data.items():
+                network_name = ic_data.get('network_name', None)
+                if network_name == ic_name:
+                    break
+            else:
+                ic_data = None
+        if ic_data == None:
             raise ValueError(
                 "%s: can't create TAP interface:"
-                " target '%s' is not connected to interconnect '%s'"
+                " target '%s' is not connected to interconnect/network '%s'"
                 % (component, target.id, ic_name))
         # we need a system unique name, since what this creates is
         # global to the whole system--we can easily run out of naming
         # space though, as network interfaces are limited in size --
         # this probably could just hash it all, but then tracing would
         # be a pain...
-        if_name = "t%s%s" % (ic_name, target.id)
+        if_name = f"{ic_name}.{target.id}"
         if len(if_name) >= 15:	# Linux's max network interface name is 15
             # so we do tHASH
-            if_name = "t" + commonl.mkid(if_name, 6)
+            if_name = f"{ic_name}.{commonl.mkid(if_name, 6)}"
         return if_name, ic_name
 
 
+    def _if_names_list(self, target, component):
+
+        if not self.if_names:
+            if_name, ic_name = self._component_validate(target, component)
+
+            if not commonl.if_present(ic_name):
+                target.log.info(f"{ic_name}: assuming network off since netif "
+                                f"{ic_name} is not present")
+                return [ ]
+            return [ ( if_name, ic_name ) ]
+        else:
+            if_names_allocation = set()
+
+            with target.lock:
+                allocdb = target._allocdb_get()
+                target_names = allocdb.get("group_allocated").split(",")
+                for target_name_itr in target_names:
+                    target_itr = ttbl.test_target.get(target_name_itr)
+                    bridge_ifname = target_itr.property_get("bridge_ifname")
+                    if_names_allocation.add(bridge_ifname)
+
+                r = []
+                for ic_name in if_names_allocation & set(self.if_names):
+                    if_name = f"{ic_name}.{target.id}"
+                    if len(if_name) >= 15:	# Linux's max network interface name is 15
+                        # so we do tHASH
+                        if_name = f"{ic_name}.{commonl.mkid(if_name, 6)}"
+                    r.append(( if_name, ic_name ))
+
+                return r
+
+
+
     def on(self, target, component):
+
         if not commonl.prctl_cap_get_effective() & 1 << 12:
             # If we don't have network setting privilege,
             # don't even go there
@@ -977,36 +1070,52 @@ class network_tap_pc(ttbl.power.impl_c):
             # need this.
             raise RuntimeError("daemon lacks CAP_NET_ADMIN: unable to"
                                " add networking capabilities ")
-        if_name, ic_name = self._component_validate(target, component)
 
-        if not commonl.if_present(f"b{ic_name}"):
-            target.log.info(f"{ic_name}: assuming network off since netif "
-                            f"b{ic_name} is not present")
-            return
+        if_names = self._if_names_list(target, component)
 
-        commonl.if_remove_maybe(if_name)	# ensure no leftovers
-        subprocess.check_call(
-            [ "ip",  "tuntap", "add", if_name, "mode", "tap" ],
-            stderr = subprocess.STDOUT)
-        subprocess.check_call(
-            [ "ip", "link", "set" ,if_name, "master", "b" + ic_name ],
-            stderr = subprocess.STDOUT)
-        # promisc on: needed so we can wireshark in
-        subprocess.check_call(
-            [ "ip", "link", "set", if_name, "promisc", "on", "up" ],
-            stderr = subprocess.STDOUT)
-        # We don't assign IP addresses here -- we leave it for the
-        # client; if we do, for example QEMU won't work as it is just
-        # used to associate the interface
-        target.fsdb.set(component, if_name)
+        target.log.info(f"network_tap_pc/on: will configure {if_names}")
+        for if_name, ic_name in if_names:
+            # if_name is the tap network interface for QEMU to attach
+            # to the network interface that represents the
+            # interconnect, ic_name
+            target.log.info(f"network_tap_pc/on: configuring {if_name}")
+            commonl.if_remove_maybe(if_name)	# ensure no leftovers
+            subprocess.check_call(
+                [ "ip",  "tuntap", "add", if_name, "mode", "tap" ],
+                stderr = subprocess.STDOUT)
+            subprocess.check_call(
+                [ "ip", "link", "set", if_name, "master", ic_name ],
+                stderr = subprocess.STDOUT)
+            # promisc on: needed so we can wireshark in
+            subprocess.check_call(
+                [ "ip", "link", "set", if_name, "promisc", "on", "up" ],
+                stderr = subprocess.STDOUT)
+            # We don't assign IP addresses here -- we leave it for the
+            # client; if we do, for example QEMU won't work as it is just
+            # used to associate the interface
+            target.fsdb.set(component, if_name)
+
+
 
     def off(self, target, component):
-        target.fsdb.set(component, None)
-        if_name, _ = self._component_validate(target, component)
-        commonl.if_remove_maybe(if_name)
+        if_names = self._if_names_list(target, component)
+        target.log.info(f"network_tap_pc/on: will deconfigure {if_names}")
+        for if_name, _ in if_names:
+            target.log.info(f"network_tap_pc/on: deconfiguring {if_name}")
+            commonl.if_remove_maybe(if_name)
+
+
 
     def get(self, target, component):
-        if_name, _ = self._component_validate(target, component)
-        # if there is a network interface, it will be symlinked to
-        # from /sys/class/net/IFNAME -> place
-        return os.path.isdir("/sys/class/net/" + if_name)
+        if_names = self._if_names_list(target, component)
+        target.log.info(f"network_tap_pc/on: will check for power {if_names}")
+        for if_name, _ in self._if_names_list(target, component):
+            # if there is a network interface, it will be symlinked to
+            # from /sys/class/net/IFNAME -> place
+            if not os.path.isdir("/sys/class/net/" + if_name):
+                target.log.info(f"network_tap_pc/on: {if_name} not configured, off")
+                return False
+            else:
+                target.log.info(f"network_tap_pc/on: {if_name} configured")
+        target.log.info(f"network_tap_pc/on: {if_names} all configured, on")
+        return True
