@@ -32,12 +32,15 @@ http://www.thekelleys.org.uk/dnsmasq/docs/dnsmasq-man.html.
 """
 import collections
 import ipaddress
+import logging
 import os
 import shutil
 
 import commonl
 import ttbl.pxe
 import ttbl.power
+
+logger = logging.getLogger("ttbl.dnsmasq")
 
 class pc(ttbl.power.daemon_c):
     """Start / stop a dnsmasq daemon to resolve DNS requests to a given
@@ -244,7 +247,7 @@ class pc(ttbl.power.daemon_c):
                     # Create a file for each target that will connect to
                     # this interconnect
                     # If the interconnect name was ICNAME__QUALIFIER,
-                    # we append -QUALIFIER to the name
+                    # we append -QUALIFIER to the name.
                     with open(os.path.join(dirname, target.id + qualifier), "w+") as f:
                         for addr in addrs:
                             f.write("%s\t%s %s.%s\n" % (addr,
@@ -371,6 +374,11 @@ class pc(ttbl.power.daemon_c):
 
             # For each target we know can connect, create a dhcp-host entry
             for ( target, qualifier ), data in dhcp_hosts.items():
+                if 'mac_addr' not in data:
+                    logger.info(
+                        "%s/%s: not adding %s to DHCP table, no MAC addr declared",
+                        ic.id, _component, target)
+                    continue
                 infol = [
                     # we set a tag after the host name to match a
                     # host-specific dhcp-option line to it
