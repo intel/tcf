@@ -2843,7 +2843,9 @@ def url_remove_user_pwd(url):
 
 
 
-def value_from_str_casting(arg_value: str, split_char: str = ":"):
+def value_from_str_casting(arg_value: str,
+                           split_char: str = ":",
+                           sequence_split_char: str = "~"):
     """
     Convert a value from a string, casting it to an specific type
 
@@ -2864,6 +2866,9 @@ def value_from_str_casting(arg_value: str, split_char: str = ":"):
         module prefix (eg: for *o:something.another.bleh*, the module
         *something.another* will be imported first)
 
+       ~ is used to separate multiple separate values to create a
+       list; if you need to do a ~, use %ASCII encoding (eg: %7e for ~)
+
     :returns: the object if conversion is valid or exists
 
     Examples:
@@ -2879,54 +2884,67 @@ def value_from_str_casting(arg_value: str, split_char: str = ":"):
 
       o:os.path.isfile -> function *os.path.isfile*
 
+
+    https://developers.google.com/search/docs/crawling-indexing/url-structure
+
     """
-    if split_char in arg_value:
-        type_str, value_str = arg_value.split(split_char, 1)
-        if type_str in ('bool', 'b'):
-            value = value_str.lower() == 'true'
-        elif type_str in ( 'int', 'i' ):
-            value = int(value_str)
-        elif type_str in ( 'float', 'f' ):
-            value = float(value_str)
-        elif type_str in ( 'str', 's' ):
-            value = value_str
-        elif type_str in ( 'class', 'c', 'object', 'o' ):
-            value = getattr(builtins, type_str, None)
-            if value == None:	# might be a custom type
-                try:
-                    module_name, class_name = value_str.rsplit(".", 1)
-                    module = importlib.import_module(module_name)
-                    return getattr(module, class_name)
-                except Exception as e:
-                    raise ValueError(
-                        f"can't find type/object '{arg_value}': {e}") \
-                        from e
-        else:
-            raise ValueError(
-                f"unsupported type {type_str} for argument {arg_value}")
+    if sequence_split_char in arg_value:
+        arg_value_l = arg_value.split(sequence_split_char)
+        r_value = []
     else:
-        value = arg_value
-    return value
+        arg_value_l = [ arg_value ]
+        r_value = None
+    for arg_value in arg_value_l:
+        if split_char in arg_value:
+            type_str, value_str = arg_value.split(split_char, 1)
+            if type_str in ('bool', 'b'):
+                value = value_str.lower() == 'true'
+            elif type_str in ( 'int', 'i' ):
+                value = int(value_str)
+            elif type_str in ( 'float', 'f' ):
+                value = float(value_str)
+            elif type_str in ( 'str', 's' ):
+                value = value_str
+            elif type_str in ( 'class', 'c', 'object', 'o' ):
+                value = getattr(builtins, type_str, None)
+                if value == None:	# might be a custom type
+                    try:
+                        module_name, class_name = value_str.rsplit(".", 1)
+                        module = importlib.import_module(module_name)
+                        return getattr(module, class_name)
+                    except Exception as e:
+                        raise ValueError(
+                            f"can't find type/object '{arg_value}': {e}") \
+                            from e
+            else:
+                raise ValueError(
+                    f"unsupported type {type_str} for argument {arg_value}")
+        else:
+            value = arg_value
+        if isinstance(r_value, list):
+            r_value.append(value)
+        else:
+            r_value = value
+    return r_value
 
 
 
-def flat_dict_to_nested_casting(flat_dict: dict):
+def flat_kv_to_nested_casting(args: dict):
     """
     Convert a dictionary of flat key-values to a nested dictionary,
     casting the values as specified
 
-    :param dict flat_dict: dictionary keyed by string of string values
+    :param dict list: list of key:str/value tuples
 
        key *some.key.key2* value *float:3* will be converted to
        *['some']['key']['key2'] = 3*
 
-       FIXME: values have to be a list of the value -- weird
-
     :returns dict: nested dictionary of native python types
     """
-    assert_dict_key_strings(flat_dict, "flat dict entries")
+    assert_list_of_types(args, "args", "tuple:name,value", tuple)
     d = {}
-    for k, v in flat_dict.items():
+    # match something[ANOTHER]
+    for k, v in args:
         # something.another.andanother -> [ something, another, andanother ]
         fields = k.split(".")
         _d = d		# we'll use this to iterate
@@ -2937,11 +2955,15 @@ def flat_dict_to_nested_casting(flat_dict: dict):
                 _d[field] = {}
             _d = _d[field]		# iterate to next level down
 
-        if len(v) != 1:
-            raise ValueError(
-                f"BUG? argument {k} has multiple values: {v}")
-
-        _d[fields[-1]] = value_from_str_casting(v[0])
+        field_leaf = fields[-1]
+        if field_leaf.endswith("[]"):
+            field_leaf = field_leaf[:-2]
+            v_current = _d.get(field_leaf, None)
+            if v_current == None or not isinstance(v_current, list):
+                _d[field_leaf] = list()
+            _d[field_leaf].append(value_from_str_casting(v))
+        else:
+            _d[field_leaf] = value_from_str_casting(v)
     return d
 
 
@@ -3005,6 +3027,30 @@ def factory(device_spec: str, base_type = None,
        mymodule.myclass(somename, key = "band",
                         thing = { "d": "dparam", "e": 3 })
 
+
+    >>> commonl.factory("d_c:?a.d=d3&a.e=4&p[]=dd&p[]=int:3~int:3")
+
+    would call::
+
+       d_c(a = {'d': 'd3', 'e': '4'}, p = ['dd', [3, 3]])
+
+
+    Troubleshooting:
+
+    - ValueError: Invalid IPv6 URL
+
+      netloc  contains brackets, such as to parse::
+
+        ttbl.pc.delay_til_device_spec_c://str!usb,deep_match,device_name:1-4\.[23],idVendor=0403,idProduct=6001,bInterfaceNumber=00?explicit=off
+
+      this is because a netloc of with square brackets is assumed to be an IP address
+
+      *Fix* n/a
+
+      *Workaround* pass as named parameter (in the example, device_spec)
+
+        ttbl.pc.delay_til_device_spec_c:?device_spec=usb,deep_match,device_name:1-4\.[23],idVendor=0403,idProduct=6001,bInterfaceNumber=00?explicit=off
+
     """
 
     if scheme_map == None:
@@ -3013,14 +3059,17 @@ def factory(device_spec: str, base_type = None,
     # scheme's can't contain _, which we use a lot in classes, so we
     # take - for that, because we can't have - in class names.
 
-    if '://' in device_spec:
-        scheme, rest = device_spec.split("://", 1)
-        scheme = scheme_map.get(scheme, scheme)
-        if "_" in scheme:
-            scheme_patched = scheme.replace("_", "-")
-            device_spec = scheme_patched + "://" + rest
+    # we can't use :// because we might have no hostnamespec
+    scheme, rest = device_spec.split(":", 1)
+    scheme = scheme_map.get(scheme, scheme)
+    if "_" in scheme:
+        scheme_patched = scheme.replace("_", "-")
+        device_spec = scheme_patched + ":" + rest
 
-    parsed_url = urllib.parse.urlparse(device_spec)
+    try:
+        parsed_url = urllib.parse.urlparse(device_spec)
+    except Exception as e:
+        raise ValueError(f"can't parse '{device_spec}': {e}") from e
 
     # In the past we had to do this manually because urlparse would
     # get confused with all the colons in the password side
@@ -3046,7 +3095,8 @@ def factory(device_spec: str, base_type = None,
         raise ValueError(
             f"class '{class_type}' does not derive from '{base_type}'")
 
-    arguments = urllib.parse.parse_qs(
+    # we use qsl so we can do repeated parmeters without they being overriden, and like that we can do lists
+    arguments = urllib.parse.parse_qsl(
         parsed_url.query,
         # if no value, this will be translated to bool True
         keep_blank_values = True,
@@ -3059,7 +3109,7 @@ def factory(device_spec: str, base_type = None,
     ##    'parameter3': ['int:3'],
     ##    'parameter4': ['']
     ## }
-    parsed_kwargs = flat_dict_to_nested_casting(arguments)
+    parsed_kwargs = flat_kv_to_nested_casting(arguments)
     if parsed_url.path:
         parsed_kwargs['path'] = parsed_url.path
 
