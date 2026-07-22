@@ -305,7 +305,7 @@ class driver_c(ttbl.authenticator_c):
             message = r.get("error_description", str(r))
             raise self.invalid_credentials_e(
                 f"invalid credentials for username '{username}': {message}",
-                **r)
+                { **r })
         access_token = r['access_token']
 
         # auth is valid, r is like
