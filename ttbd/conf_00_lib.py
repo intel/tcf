@@ -274,13 +274,15 @@ class vlan_pci(ttbl.power.impl_c):
             ])
 
         # Configure the IP addresses for the top interface
-        subprocess.check_call([		# add IPv6
-            # if this fails, check Network Manager hasn't disabled ipv6
-            # sysctl -a | grep disable_ipv6 must show all to 0
-            "/usr/sbin/ip", "addr", "add",
-            f"{target.kws['ipv6_addr']}/{target.kws['ipv6_prefix_len']}",
-            "dev", bridge_ifname
-        ])
+        ipv6_addr = target.kws.get('ipv6_addr', None)
+        if ipv6_addr != None:
+            subprocess.check_call([		# add IPv6
+                # if this fails, check Network Manager hasn't disabled ipv6
+                # sysctl -a | grep disable_ipv6 must show all to 0
+                "/usr/sbin/ip", "addr", "add",
+                f"{target.kws['ipv6_addr']}/{target.kws['ipv6_prefix_len']}",
+                "dev", bridge_ifname
+            ])
         subprocess.check_call([		# add IPv4
             "/usr/sbin/ip", "addr", "add",
             f"{target.kws['ipv4_addr']}/{target.kws['ipv4_prefix_len']}",
@@ -402,7 +404,7 @@ class vlan_pci(ttbl.power.impl_c):
             f"interfaces.power.{component}.vlan_taps", None)
         if taps == True:
             subprocess.call([ "/usr/sbin/ip", "link", "del", f"{bridge_ifname}.tap" ])
-        else:
+        if taps != None:
             for tapname in taps.split():
                 subprocess.call([ "/usr/sbin/ip", "link", "del", f"{bridge_ifname}.{tapname}" ])
         return
@@ -487,7 +489,7 @@ def target_vlan_add(nw_name: str,
                     switch_target: ttbl.test_target,
                     mac_addr: str, vlan_id: int,
                     ipv4_addr: str, ipv4_prefix_len: int,
-                    ipv6_addr: str, ipv6_prefix_len: int,
+                    ipv6_addr: str = None, ipv6_prefix_len: int = None,
                     switch_class: ttbl.router.router_c = ttbl.router.cisco_c,
                     bridge_ifname: str = None,
                     network: str = None,
@@ -669,10 +671,10 @@ def target_vlan_add(nw_name: str,
         "ipv4_prefix_len: expected integer between 1 and 31;" \
         f" got {type(ipv4_prefix_len)} {ipv4_prefix_len}"
 
-    assert isinstance(ipv6_addr, str), \
+    assert ipv6_addr == None or isinstance(ipv6_addr, str), \
         "ipv6_addr: expected IPv6 address A:B:...:1; " \
         f" got {type(ipv6_addr)} {ipv6_addr}"
-    assert isinstance(ipv6_prefix_len, int) \
+    assert ipv6_prefix_len == None or isinstance(ipv6_prefix_len, int) \
         and 1 < ipv6_prefix_len < 128, \
         "ipv6_prefix_len: expected integer between 1 and 128;" \
         f" got {type(ipv6_prefix_len)} {ipv6_prefix_len}"
@@ -702,6 +704,13 @@ def target_vlan_add(nw_name: str,
     # create vlans on power-on
     # destroy vlans on power-off, release -> power interface powers off on
     # release if off_on_release is defined
+    tags_ipv6 = {}
+    if ipv6_addr:
+        tags_ipv6 = {
+            'ipv6_addr': ipv6_addr,
+            'ipv6_prefix_len': ipv6_prefix_len,
+            'server.url6': server_url6,
+        }
     ic = ttbl.interconnect_c(
         nw_name,
         _type = "eth_network_vlan",
@@ -713,12 +722,8 @@ def target_vlan_add(nw_name: str,
             "network": network,
             "ipv4_addr": ipv4_addr,
             "ipv4_prefix_len": ipv4_prefix_len,
-            'ipv6_addr': ipv6_addr,
-            'ipv6_prefix_len': ipv6_prefix_len,
-            'server': {
-                "url": server_url,
-                "url6": server_url6,
-            }
+            'server.url': server_url,
+            **tags_ipv6,
         }
     )
 
