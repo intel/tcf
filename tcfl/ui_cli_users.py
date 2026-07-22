@@ -77,7 +77,7 @@ def _credentials_get_global(cli_args: argparse.Namespace):
                      ' (use *ask* for server-specific): ')
         if user == "":	# default to LOGIN name
             user = getpass.getuser()
-            print("I: defaulting to login name '{user}'")
+            print(f"I: defaulting to login name '{user}'")
         elif user == "ask":
             user = None
 
