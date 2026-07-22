@@ -206,6 +206,7 @@ not published and must be assumed as *off* or *fully off*.
 """
 import collections
 import concurrent.futures
+import datetime
 import errno
 import json
 import multiprocessing.process
@@ -216,6 +217,7 @@ import time
 import traceback
 import types
 import shutil
+import socket
 import subprocess
 import sys
 import logging
@@ -626,7 +628,8 @@ class interface(ttbl.tt_interface):
                     # in a way we are telling
                     target.log.error(
                         "%s: ignoring power state error from explicit power component: %s"
-                        % (component, e))
+                        % (component, e),
+                        exc_info = True)
                     state = None
                 self.assert_return_type(state, bool, target,
                                         component, "power.get", none_ok = True)
@@ -4224,7 +4227,7 @@ def _execute_action(target: ttbl.test_target, state: bool, soft_failure: bool):
             raise
         target.log.warning(
             "ttbl.power._execute_action(): ignoring power %s failure: %s",
-            "on" if state == True else "off", e)
+            "on" if state == True else "off", e, exc_info = True)
 
 
 _startup_defer_list = []
