@@ -196,11 +196,23 @@ class impl_c(ttbl.tt_interface_impl_c):
     :param int rfc2217_host: (optional; default *0.0.0.0*) if given,
       interfaces were to bind.
 
+    :param bool re_enable_if_dead: (optional; default *False*) Check
+      if the implementation's link died and it has to be
+      re-enabled
+
+      Some implementations of console die because their
+      connections get killed outside of the implementation's
+      control. Setting this to True allows the console code to
+      periodically when reading so that if the implementation
+      reports is disabled because the link died but it should be
+      enabled, it will be automatically re-enabled.
+
     """
     def __init__(self, command_sequence = None, command_timeout = 5,
                  crlf = '\r', stderr_restart_regex: re.Pattern = None,
                  rfc2217_tcp_port: int = None,
-                 rfc2217_host: str = "0.0.0.0"):
+                 rfc2217_host: str = "0.0.0.0",
+                 re_enable_if_dead: bool = False):
         assert command_sequence == None \
             or isinstance(command_sequence, list), \
             "command_sequence: expected list of tuples; got %s" \
@@ -217,6 +229,8 @@ class impl_c(ttbl.tt_interface_impl_c):
             " got '{rfc2217_tcp_port}'"
         assert isinstance(rfc2217_host, str), \
             "rfc2217_host: expected str IP address; got '{rfc2217_host}'"
+        assert isinstance(re_enable_if_dead, bool), \
+            "re_enable_if_dead: expected bool; got '{type(re_enable_if_dead)}'"
 
         self.command_sequence = command_sequence
         self.command_timeout = command_timeout
@@ -234,7 +248,7 @@ class impl_c(ttbl.tt_interface_impl_c):
         #: periodically when reading so that if the implementation
         #: reports is disabled because the link died but it should be
         #: enabled, it will be automatically re-enabled.
-        self.re_enable_if_dead = False
+        self.re_enable_if_dead = re_enable_if_dead
         self.crlf = crlf
         self.stderr_restart_regex = stderr_restart_regex
         self.rfc2217_tcp_port = rfc2217_tcp_port
