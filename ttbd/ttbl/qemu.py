@@ -723,7 +723,10 @@ class pc(ttbl.power.daemon_c,
         # network. Collect the list of those names.
         with target.lock:
             allocdb = target._allocdb_get()
-            target_names = allocdb.get("group_allocated").split(",")
+            if allocdb:
+                target_names = allocdb.get("group_allocated").split(",")
+            else:
+                target_names = []
             for target_name_itr in target_names:
                 target_itr = ttbl.test_target.get(target_name_itr)
                 bridge_ifname = target_itr.property_get("bridge_ifname")
