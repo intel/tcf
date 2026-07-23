@@ -470,14 +470,14 @@ class pc(ttbl.power.daemon_c):
                         f.write(
                             "dhcp-option=tag:%(id)s%(qualifier)s," % kws
                             + "option:bootfile-name," + boot_filename + "\n")
-                    if ic_ipv4_addr:
-                        f.write(
-                            "dhcp-option=tag:%(id)s%(qualifier)s," % kws
-                            + "option:tftp-server," + ic_ipv4_addr + "\n")
-                    if ic_ipv6_addr:
-                        f.write(
-                            "dhcp-option=tag:%(id)s%(qualifier)s," % kws
-                            + "option:tftp-server," + ic_ipv6_addr + "\n")
+                        if ic_ipv4_addr:
+                            f.write(
+                                "dhcp-option=tag:%(id)s%(qualifier)s," % kws
+                                + "option:tftp-server," + ic_ipv4_addr + "\n")
+                        if ic_ipv6_addr:
+                            f.write(
+                                "dhcp-option=tag:%(id)s%(qualifier)s," % kws
+                                + "option:tftp-server," + ic_ipv6_addr + "\n")
                     else:
                         raise RuntimeError(
                             "%s: TFTP/PXE boot mode selected, but no boot"
