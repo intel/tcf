@@ -1161,9 +1161,6 @@ class fs_cache_c():
             # We do not want to cleanup if the last cleanup time is less than 0
             # seconds or less than the time set for last_cleanup_time_max_s
             if last_cleanup_time_s < 0 or last_cleanup_time_s < last_cleanup_time_max_s:
-                print(
-                    f" last happened {last_cleanup_time_s}, less than"
-                    f" {last_cleanup_time_max_s}s ago", file = sys.stderr)
                 return
         except FileNotFoundError:
             # there is no last_cleanup tag, so...do cleanup
