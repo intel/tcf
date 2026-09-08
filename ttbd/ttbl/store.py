@@ -73,6 +73,64 @@ class interface(ttbl.tt_interface):
     }
 
     def _validate_file_path(self, target, file_path, user_path):
+        """
+        Translate and validate a client provided file path into a
+        real, safe path in the server's filesystem
+
+        Client requests (upload, download, list, remove) specify a
+        file with a path relative to one of a few places this
+        interface allows access to; this function maps that request
+        to an actual filesystem location, ensuring the client can't
+        escape said locations (eg: by means of ``..`` components) to
+        access anything else in the server.
+
+        Depending on *file_path*, the real location is decided as:
+
+        - if it matches (as a prefix) one of the target's
+          :data:`target_sub_paths` (eg: ``capture/FILENAME``), only
+          the file's basename is kept and the location is resolved to
+          *TARGETSTATEDIR/SUBPATH/FILENAME*, with the read/write mode
+          declared in :data:`target_sub_paths` for that subpath.
+
+        - if it is a relative path, it is considered to be in the
+          calling user's own storage area and resolved to
+          *USERPATH/FILE_PATH* (normalized); this location is always
+          read/write.
+
+        - if it is an absolute path, it has to match (as a prefix) one
+          of the server administrator configured
+          :data:`paths_allowed`; the matching prefix is translated to
+          the real filesystem path it maps to and the location is
+          always read only.
+
+        - otherwise, access is denied.
+
+        :param target: object describing the target for which the
+          request is being served (or *None* if not associated to a
+          target, eg: when doing top level user storage operations)
+        :type target: ttbl.test_target
+
+        :param str file_path: file path as provided by the client;
+          maybe relative (user's storage) or absolute (system
+          location in :data:`paths_allowed`), or start with a target
+          subpath (eg: ``capture/``)
+
+        :param str user_path: path to the calling user's own storage
+          area, used to resolve relative *file_path*s
+
+        :returns: *(file_path_final, rw)*, where *file_path_final* is
+          the validated, absolute path in the server's filesystem and
+          *rw* is *True* if the location allows writing to it, *False*
+          if it is read only
+
+        :raises ValueError: if *file_path* contains path traversal
+          components (eg: ``..``)
+
+        :raises RuntimeError: if *file_path* is an absolute path that
+          does not match any of the allowed :data:`paths_allowed`
+          prefixes
+        """
+
         matches = self._bad_path.findall(file_path)
         if matches \
            or os.path.pardir in file_path:
@@ -102,12 +160,16 @@ class interface(ttbl.tt_interface):
             if file_path.startswith(path):
                 file_path = file_path.replace(path, path_translated, 1)
                 file_path_final = os.path.normpath(file_path)
-                return file_path_final, False	# FIXME: always read-only?
+                # These paths are ALWAYS read only--other pieces in
+                # the code assume such
+                return file_path_final, False
 
         # FIXME: use PermissionError in Python3
         raise RuntimeError(
             "%s: tries to read from a location that is not allowed"
             % file_path)
+
+
 
     def _validate_path(self, target, path):
         if target:
