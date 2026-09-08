@@ -668,6 +668,27 @@ class pc(ttbl.power.daemon_c,
 
         self.cmdline_extra = []
         image_keys = target.fsdb.keys("qemu-image-*")
+
+        # Verify the safety of these images
+        #
+        # This can be relative (to user's storage) or an absolute path
+        # to places we are allowed to read from per the storage
+        # interface ttbl.store.paths_allowed).
+        #
+        # don't let a rogue .. be used to read something we shall not
+        who = target.owner_get()                       # e.g. "john:some-ticket"
+        username, _ticket = ttbl.who_split(who)
+        user_path = os.path.join(ttbl.test_target.files_path, username)
+        for image_key in image_keys:
+            dest = target.fsdb.get(image_key)
+            # FIXME this is going to need the defaul BIOS image
+            try:
+                target.store._validate_file_path(target, dest, user_path)
+            except Exception as e:
+                raise PermissionError(
+                    "QEMU: %s: image '%s': destination '%s' is not allowed: %s"
+                    % (target.id, image_key, dest, e)) from e
+
         #
         # Images interface: flash() below has been used to set images
         # to run, this will feed them into QEMU
