@@ -148,7 +148,8 @@ class interface(ttbl.tt_interface):
                     return file_path_final, rw
 
         # fall through
-        if not os.path.isabs(file_path):
+        if not os.path.isabs(file_path) \
+           or file_path.startswith(user_path + "/"):
             # file comes from the user's storage
             file_path_normalized = os.path.normpath(file_path)
             file_path_final = os.path.join(user_path, file_path_normalized)
