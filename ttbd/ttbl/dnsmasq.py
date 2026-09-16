@@ -46,10 +46,28 @@ class pc(ttbl.power.daemon_c):
     """Start / stop a dnsmasq daemon to resolve DNS requests to a given
     network interface
 
+    :param str path: (optional; default */usr/sbin/dnsmasq*) path to
+      the *dnsmasq* binary to execute.
+
     :param str ifname: (optional; default target's name) name of the
       network interface to attach dnsmasq to.
 
-    :param bool tftp: (optional; default *True*) enable TFTP
+    :param bool allow_other_macs: (optional; default *False*) if
+      *True*, let DNSMASQ hand out DHCP leases off a computed IPv4
+      range (*dhcp-range=IPADDR,BROADCAST,PREFIXLEN*) to any MAC
+      address that asks; if *False* (the default), only the
+      statically configured targets (via *dhcp-host*, one per known
+      target) are served (*dhcp-range=IPADDR,static*), so unknown
+      devices connecting to the network won't get an address.
+
+    :param bool,str tftp: (optional; default *True*) enable TFTP
+
+      - *True*: serve TFTP files from *TARGETDIR/tftp.root*
+
+      - *False*: disable TFTP serving
+
+      - *str*: serve TFTP files from the given path (templated
+        against the daemon's keywords, eg: *%(path)s/tftp.root*)
 
     This is meant to be used in the power rail of an interconnect
     target that represents a network to which the server is physically
@@ -134,6 +152,36 @@ class pc(ttbl.power.daemon_c):
 
     The following are recognized:
 
+    - *boot_filename*: string (optional) name of the file served over
+      TFTP/PXE for a target to boot (passed to *dnsmasq* as the DHCP
+      *boot file*); resolved by checking the following sources in
+      order, each overriding the value found by the previous one if it
+      is set (so the last one that matches wins):
+
+      1. *CONFIG*: :data:`ttbl.pxe.architectures`\\ *[BSP]* .boot_filename
+         (or *[efi-BSP]* .boot_filename), based on the target's BSP
+         architecture, if declared
+
+      2. *IC.boot_filename*: from the interconnect's inventory
+
+      3. *IC.boot_filename_ARCHNAME*: from the interconnect's
+         inventory, specific to the target's BSP architecture
+         (*ARCHNAME* sanitized with :func:`commonl.name_make_safe`);
+         only looked up if a BSP/architecture was determined in step 1
+
+      4. *TARGET.pos.boot_filename*: from the target's own inventory
+
+      5. *TARGET.interconnects.ICNAME.boot_filename*: from the
+         target's inventory, specific to the interconnect it
+         connects over (highest priority)
+
+      If none of these yield a value, a warning is logged and no
+      boot filename is configured for that target.
+
+      Note this file is just advertised to the target by the DHCP
+      server; it is up to the target to actually fetch it over
+      TFTP and for the TFTP server to be configured to serve it.
+
     - *default_route*: bool, string: (optional; default *True*)
 
       - *True*: a default route will be sent by the DHCP server with
@@ -154,9 +202,13 @@ class pc(ttbl.power.daemon_c):
     """
     def __init__(self, path = "/usr/sbin/dnsmasq", ifname = None,
                  allow_other_macs: bool = False,
-                 tftp: bool = True):
+                 tftp: bool = True,
+                 configlinesl: list = None
+                 ):
         assert isinstance(allow_other_macs, bool), \
             f"allow_other_macs: expected bool; got {type(allow_other_macs)}"
+        assert isinstance(tftp, ( bool, str )), \
+            f"tftp: expected bool, str; got {type(tftp)}"
 
         if ifname != None:
             assert isinstance(ifname, str) \
@@ -183,7 +235,13 @@ class pc(ttbl.power.daemon_c):
         ttbl.power.daemon_c.__init__(self, cmdline, precheck_wait =
                                      0.5, mkpidfile = False,
                                      pidfile = "%(path)s/dnsmasq.pid")
-        self.tftp = tftp
+        if isinstance(tftp, str):
+            self.tftp = tftp
+        elif tftp:
+            self.tftp = "%(path)s/tftp.root"	# COMPAT
+        else:
+            self.tftp = None
+
         self.upid_set(
             "dnsmasq daemon",
             # if multiple virtual machines are created associated to a
@@ -191,6 +249,66 @@ class pc(ttbl.power.daemon_c):
             #   each...in most cases
             serial_number = commonl.mkid(" ".join(cmdline))
         )
+
+
+    @staticmethod
+    def _target_boot_filename_get(
+            target: ttbl.test_target, ic: ttbl.test_target,
+            bsp: dict) -> str:
+
+        # Figure out the Boot filename from config defaults,
+        # IC inventory, target inventory
+        #
+        # See doc/09-api.rst for *boot_filename* and *boot_server*
+
+        boot_filename = None
+        sources = []
+        # If the target declares a BSP (at this point of the
+        # game, it should), figure out which architecture is
+        # so we can point it to the right file.
+        arch = None
+        if bsp:
+            sources.append("CONFIG")
+            # try ARCH or efi-ARCH
+            # override with anything the target declares in config
+            if bsp in ttbl.pxe.architectures:
+                arch = ttbl.pxe.architectures[bsp]
+                arch_name = bsp
+                boot_filename = arch_name + "/" + arch.get('boot_filename', None)
+                sources.append(f"ttbl.pxe.architectures['{bsp}'].boot_filename")
+            elif "efi-" + bsp in ttbl.pxe.architectures:
+                arch_name = "efi-" + bsp
+                arch = ttbl.pxe.architectures[arch_name]
+                boot_filename = arch_name + "/" + arch.get('boot_filename', None)
+                sources.append(f"ttbl.pxe.architectures['{arch_name}'].boot_filename")
+
+        sources.append("INVENTORY")
+        boot_filename = ic.property_get('boot_filename', boot_filename)
+        sources.append(f"{ic.id}.boot_filename")
+
+        if arch:
+            arch_name_safe = commonl.name_make_safe(arch_name)
+            boot_filename = ic.property_get('boot_filename_' + arch_name_safe, boot_filename)
+            sources.append(f"{ic.id}.boot_filename_{arch_name_safe}")
+
+        # General from target's inventory
+        # We don't do the ARCH variation here because we are in the
+        # target already, this one has only one arch...unless it has
+        # multiple BSPs which if that is needed, we'll add the support
+        # for it.
+        boot_filename = target.property_get('pos.boot_filename', boot_filename)
+        sources.append(f"{target.id}.pos.boot_filename")
+
+        # Interconnect specific from target's inventory
+        boot_filename = target.property_get(f'interconnects.{ic.id}.boot_filename', boot_filename)
+        sources.append(f"{target.id}.interconnects.{ic.id}.boot_filename")
+
+        if not boot_filename:
+            target.log.warning(
+                "%s: couldn't find a boot filename, tried: %s"
+                % (target.id, " ".join(sources)))
+        return boot_filename
+
 
 
     # linux/include/if.h
@@ -299,10 +417,17 @@ class pc(ttbl.power.daemon_c):
                 configl += [
                     # Enable TFTP server to STATEDIR/tftp.root
                     "enable-tftp",
-                    "tftp-root=%(path)s/tftp.root",
+                    # defaults to "%(path)s/tftp.root"
+                    "tftp-root=" + self.tftp,
                     # all files TFTP is to send have to be owned by the
                     # user running it (the same one running this daemon)
                     "tftp-secure"
+                ]
+            else:
+                configl += [
+                    "# TFTP not enabled because tftp argument to",
+                    f"# ttbl.dnsmasq.pc is {self.tftp}; maybe relying",
+                    "# on external TFTP server"
                 ]
 
             # Add stuff based on having ipv4/6 support
@@ -405,6 +530,7 @@ class pc(ttbl.power.daemon_c):
                     kws['bsp'] = bsp
                 else:
                     bsp = None
+
                 ttbl.pxe.tag_get_from_ic_target(kws, 'pos_http_url_prefix', ic, target)
                 ttbl.pxe.tag_get_from_ic_target(kws, 'pos_nfs_server', ic, target)
                 ttbl.pxe.tag_get_from_ic_target(kws, 'pos_nfs_path', ic, target)
@@ -417,73 +543,52 @@ class pc(ttbl.power.daemon_c):
                 # tcfl.pos has a lot of it in the client side; we need
                 # a unified source.
 
-                f.write(
-                    "dhcp-option=tag:%(id)s%(qualifier)s,option:root-path,%(pos_nfs_server)s:%(pos_nfs_path)s,soft,nfsvers=4\n"
-                    % kws)
+                if kws.get("pos_nfs_server", None) \
+                   and kws.get("pos_nfs_path", None):
+                    f.write(
+                        "dhcp-option=tag:%(id)s%(qualifier)s"
+                        ",option:root-path,%(pos_nfs_server)s:%(pos_nfs_path)s"
+                        ",soft,nfsvers=4\n"
+                        % kws)
 
-                # If the target declares a BSP (at this point of the
-                # game, it should), figure out which architecture is
-                # so we can point it to the right file.
-                if bsp:
-                    # try ARCH or efi-ARCH
-                    # override with anything the target declares in config
-                    arch = None
-                    boot_filename = None
-                    boot_filename = target.property_get('pos_tftp_boot_filename', None)
-                    if boot_filename:
-                        pass
-                    elif bsp in ttbl.pxe.architectures:
-                        arch = ttbl.pxe.architectures[bsp]
-                        arch_name = bsp
-                        boot_filename = arch_name + "/" + arch.get('boot_filename', None)
-                    elif "efi-" + bsp in ttbl.pxe.architectures:
-                        arch_name = "efi-" + bsp
-                        arch = ttbl.pxe.architectures[arch_name]
-                        boot_filename = arch_name + "/" + arch.get('boot_filename', None)
+                # Control default routes
+                default_route = ttbl.pxe.tag_get_from_ic_target(
+                    kws, 'default_route', ic, target, True)
+                if default_route == False:
+                    # this means NO default route
+                    f.write("dhcp-option=tag:%(id)s%(qualifier)s," % kws
+                            + "option:router\n")
+                elif default_route == True:
+                    pass		# default router behaviour
+                else:
+                    f.write("dhcp-option=tag:%(id)s%(qualifier)s," % kws
+                            + f"option:router,{default_route}\n")
 
-                    # Control default routes
-                    default_route = ttbl.pxe.tag_get_from_ic_target(
-                        kws, 'default_route', ic, target, True)
-                    if default_route == False:
-                        # this means NO default route
-                        f.write("dhcp-option=tag:%(id)s%(qualifier)s," % kws
-                                + "option:router\n")
-                    elif default_route == True:
-                        pass		# default router behaviour
-                    else:
-                        f.write("dhcp-option=tag:%(id)s%(qualifier)s," % kws
-                                + f"option:router,{default_route}\n")
+                default_route6 = ttbl.pxe.tag_get_from_ic_target(
+                    kws, 'default_route6', ic, target, True)
+                if default_route6 == False:
+                    # this means NO default route
+                    f.write("dhcp-option=tag:%(id)s%(qualifier)s," % kws
+                            + "option6:router\n")
+                elif default_route6 == True:
+                    pass		# default router behaviour
+                else:
+                    f.write("dhcp-option=tag:%(id)s%(qualifier)s," % kws
+                            + f"option:router6,{default_route6}\n")
 
-                    default_route6 = ttbl.pxe.tag_get_from_ic_target(
-                        kws, 'default_route6', ic, target, True)
-                    if default_route6 == False:
-                        # this means NO default route
-                        f.write("dhcp-option=tag:%(id)s%(qualifier)s," % kws
-                                + "option6:router\n")
-                    elif default_route6 == True:
-                        pass		# default router behaviour
-                    else:
-                        f.write("dhcp-option=tag:%(id)s%(qualifier)s," % kws
-                                + f"option:router6,{default_route6}\n")
-
-                    if boot_filename:
+                boot_filename = self._target_boot_filename_get(target, ic, bsp)
+                if boot_filename:
+                    f.write(
+                        "dhcp-option=tag:%(id)s%(qualifier)s," % kws
+                        + "option:bootfile-name," + boot_filename + "\n")
+                    if ic_ipv4_addr:
                         f.write(
                             "dhcp-option=tag:%(id)s%(qualifier)s," % kws
-                            + "option:bootfile-name," + boot_filename + "\n")
-                        if ic_ipv4_addr:
-                            f.write(
-                                "dhcp-option=tag:%(id)s%(qualifier)s," % kws
-                                + "option:tftp-server," + ic_ipv4_addr + "\n")
-                        if ic_ipv6_addr:
-                            f.write(
-                                "dhcp-option=tag:%(id)s%(qualifier)s," % kws
-                                + "option:tftp-server," + ic_ipv6_addr + "\n")
-                    else:
-                        raise RuntimeError(
-                            "%s: TFTP/PXE boot mode selected, but no boot"
-                            " filename can be guessed for arch/BSP %s/%s;"
-                            " declare tag pos_tftp_boot_filename?"
-                            % (target.id, arch_name, bsp))
+                            + "option:tftp-server," + ic_ipv4_addr + "\n")
+                    if ic_ipv6_addr:
+                        f.write(
+                            "dhcp-option=tag:%(id)s%(qualifier)s," % kws
+                            + "option:tftp-server," + ic_ipv6_addr + "\n")
 
         # note the rename we did target -> ic
         ttbl.power.daemon_c.on(self, ic, _component)
