@@ -739,7 +739,7 @@ def target_vlan_add(nw_name: str,
         # parameters to attach.
         dhcp = ttbl.dnsmasq.pc(ifname = bridge_ifname,
                                allow_other_macs = True,
-                               tftp = True),
+                               tftp = tftp),
     ))
 
     ic.interface_add("console", ttbl.console.interface(
