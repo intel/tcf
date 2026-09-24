@@ -3502,6 +3502,26 @@ def parameters(*args):
 
 
 
+def parameters_add(tc: tcfl.tc.target_c, *parameters):
+    """
+    Add parameters to an existing testcase
+
+    :param tc: the testcase to add parameters to
+    :param parameters: a list of :class:`parameter_c` instances to add
+      to the testcase
+    """
+    if id(tc._parameters) == id(type(tc)._parameters):
+        tc._parameters = copy.deepcopy(type(tc)._parameters)
+    for parameter in parameters:
+        # name can only be a-zA-Z_ so it can be passed in an env
+        # var, eg as PARAM_NAME_USER PARAM_NAME_PASSWORD
+        assert isinstance(parameter, tcfl.tc.parameter_c), \
+            f"{parameter}: bad parameter instance, expected child of" \
+            f" tcfl.tc.parameter_c, got {type(parameter)}"
+        tc._parameters[parameter.name] = parameter
+
+
+
 
 def _target_app_setup(obj, cls_name, target_want_name):
     """
