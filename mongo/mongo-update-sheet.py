@@ -1249,7 +1249,9 @@ def _sheet_update_temp_matrix(runid, records, name, label_name,
     except googleapiclient.errors.Error as e:
         # we don't want to hard fail because of size limitations and
         # loose info
-        logging.error(f"{runid}: can't update {name}: {e}")
+        logging.error(f"{runid}: can't update {name}: {e}", exc_info = True)
+    except Exception as e:
+        logging.exception(f"{runid}: can't update {name}: {e}")
 
 
 def sheet_update_key_value(runid, records, name, create = True,
@@ -1316,8 +1318,15 @@ def sheet_update_key_value(runid, records, name, create = True,
             keys = _existing_keys
     row = [ runid ]
     for key in keys:	# the order is important
-        row.append(records.get(key, None))
-    sh.rows_insert(1, 1)
+        value = records.get(key, None)
+        # we only can put escalars in there
+        if not isinstance(value, (str, bytes, int, float, complex, bool)):
+            value = f"unsupported/{type(value).__name__}"
+        row.append(value)
+    try:
+        sh.rows_insert(1, 1)
+    except Exception as e:
+        logging.exception("%s: sheet/%s: can't insert row: %s", runid, name, e)
     sh.feed_rows([ row ], fromrow = 1, clear_values = False)
     # Now cap for size -- if at the time we read the sheet it was
     # already at capacity, we have added to it, so cap it
@@ -2124,7 +2133,10 @@ def sheet_update(runid_raw):
                     data_xlat[_domain][_key] = value
 
     for domain, data in data_xlat.items():
-        sheet_update_key_value(runid_pretty, data, "_KPI: %s" % domain)
+        try:
+            sheet_update_key_value(runid_pretty, data, "_KPI: %s" % domain)
+        except Exception as e:
+            logging.exception("%s: exception updating KPI %s", runid, domain)
 
     t.tick("sheet: updated")
 
