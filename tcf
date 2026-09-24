@@ -438,7 +438,9 @@ if __name__ == "__main__":
                 "%(levelname)s[%(process)d]/%(asctime)s+%(relativeCreated)dms"
                 " %(name)s::%(module)s.%(funcName)s():%(lineno)d: %(message)s"))
 
-    for environment in args.environment:
+    # run_environment* are set by the run subcommand in tcfl.tc._run()
+    # and this is a hack that should be just done with a function but oh well
+    for environment in args.environment + getattr(args, "run_environment", []):
         if '=' in environment:
             key, val = environment.split("=", 1)
         else:
@@ -446,7 +448,7 @@ if __name__ == "__main__":
             val = "true"
         os.environ[key] = val
 
-    for environment in args.environment_password:
+    for environment in args.environment_password + getattr(args, "run_environment_password", []):
         key, val = environment.split("=", 1)
         os.environ[key] = commonl.password_get(None, None, val)
 

@@ -10067,12 +10067,12 @@ def argp_setup(arg_subparsers):
     # be specified in *run* which helps in some integration
     ap.add_argument(
         "--environment", metavar = "KEY[=VALUE]", action='append',
-        default = [],
+        default = [], dest = "run_environment",
         help = "add an environment variable to execution;"
         " if VALUE is omitted, it defaults to 'true'")
     ap.add_argument(
         "--environment-password", metavar = "KEY[=VALUE]", action = 'append',
-        default = [],
+        default = [], dest = "run_environment_password",
         help = "add an environment variable to execution"
         " that might contain password (KEY=KEYRING[:DOMAIN[:USER]] and"
         " KEY=FILE:FILENAME are expanded")
