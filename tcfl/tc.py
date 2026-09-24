@@ -3502,7 +3502,7 @@ def parameters(*args):
 
 
 
-def parameters_add(tc: tcfl.tc.target_c, *parameters):
+def parameters_add(tc, *parameters):
     """
     Add parameters to an existing testcase
 
