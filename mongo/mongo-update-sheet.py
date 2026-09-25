@@ -407,8 +407,18 @@ def _runids_postprocess_summary_per_run(runid_raw):
             {
                 # We don't reduce TARGETTYPE:BSPMODEL as we need it to verify coverage
                 "$project" : {
-                    "used_target_types": { "$split": [ "$target_types", "," ] },
-                    "used_target_servers": { "$split": [ "$target_servers", "," ] },
+                    "used_target_types": {
+                        "$setUnion": [
+                            { "$split": [ "$target_types", "," ] },
+                            []
+                        ]
+                    },
+                    "used_target_servers": {
+                        "$setUnion": [
+                            { "$split": [ "$target_servers", "," ] },
+                            []
+                        ]
+                    },
                     # 1 means pass these through
                     "runid": 1,
                     "result": 1,
@@ -433,8 +443,8 @@ def _runids_postprocess_summary_per_run(runid_raw):
                     # responsibility of the reporter to arrange
                     # domains and execution models that allow proper
                     # grouping FIXME document
-                    "data": { "$push": "$data" },
-                    "data-v2": { "$push": "$data-v2" },
+                    "data": { "$addToSet": "$data" },
+                    "data-v2": { "$addToSet": "$data-v2" },
                     # Count passing, erroring, failing, blocked and skipped
                     "pass": {
                         "$sum": {
@@ -456,7 +466,7 @@ def _runids_postprocess_summary_per_run(runid_raw):
                     },
                     # Accumulate specific ones which failed, for failure-frequency
                     "fail_tc_names": {
-                        "$push": {
+                        "$addToSet": {
                             "$cond": [
                                 { "$eq": [ "$result", "FAIL" ] },
                                 "$tc_name",
@@ -475,7 +485,7 @@ def _runids_postprocess_summary_per_run(runid_raw):
                     },
                     # Accumulate specific ones which errored, for error-frequency
                     "errr_tc_names": {
-                        "$push": {
+                        "$addToSet": {
                             "$cond": [
                                 { "$eq": [ "$result", "ERRR" ] },
                                 "$tc_name",
@@ -504,13 +514,13 @@ def _runids_postprocess_summary_per_run(runid_raw):
                     # Tally which target types, servers and testcases
                     # we are using
                     "used_target_types_set": {
-                        "$push": "$used_target_types",
+                        "$addToSet": "$used_target_types",
                     },
                     "used_target_servers_set": {
-                        "$push": "$used_target_servers",
+                        "$addToSet": "$used_target_servers",
                     },
-                    "tc_names": {
-                        "$push": "$tc_name",
+                    "tcs": {
+                        "$addToSet": "$tc_name",
                     },
                 },
             },
@@ -548,15 +558,7 @@ def _runids_postprocess_summary_per_run(runid_raw):
                     },
                     "fail_tc_names": 1,
                     "errr_tc_names": 1,
-                    "tcs": {
-                        "$reduce": {
-                            "input": "$tc_names",
-                            "initialValue": [],
-                            "in": {
-                                "$setUnion": [ "$$value", [ "$$this" ] ]
-                            },
-                        },
-                    },
+                    "tcs": 1,
                 },
             },
             {
@@ -626,7 +628,6 @@ def _runids_postprocess_summary_per_run(runid_raw):
                     },
                 }
             },
-            # FIXME: remove intermediate fields
         ], allowDiskUse = True)
 
 
