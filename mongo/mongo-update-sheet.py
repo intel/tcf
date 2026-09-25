@@ -1354,6 +1354,8 @@ def sheet_update_key_value(runid, records, name, create = True,
     :returns: True if the sheet is present, False if we didn't have to
       update it
     """
+    if googlel.dry_run:
+        return
     # Now unfold the FPBT dictionary into a table runid/target-types
     sh = googlel.spreadsheet(args.s, args.spreadsheet_id, name, create = create)
     if not create and not sh._shid:
@@ -1423,6 +1425,8 @@ def sheet_update_key_value(runid, records, name, create = True,
     return True
 
 def sheet_update_per_component(runid, doc_runid):
+    if googlel.dry_run:
+        return
     all_records = collections.defaultdict(None)
     ppc_records = collections.defaultdict(None)
     fpc_records = collections.defaultdict(None)
@@ -1496,6 +1500,8 @@ def sheet_update_per_component(runid, doc_runid):
 
 # Adding the code to get the stats for each board type
 def sheet_update_per_board_types(runid, doc_runid):
+    if googlel.dry_run:
+        return
     all_records = collections.defaultdict(None)
     ppc_records = collections.defaultdict(None)
     fpc_records = collections.defaultdict(None)
@@ -1859,6 +1865,9 @@ def _sheet_update_tcs_matrix(
 
 
 def sheet_update(runid_raw):
+    if googlel.dry_run:
+        t.tick("sheet/summary: dry-run, not updating")
+        return
     runid, runid_raw = _runid_settle(runid_raw)
     # Update the google sheet with all the info from the sumary sheet;
     # we just load it in one go and update everything
