@@ -1087,6 +1087,8 @@ def __sheet_update_temp_matrix(runid, records, name, label_name,
     runids = [ runid ]
     t.tick("%s: sheet/%s updating" % (runid, name))
     if not ffsh.created:
+        if not create:
+            return
         columns_ab = ffsh.number_to_letters(ffsh.sheet_get_column_count())
         # Get actual notes so we can preserve them
         @googlel.retry_google_operation
@@ -1401,9 +1403,9 @@ def sheet_update_per_component(runid, doc_runid):
     sheet_update_key_value(runid, ppc_records, "_Pass per component",
                            create = False)
     sheet_update_key_value(runid, fpc_records, "_Fail per component",
-                           create = True)
+                           create = False)
     sheet_update_key_value(runid, epc_records, "_Error per component",
-                           create = True)
+                           create = False)
     sheet_update_key_value(runid, bpc_records, "_Block per component",
                            create = False)
 
@@ -1473,9 +1475,9 @@ def sheet_update_per_board_types(runid, doc_runid):
     sheet_update_key_value(runid, ppc_records, "_Pass per board_types",
                            create = False)
     sheet_update_key_value(runid, fpc_records, "_Fail per board_types",
-                           create = True)
+                           create = False)
     sheet_update_key_value(runid, epc_records, "_Error per board_types",
-                           create = True)
+                           create = False)
     sheet_update_key_value(runid, bpc_records, "_Block per board_types",
                            create = False)
 
@@ -1860,7 +1862,8 @@ def sheet_update(runid_raw):
                 if tt == 'tt_power':
                     continue
                 fpbt_records[tt] += failed
-    sheet_update_key_value(runid_pretty, fpbt_records, "_Failures per board type")
+    sheet_update_key_value(runid_pretty, fpbt_records, "_Failures per board type",
+                           create = False)
 
     for tt_doc in doc.get('error_per_target_type', []):
         if 'error_target_type' in tt_doc:
@@ -1876,7 +1879,8 @@ def sheet_update(runid_raw):
                 if tt == 'tt_power':
                     continue
                 epbt_records[tt] += error
-    sheet_update_key_value(runid_pretty, epbt_records, "_Errors per board type")
+    sheet_update_key_value(runid_pretty, epbt_records, "_Errors per board type",
+                           create = False)
 
     # Process blockage-per-target
     for entry in doc.get('targets_blocked', []):
@@ -1888,7 +1892,7 @@ def sheet_update(runid_raw):
                 target_name = 'static'
             bpt_records[target_name] += blockage
     _sheet_update_temp_matrix(runid_pretty, bpt_records, "Blockage per target",
-                              "Target")
+                              "Target", create = False)
 
     # Process failure-per-target
     for entry in doc.get('targets_failed', []):
@@ -1901,7 +1905,7 @@ def sheet_update(runid_raw):
                 target_name = 'static'
             fpt_records[target_name] += failures
     _sheet_update_temp_matrix(runid_pretty, fpt_records, "Failure per target",
-                              "Target")
+                              "Target", create = False)
 
     # Process errors-per-target
     for entry in doc.get('targets_errored', []):
@@ -1914,7 +1918,7 @@ def sheet_update(runid_raw):
                 target_name = 'static'
             ept_records[target_name] += failures
     _sheet_update_temp_matrix(runid_pretty, ept_records, "Error per target",
-                              "Target")
+                              "Target", create = False)
 
     # Process Failure Freuency records tc_name / number of
     # failures
@@ -1925,13 +1929,13 @@ def sheet_update(runid_raw):
         ff_tc_names.add(tc_name)
         ff_records[tc_name] += 1
     _sheet_update_temp_matrix(runid_pretty, ff_records, "Failure frequency",
-                              "Testcase")
+                              "Testcase", create = False)
 
     for tc_name in doc.get('errr_tc_names', []):
         ef_tc_names.add(tc_name)
         ef_records[tc_name] += 1
     _sheet_update_temp_matrix(runid_pretty, ef_records, "Error frequency",
-                              "Testcase")	  
+                              "Testcase", create = False)
     # Update the percomponent charts
     sheet_update_per_component(runid_pretty, doc)
     # Update the pertargettype charts
