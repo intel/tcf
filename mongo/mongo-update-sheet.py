@@ -443,8 +443,24 @@ def _runids_postprocess_summary_per_run(runid_raw):
                     # responsibility of the reporter to arrange
                     # domains and execution models that allow proper
                     # grouping FIXME document
-                    "data": { "$addToSet": "$data" },
-                    "data-v2": { "$addToSet": "$data-v2" },
+                    "data": {
+                        "$addToSet": {
+                            "$cond": [
+                                { "$lt": [ { "$bsonSize": "$data" }, 1000 ] },
+                                "$data",
+                                "removed[mongo-update-sheet]: too large"
+                            ]
+                        }
+                    },
+                    "data-v2": {
+                        "$addToSet": {
+                            "$cond": [
+                                { "$lt": [ { "$bsonSize": "$data-v2" }, 1000 ] },
+                                "$data-v2",
+                                "removed[mongo-update-sheet]: too large"
+                            ]
+                        }
+                    },
                     # Count passing, erroring, failing, blocked and skipped
                     "pass": {
                         "$sum": {
