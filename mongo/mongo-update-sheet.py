@@ -778,7 +778,8 @@ def _runids_postprocess_failure_per_target(runid_raw):
         }
     ])
 
-def _runids_postprocess_failures_per_target_type(runid_raw):
+def _runids_postprocess_failures_per_target_type(runid_raw,
+                                                 cap: int = 1000):
     # See _runids_postprocess_summary_per_run
     return db[args.collection_id]\
         .aggregate([
@@ -827,6 +828,47 @@ def _runids_postprocess_failures_per_target_type(runid_raw):
                 }
             },
             {
+                # reduce size of error_tc_names to maximum *cap, to avoid
+                # huge documents in the summary database
+                "$project": {
+                    "_id": 1,
+                    "failed": 1,
+                    "failed_tc_names": {
+                        "$let": {
+                            "vars": {
+                                "uniq": {
+                                    "$reduce": {
+                                        "input": "$failed_tc_names",
+                                        "initialValue": [],
+                                        "in": {
+                                            "$cond": [
+                                                { "$in": [ "$$this", "$$value" ] },
+                                                "$$value",
+                                                { "$concatArrays": [ "$$value", [ "$$this" ] ] }
+                                            ]
+                                        }
+                                    }
+                                }
+                            },
+                            # if we capped it, add an entry "this was
+                            # capped"
+                            "in": {
+                                "$cond": [
+                                    { "$gt": [ { "$size": "$$uniq" }, cap ] },
+                                    {
+                                        "$concatArrays": [
+                                            { "$slice": [ "$$uniq", cap ] },
+                                            [ "this list was capped by mongo-update-sheet" ]
+                                        ]
+                                    },
+                                    "$$uniq"
+                                ]
+                            }
+                        }
+                    }
+                }
+            },
+            {
                 "$group": {
                     "_id": "$_id.runid",
                     "target_types" : {
@@ -840,7 +882,8 @@ def _runids_postprocess_failures_per_target_type(runid_raw):
             }
         ])
 
-def _runids_postprocess_error_per_target_type(runid_raw):
+def _runids_postprocess_error_per_target_type(runid_raw,
+                                              cap: int = 1000):
     # See _runids_postprocess_summary_per_run
     return db[args.collection_id]\
         .aggregate([
@@ -889,13 +932,54 @@ def _runids_postprocess_error_per_target_type(runid_raw):
                 }
             },
             {
+                # reduce size of error_tc_names to maximum *cap, to avoid
+                # huge documents in the summary database
+                "$project": {
+                    "_id": 1,
+                    "error": 1,
+                    "error_tc_names": {
+                        "$let": {
+                            "vars": {
+                                "uniq": {
+                                    "$reduce": {
+                                        "input": "$error_tc_names",
+                                        "initialValue": [],
+                                        "in": {
+                                            "$cond": [
+                                                { "$in": [ "$$this", "$$value" ] },
+                                                "$$value",
+                                                { "$concatArrays": [ "$$value", [ "$$this" ] ] }
+                                            ]
+                                        }
+                                    }
+                                }
+                            },
+                            # if we capped it, add an entry "this was
+                            # capped"
+                            "in": {
+                                "$cond": [
+                                    { "$gt": [ { "$size": "$$uniq" }, cap ] },
+                                    {
+                                        "$concatArrays": [
+                                            { "$slice": [ "$$uniq", cap ] },
+                                            [ "this list was capped by mongo-update-sheet" ]
+                                        ]
+                                    },
+                                    "$$uniq"
+                                ]
+                            }
+                        }
+                    }
+                }
+            },
+            {
                 "$group": {
                     "_id": "$_id.runid",
                     "error_per_target_type" : {
                         "$push": {
                             "error_target_type": "$_id.target_type",
                             "error": "$error",
-                            "error_tc_names": "$failed_tc_names"
+                            "error_tc_names": "$error_tc_names"
                         },
                     },
                 }
