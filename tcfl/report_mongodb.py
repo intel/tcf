@@ -193,6 +193,10 @@ class driver(tcfl.tc.report_driver_c):
         #:   recommended modifying existing fields.
         self.complete_hooks = []
 
+        #: list of types we store; dicts are dangerous because it can
+        #: be a very deep hierarchy and clog the DB
+        self.allowed_types = ( str, bytes, int, float, complex, bool )
+
     #: Maximum size of a console attachment
     #:
     #: If set to a positive number, any attachment with *console* in
@@ -276,6 +280,11 @@ class driver(tcfl.tc.report_driver_c):
             if name.startswith("$"):
                 name = name.replace("$", "_", 1)
             value = attachments['value']
+            # FIXME: implement a better way to do this so the user can
+            # filter what can go in with more fine control (eg: some
+            # limited dicts)
+            if not isinstance(value, self.allowed_types):
+                value = f"unsupported/{type(value).__name__}"
             # there are  scripts that depend on this, thus keep both
             doc.setdefault('data', {})
             doc['data'].setdefault(domain, {})
