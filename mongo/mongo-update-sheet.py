@@ -1187,10 +1187,11 @@ def __sheet_update_temp_matrix(runid, records, name, label_name,
     ff_notes = collections.defaultdict(str)
     ff_values = collections.defaultdict(list)
     runids = [ runid ]
+    if not ffsh._shid:
+        t.tick("%s: sheet/%s: skipping [has to exist first]" % (runid, name))
+        return
     t.tick("%s: sheet/%s updating" % (runid, name))
     if not ffsh.created:
-        if not create:
-            return
         columns_ab = ffsh.number_to_letters(ffsh.sheet_get_column_count())
         # Get actual notes so we can preserve them
         @googlel.retry_google_operation
@@ -1878,7 +1879,7 @@ def _sheet_update_tcs_matrix(
 
     # now draw it
     _sheet_update_temp_matrix(runid, records, name, "target / testcase",
-                              create = False, order = None)
+                              create = create, order = None)
 
 
 def sheet_update(runid_raw):
