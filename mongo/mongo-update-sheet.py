@@ -1118,9 +1118,10 @@ def _summary_refresh(runid_raw):
         return
     t.tick("%s: summarizing done" % runid_raw)
 
-    doc_data = doc['data']
-    doc_data_v2 = doc['data-v2']
-    del doc['data']
+    doc_data = doc.get('data', {})
+    doc_data_v2 = doc.get('data-v2', {})
+    if doc_data:
+        del doc['data']
     if 'data_v2' in doc:
         del doc['data_v2']
     del doc['_id']
