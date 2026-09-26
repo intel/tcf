@@ -1864,6 +1864,7 @@ def _sheet_update_tcs_matrix(
         else:
             row_header = doc['tc_name']
         runid_separator = urllib.parse.quote(args.runid_separator)
+
         records[row_header] = \
             '=HYPERLINK("%(url)s/%(build_no)s/artifact/report-%(runid_raw)s%(runid_separator)s%(hashid)s.txt","%(result)s")' \
             % dict(
@@ -2063,9 +2064,6 @@ def sheet_update(runid_raw):
     # the permutations of TCs+TARGETS is limited -- if you try to pull
     # about thousands of rows, it is likely to croak
     _sheet_update_tcs_matrix(runid_raw, runid_pretty, doc,
-                             # IPG: disable PASS testcases because we
-                             # are bursting the spreadsheet limits
-                             #[ "PASS", "FAIL", "ERRR", "BLCK", "SKIP" ],
                              [ "FAIL", "ERRR", "BLCK", "SKIP" ],
                              "History (by target and testcase)",
                              create = False, tcs_include_target = True)
