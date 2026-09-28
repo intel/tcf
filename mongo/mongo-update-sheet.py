@@ -446,7 +446,7 @@ def _runids_postprocess_summary_per_run(runid_raw):
                     "data": {
                         "$addToSet": {
                             "$cond": [
-                                { "$lt": [ { "$bsonSize": "$data" }, 1000 ] },
+                                { "$lt": [ { "$bsonSize": "$data" }, 10000 ] },
                                 "$data",
                                 "removed[mongo-update-sheet]: too large"
                             ]
@@ -455,7 +455,7 @@ def _runids_postprocess_summary_per_run(runid_raw):
                     "data-v2": {
                         "$addToSet": {
                             "$cond": [
-                                { "$lt": [ { "$bsonSize": "$data-v2" }, 1000 ] },
+                                { "$lt": [ { "$bsonSize": "$data-v2" }, 10000 ] },
                                 "$data-v2",
                                 "removed[mongo-update-sheet]: too large"
                             ]
@@ -2198,6 +2198,13 @@ def sheet_update(runid_raw):
     # domain/key as needed, then update those in the worksheet
     data_xlat = collections.defaultdict(dict)
     for datad in doc.get('data', []):
+        if not isinstance(datad, dict):
+            # same as above for 'data-v2'
+            # the pipeline will put a message if they had to cut off
+            # something because it's too large
+            logging.exception("%s: skipping data item (not dict): %s",
+                              runid, datad)
+            continue
         for domain, values in datad.items():
             for key, value in values.items():
                 for domain_regex, key_regex, new_domain, new_key in kpi_xlat_table:
@@ -2218,6 +2225,12 @@ def sheet_update(runid_raw):
     # Go over the whole list of data in the array and translate the
     # domain/key as needed, then update those in the worksheet
     for datad in doc.get('data-v2', []):
+        if not isinstance(datad, dict):
+            # same as above for 'data'
+            # the pipeline will put a message if they had to cut off
+            # something because it's too large
+            logging.exception("%s: skipping data item (not dict): %s", runid, datad)
+            continue
         # DOMAIN {
         #    NAME {
         #      TARGETID2: VALUE
