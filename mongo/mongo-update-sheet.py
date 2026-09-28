@@ -373,7 +373,121 @@ def _runids_postprocess_summary_per_target_types(runid_raw):
         ], allowDiskUse = True)
 
 
-def _runids_postprocess_summary_per_run(runid_raw):
+def _runids_postprocess_total_tcs(runid_raw):
+    return db[args.collection_id]\
+        .aggregate([
+            {
+                "$match": {
+                    "runid": runid_raw,
+                    "hashid": { "$exists": True },
+                }
+            },
+            {
+                "$group": {
+                    "_id": "$runid",
+                    "tcs": { "$addToSet": "$tc_name" },
+                }
+            },
+            {
+                "$project": {
+                    "_id": 1,
+                    "total_tcs": { "$size": "$tcs" },
+                }
+            },
+        ], allowDiskUse = True)
+
+
+def _runids_postprocess_fail_tc_names(runid_raw, cap: int = 1000):
+    return db[args.collection_id]\
+        .aggregate([
+            {
+                "$match": {
+                    "runid": runid_raw,
+                    "hashid": { "$exists": True },
+                    "result": "FAIL",
+                }
+            },
+            {
+                "$group": {
+                    "_id": "$runid",
+                    "fail_tc_names": { "$addToSet": "$tc_name" },
+                }
+            },
+            {
+                # reduce size of error_tc_names to maximum *cap, to avoid
+                # huge documents in the summary database
+                "$project": {
+                    "_id": 1,
+                    "fail_tc_names": {
+                        "$let": {
+                            "vars": { "uniq": "$fail_tc_names" },
+                            # if we capped it, add an entry "this was
+                            # capped"
+                            "in": {
+                                "$cond": [
+                                    { "$gt": [ { "$size": "$$uniq" }, cap ] },
+                                    {
+                                        "$concatArrays": [
+                                            { "$slice": [ "$$uniq", cap ] },
+                                            [ "this list was capped by mongo-update-sheet" ]
+                                        ]
+                                    },
+                                    "$$uniq"
+                                ]
+                            }
+                        }
+                    }
+                }
+            },
+        ], allowDiskUse = True)
+
+
+def _runids_postprocess_errr_tc_names(runid_raw, cap: int = 1000):
+    return db[args.collection_id]\
+        .aggregate([
+            {
+                "$match": {
+                    "runid": runid_raw,
+                    "hashid": { "$exists": True },
+                    "result": "ERRR",
+                }
+            },
+            {
+                "$group": {
+                    "_id": "$runid",
+                    "errr_tc_names": { "$addToSet": "$tc_name" },
+                }
+            },
+            {
+                # reduce size of error_tc_names to maximum *cap, to avoid
+                # huge documents in the summary database
+                "$project": {
+                    "_id": 1,
+                    "errr_tc_names": {
+                        "$let": {
+                            "vars": { "uniq": "$errr_tc_names" },
+                            # if we capped it, add an entry "this was
+                            # capped"
+                            "in": {
+                                "$cond": [
+                                    { "$gt": [ { "$size": "$$uniq" }, cap ] },
+                                    {
+                                        "$concatArrays": [
+                                            { "$slice": [ "$$uniq", cap ] },
+                                            [ "this list was capped by mongo-update-sheet" ]
+                                        ]
+                                    },
+                                    "$$uniq"
+                                ]
+                            }
+                        }
+                    }
+                }
+            },
+        ], allowDiskUse = True)
+
+
+def _runids_postprocess_summary_per_run(runid_raw, cap: int = 1000):
     # Agregate results to generate summaries
     # http://api.mongodb.com/python/current/examples/aggregation.html#aggregation
     #
@@ -481,15 +595,6 @@ def _runids_postprocess_summary_per_run(runid_raw):
                         },
                     },
                     # Accumulate specific ones which failed, for failure-frequency
-                    "fail_tc_names": {
-                        "$addToSet": {
-                            "$cond": [
-                                { "$eq": [ "$result", "FAIL" ] },
-                                "$tc_name",
-                                "$nop",
-                            ]
-                        }
-                    },
                     "errr": {
                         "$sum": {
                             "$cond": [
@@ -498,16 +603,6 @@ def _runids_postprocess_summary_per_run(runid_raw):
                                 0
                             ]
                         },
-                    },
-                    # Accumulate specific ones which errored, for error-frequency
-                    "errr_tc_names": {
-                        "$addToSet": {
-                            "$cond": [
-                                { "$eq": [ "$result", "ERRR" ] },
-                                "$tc_name",
-                                "$nop",
-                            ]
-                        }
                     },
                     "blck": {
                         "$sum": {
@@ -572,8 +667,6 @@ def _runids_postprocess_summary_per_run(runid_raw):
                             },
                         },
                     },
-                    "fail_tc_names": 1,
-                    "errr_tc_names": 1,
                     "tcs": 1,
                 },
             },
@@ -586,13 +679,10 @@ def _runids_postprocess_summary_per_run(runid_raw):
                     "fail": 1,
                     "blck": 1,
                     "skip": 1,
-                    "tcs": 1,
-                    # Number of different test cases
-                    "total_tcs": { "$size": "$tcs" },
+                    # Number of different test cases total_tcs gets
+                    # calculated  in a separate pipeline
                     "total": 1,
                     "total_ran": 1,
-                    "errr_tc_names": 1,
-                    "fail_tc_names": 1,
                     "pass%": {
                         "$cond": [
                             {
@@ -1116,6 +1206,32 @@ def _summary_refresh(runid_raw):
     if doc == None:
         t.tick("%s: runid not found" % runid_raw)
         return
+
+    # Compute large list fields out of the main summary pipeline to keep it fast.
+    for tc_doc in _runids_postprocess_total_tcs(runid_raw):
+        if tc_doc.get('_id') == runid_raw:
+            doc['total_tcs'] = int(tc_doc.get('total_tcs', 0))
+            break
+    else:
+        doc['total_tcs'] = 0
+
+    for fail_doc in _runids_postprocess_fail_tc_names(runid_raw):
+        if fail_doc.get('_id') == runid_raw:
+            doc['fail_tc_names'] = fail_doc.get('fail_tc_names', [])
+            break
+    else:
+        doc['fail_tc_names'] = []
+
+    for errr_doc in _runids_postprocess_errr_tc_names(runid_raw):
+        if errr_doc.get('_id') == runid_raw:
+            doc['errr_tc_names'] = errr_doc.get('errr_tc_names', [])
+            break
+    else:
+        doc['errr_tc_names'] = []
+
+    # Keep compatibility if old docs/pipelines still provide these.
+    doc.pop('tcs', None)
+
     t.tick("%s: summarizing done" % runid_raw)
 
     doc_data = doc.get('data', {})
