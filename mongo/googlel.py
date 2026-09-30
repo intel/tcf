@@ -4,24 +4,16 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-"""
-
-
-1. Obtain credentials:
+"""1. Obtain credentials:
    - Navigate to https://console.developers.google.com
    - Select *Credentials*
    - Select *Create Credential* > *Oauth client ID*
-   - Select ID* *None*, and give it a name (NAME)
-   - Select *Application Type* > *Other*
-   - click *OK* and ignore the details presented
+   - Select *Application Type* > *Desktop client 3*
+   - Name: <some name>
+   - click *Create*
 
-2. Download the new client secret credentials:
-   - Enable *Google Sheet API* in the project link
-     https://console.developers.google.com
-   - Go back to https://console.developers.google.com/apis/credentials
-   - Look for the new credential name *NAME*
-   - Select the icon that allows to download the JSON file, download
-     and save to be the client_secret_NAME.json file
+2. A dialog pops, download the new client secret credentials, the
+   *Download JSON* file. Rename to *client-secret-NAME.json*.
 
 3. Create a new sheet:
    - Go to https://docs.google.com/spreadsheets
@@ -31,58 +23,41 @@
      https://docs.google.com/spreadsheets/d/SHEETID/edit#gid=0
      it would be *SHEETID*, but about 40 chars long.
 
-   Initialize the sheet:
+4. Launch the download script to download the file and authenticate
+   the user::
 
-   - Create subsheets named:
+     $ ./mongo-download-sheet.py --noauth_local_webserver FILENAME.xlsx SHEETID \
+           credentials-NAME.json client-secret-NAME.json
 
-     - *_coverity issues*
-
-     the script relies on this being properly spelled.
-
-5. Launch the script from the console and feed it some log file,
-   pointing to the client secret file::
-
-     $ ./import-google-sheet.py -v -i SHEETID \
-           --noauth_local_webserver \
-           -s client_secret.json \
-           /dev/null
+   This will creates a credential file (*credentials-NAME.json*) that
+   you can remove to restart the process.
 
    A message like::
 
-     .../site-packages/oauth2client/_helpers.py:255: UserWarning: Cannot access ./credentials.json: No such file or directory
-     warnings.warn(_MISSING_FILE_MESSAGE.format(filename))
+     Your browser has been opened to visit:
 
-     Go to the following link in your browser:
+        https://accounts.google.com/o/oauth2/...
 
-       https://accounts.google.com/o/oauth2/auth?scope=https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fspreadsheets&redirect_uri=urn%3Aietf%3Awg%3Aoauth%3A2.0%3Aoob&response_type=code&client_id=6663245526205-ad6j411pfppqtfib1pgkd1vuut6joijh.apps.googleusercontent.com&access_type=offline
+     If your browser is on a different machine then exit and re-run this
+     application with the command-line parameter
 
-     Enter verification code:
+         --noauth_local_webserver
 
 
-   go to a web browser, paste that URL and follow the instructions
-   until you are given a page that says something like::
+   authenticate in the browser, the console shall say::
+
+     Authentication successful.
+
+
+   If using --noauth_local_webserver, go to a web browser, paste that
+   URL and follow the instructions until you are given a page that
+   says something like::
 
      Please copy this code, switch to your application and paste it there:
 
      4/op8lpe_M5nEIcjPt7ejkejdUGJb24fd-czxhWC-ptU
 
    enter it back in the terminal that was asking for it.
-
-   This creates a credential file
-   (*credentials.json*) that you can remove to
-   restart the process.
-
-Notes:
-
-- The following warning appear on fedora, but it doesn't have any
-  impact and can be ignored::
-
-    Traceback (most recent call last):
-      File "/usr/lib/python2.7/site-packages/googleapiclient/discovery_cache/__init__.py", line 41, in autodetect
-        from . import file_cache
-      File "/usr/lib/python2.7/site-packages/googleapiclient/discovery_cache/file_cache.py", line 41, in <module>
-        'file_cache is unavailable when using oauth2client >= 4.0.0')
-    ImportError: file_cache is unavailable when using oauth2client >= 4.0.0
 
 """
 
