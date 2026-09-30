@@ -166,14 +166,18 @@ class app(object):
         if not credentials or credentials.invalid:
             flow = oauth2client.client.flow_from_clientsecrets(
                 self.client_secret_filename,
-                'https://www.googleapis.com/auth/spreadsheets')
+                [
+                    'https://www.googleapis.com/auth/spreadsheets',
+                    "https://www.googleapis.com/auth/drive.readonly",
+                ]
+            )
             flow.user_agent = self.name
             credentials = oauth2client.tools.run_flow(flow, store, args)
             logging.info('storing credentials at: ' + self.credentials_filename)
-        return credentials
+        return store, credentials
 
     def service_get(self, args):
-        credentials = self._credentials_get(args)
+        _, credentials = self._credentials_get(args)
         http = credentials.authorize(httplib2.Http())
         service = discovery.build(
             'sheets', 'v4', http = http, cache_discovery=False,
@@ -181,6 +185,10 @@ class app(object):
                                    'version=v4')
         )
         return service
+
+    def store_get(self, args):
+        store, _ = self._credentials_get(args)
+        return store
 
 
 class spreadsheet(object):
@@ -199,10 +207,11 @@ class spreadsheet(object):
         self._format_requests = []
         self._values = []
         self._spreadsheet_requests = []
-        self.created = False
+        self.created = None
         if sheet_id == None:
             try:
                 self._shid = self.sheet_name_to_id()
+                self.created = False
             except ValueError:
                 if create:
                     self._sheet_add()
@@ -212,6 +221,7 @@ class spreadsheet(object):
                     else:
                         self._shid = self.sheet_name_to_id()
                 else:
+                    self.created = False
                     self.sheet_metadata_get()
         else:
             self._shid = sheet_id
