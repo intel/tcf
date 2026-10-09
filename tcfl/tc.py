@@ -8360,7 +8360,7 @@ class tc_c(reporter_c, metaclass=_tc_mc):
                         self.report_info(
                             f"NOTE: this is a subtestcase of"
                             f" {self.parent.name} ({self.parent.runid_hashid});"
-                            " refer to it for full information", dlevel = 1)
+                            " refer to it for full information", dlevel = 2)
                     for _target in list(self.target_group.targets.values()):
                         # We need to update all the target's KWS, as we
                         # have added KWS to the tescase (tc_hash and
