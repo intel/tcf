@@ -234,6 +234,7 @@ def ipxe_sanboot_url(target, sanboot_url, dhcp = None,
     # one if not set.
     boot_entry_pxe = target.kws.get(
         "bios.boot_entry_pxe", None)
+
     if boot_entry_pxe == None:
         boot_entry_pxe = r"UEFI PXEv4 \(MAC:%s\)"
         target.report_info("UEFI: booting PXE boot entry (default):"
@@ -242,11 +243,11 @@ def ipxe_sanboot_url(target, sanboot_url, dhcp = None,
         target.report_info("UEFI: booting PXE boot entry from inventory"
                            " bios.boot_entry_pxe:"
                            f" {boot_entry_pxe}")
-
     if '%' in boot_entry_pxe:
         # Eg: UEFI PXEv4 (MAC:4AB0155F98A1)
         # FIXME: this is lame and needs keyword encoding with macs in multiple formats
         boot_entry_pxe = boot_entry_pxe % mac_addr.replace(":", "").upper().strip()
+    target.report_info(f"UEFI: booting PXE EFI entry: {boot_entry_pxe}")
 
     tcfl.biosl.boot_network_pxe(
         target,
