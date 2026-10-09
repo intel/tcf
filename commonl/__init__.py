@@ -1136,7 +1136,7 @@ class fs_cache_c():
     }
 
     def lru_cleanup_unlocked(self, max_entries: int,
-                             last_cleanup_time_max_s: int):
+                             last_cleanup_time_max_s: int = 5):
         """
         Delete the oldest in a list of entries that are used as a cache
         until only *max_entries* are left
@@ -1144,9 +1144,8 @@ class fs_cache_c():
         :param int max_entries: maximum number of entries which should be
           left
 
-        :param int last_cleanup_time_max_s: maximum number of seconds allowed
-          since last cleanup run
-
+        :param int last_cleanup_time_max_s: (optional; default 5s)
+          maximum number of seconds allowed since last cleanup run
         """
         assert isinstance(max_entries, int) and max_entries > 0
 
