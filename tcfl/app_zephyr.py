@@ -568,7 +568,7 @@ class zephyr(tcfl.tc.target_extension_c):
           This parameter can be omitted if only one BSP is available
           in the current BSP Model.
 
-        :returns: dictionary keyed by CONFIG\_ name with its value.
+        :returns: dictionary keyed by CONFIG\\_ name with its value.
         """
         target = self.target
         bsp = self._bsp_select(target, bsp)

@@ -1210,7 +1210,7 @@ class tc_zephyr_sanity_c(tcfl.tc.tc_c):
             console = target.kws.get("console", None)
             # add success expectations in the right order, wait for them
             self.expect_global_append(target.console.text(
-                re.compile("\*\*\*\*\* Booting Zephyr OS [^\*]*\*\*\*\*\*"),
+                re.compile(r"\*\*\*\*\* Booting Zephyr OS [^\*]*\*\*\*\*\*"),
                 name = "Zephyr boot banner",
                 console = console
             ))
@@ -1402,7 +1402,7 @@ class tc_zephyr_sanity_c(tcfl.tc.tc_c):
     # it. Mind there might be \r at the end, so we'll hack it.
     subtc_results_valid = ('PASS', 'FAIL', 'SKIP')
     subtc_regex = re.compile(r"^(?P<result>(" + "|".join(subtc_results_valid)
-                             + "|starting test)) - (?P<testname>[\S\\r\.]+)$",
+                             + r"|starting test)) - (?P<testname>[\S\\r\.]+)$",
                              re.MULTILINE)
 
     def _subtestcases_grok(self, target):
