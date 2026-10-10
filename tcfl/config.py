@@ -31,6 +31,27 @@ loaded_files = []
 share_path = os.path.expanduser(_install.share_path)
 #: Path where state files are stored
 state_path = None
+
+
+
+#: When a server's IP address is reverse resolved to a FQDN with no
+#: domain because of backend misconfiguration, allow specifying a list
+#: of domains that we will try to see if we find a good one that
+#: matches the IP address.
+#:
+#: >>> tcfl.config.server_sus_domains["subdomain.domain.com"] = \
+#: >>>     "workaround broken Reverse PTR records from IPAM system"
+#:
+#: if IP address x.y.z.w reverse resolves to "hostname" instead of
+#: hostname.subdomain.domain.com, we will try to see if
+#: "hostname.subdomain.domain.com" resolves to x.y.z.w and if so, we
+#: will use that instead of the broken reverse PTR record.
+server_sus_domains = {
+    # "domain": "reason for being a sus domain",
+}
+
+
+
 #: List of URLs to servers we are working with
 #:
 #: each entry is a tuple of:

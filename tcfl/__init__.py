@@ -1226,11 +1226,32 @@ class server_c:
             # workaround it by using the hostname
             if name.count(".") == 0:
                 log_sd.info(f"reverse lookup for {hostname} yields {name}:"
-                            " seems sus: no domain name part; using original")
-                name = hostname
+                            " seems sus: no domain name part; trying"
+                            " alternatives from tcfl.config.server_sus_domains")
+                for domain in getattr(tcfl.config, "server_sus_domains", {}):
+                    if not domain or not isinstance(domain, str):
+                        log_sd.warning(f"{hostname}: ignoring invalid domain"
+                                       f" '{domain}' in tcfl.config.server_sus_domains")
+                        continue
+                    try:
+                        name_not_sus = f"{name}.{domain}"
+                        name_not_sus_resolved, _aliases, addresses_sus = \
+                            socket_gethostbyname_ex_cached(name_not_sus)
+                        if address in addresses_sus:
+                            log_sd.info(f"{name}: adding {domain} yields"
+                                        " same IP address; using that")
+                            name = name_not_sus
+                            break
+                        continue
+                    except socket.herror as e:
+                        log_sd.info(f"{name}.{domain}: doesn't exist {e}")
+                else:
+                    log_sd.info(f"{name}: no domains in"
+                                " tcfl.config.server_sus_domains work or none present")
+                    name = hostname
 
             if f"https://{name}:{seed_port}" in servers:
-                # if we added this by name, justr ignore it
+                # if we added this by name, just ignore it
                 log_sd.info(f"reverse lookup {name}: skipping, already added")
                 continue
             server = cls(
