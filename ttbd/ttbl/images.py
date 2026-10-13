@@ -213,6 +213,7 @@ import filelock
 import hashlib
 import numbers
 import os
+import pathlib
 import re
 import shutil
 import subprocess
@@ -770,26 +771,18 @@ class interface(ttbl.tt_interface):
             # ones that can do parallel
             serial = collections.defaultdict(collections.OrderedDict)
             parallel = collections.defaultdict(collections.OrderedDict)
+            user_path = pathlib.Path(user_path).resolve(strict = True)
             for img_type, img_name in images.items():
                 # validate image types (from the keys) are valid from
                 # the components and aliases
                 impl, img_type_real = self.impl_get_by_name(img_type,
                                                             "image type")
-                if not os.path.isabs(img_name):
-                    # file comes from the user's storage
-                    file_name = os.path.join(user_path, img_name)
-                else:
-                    # file from the system (mounted FS or similar);
-                    # double check it is allowed
-                    for path, path_translated in ttbl.store.paths_allowed.items():
-                        if img_name.startswith(path):
-                            img_name = img_name.replace(path, path_translated, 1)
-                            break
-                    else:
-                        raise PermissionError(
-                            "%s: absolute image path tries to read from"
-                            " a location that is not allowed" % img_name)
-                    file_name = img_name
+                # if the path is relative, img_path will be relative
+                # to the user's directory; if it is absolute, it has
+                # to be in a location that is allowed by the server
+                # configuration
+                file_name, _rw = target.store._validate_file_path(target, img_name, user_path)
+
                 # we need to lock, since other processes might be
                 # trying to decompress the file at the same time
                 # We want to have the lock in another directory
@@ -810,7 +803,7 @@ class interface(ttbl.tt_interface):
                     parallel[impl][img_type_real] = real_file_name
                 else:
                     serial[impl][img_type_real] = real_file_name
-                if real_file_name.startswith(user_path):
+                if pathlib.Path(real_file_name).resolve(strict = False).is_relative_to(user_path):
                     # modify the mtime, so the file storage cleanup knows
                     # we are still using this file and doesn't not attempt
                     # to clean it up too soon
