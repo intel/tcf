@@ -763,6 +763,8 @@ class cisco_catalyst_c(router_c):
                 # manually, so we set the max, what it takes to get
                 # the Welcome message which is longish
                 timeout = 30)
+            #self.p.logfile = open(
+            #    f"{ttbl.test_target.files_path}/router-expect-{self.hostname}-{os.getpid()}.log", "ab")
             self.p.expect(
                 # this comes because we run ssh with -v, helps catch connection done
                 b"debug1: Entering interactive session",
@@ -808,7 +810,7 @@ class cisco_catalyst_c(router_c):
                 f"{self.username}@{self.hostname}: connection died; is it on?") \
                 from e
         except pexpect.exceptions.TIMEOUT as e:
-            self.logger.info(f"didn't find (TIMEOUT): {expectation}")
+            self.logger.info(f"didn't find (TIMEOUT): {expectation}: {e}")
             raise self.exception(
                 f"{self.username}@{self.hostname}: timeout ({timeout}s)"
                 f" receiving '{expectation}'") from e
@@ -1006,6 +1008,7 @@ class cisco_catalyst_c(router_c):
                 f"no vlan {vlan_id}",
                 f"vlan {vlan_id}",
                 f"name {vlan_name}",
+                "exit",		# exit the vlan configuration
             ]
             if switch_ports:
                 # allow acces only to certain ports
