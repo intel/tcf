@@ -1046,9 +1046,16 @@ def target_qemu_pos_add(target_name,
         disk_size
     ])
     # reinitialize also the EFI vars storage
+    # FIXME: this needs to be renamed to something following the component name
     shutil.copy("/usr/share/OVMF/OVMF_VARS.fd", target.state_dir)
     # this is a very ugly hack to be able to override the BIOS image
     # used by QEMU
+
+    # this is needed so qemu can read this file, since
+    # ttbl.store.interface._validate_file_path() will be used to
+    # gatekeep where we can read from
+    ttbl.store.paths_allowed.setdefault(
+        '/usr/share/edk2/ovmf/OVMF_CODE.fd', '/usr/share/edk2/ovmf/OVMF_CODE.fd')
     target.fsdb.set('qemu-image-bios', '/usr/share/edk2/ovmf/OVMF_CODE.fd')
 
     # QEMU object
