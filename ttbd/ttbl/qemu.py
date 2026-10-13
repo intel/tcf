@@ -314,6 +314,16 @@ class pc(ttbl.power.daemon_c,
     Additionally, *qemu-image-kernel-args* can be set to arguments to
     the kernel.
 
+
+    Note you need to add any default files to
+    :data:`ttbl.store.paths_allowed`, like :file:`conf_00_lib_pos.py`,
+    function :func:`target_qemu_pos_add` does:
+
+    >>> ttbl.store.paths_allowed.setdefault(
+    >>>     '/usr/share/edk2/ovmf/OVMF_CODE.fd',
+    >>>     '/usr/share/edk2/ovmf/OVMF_CODE.fd')
+
+
     **Serial consoles**
 
     This driver doesn't intervene on serial consoles (if wanted or
@@ -681,7 +691,8 @@ class pc(ttbl.power.daemon_c,
         user_path = os.path.join(ttbl.test_target.files_path, username)
         for image_key in image_keys:
             dest = target.fsdb.get(image_key)
-            # FIXME this is going to need the defaul BIOS image
+            # note you need to add any default files to
+            # ttbl.store.paths_allowed, see doc
             try:
                 target.store._validate_file_path(target, dest, user_path)
             except Exception as e:
