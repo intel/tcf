@@ -453,12 +453,9 @@ class interface(ttbl.tt_interface):
             assert impl.explicit in ( None, 'on', 'off', 'both' ), \
                 "power component '%s': impls' explicit value is %s;" \
                 " expected None, 'on', 'off' or 'both'" % (name, impl.implicit)
-            try:
-                impl.target_setup(target, iface_name, name)
-            except Exception as e:
-                target.log.error(
-                    f"exception setting up {iface_name} {name}: {e}")
-                raise
+            # we don't call impl.target_setup() here because
+            # ttbl.test_target.interface_add()
+
 
 
     def _release_hook(self, target, _force):
