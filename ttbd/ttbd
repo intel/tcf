@@ -119,35 +119,42 @@ API_VERSION = 2
 API_PATH = "/ttb-v"
 API_PREFIX = API_PATH + str(API_VERSION) + "/"
 
-def flask_loge_abort(http_code, message, **kwargs):
-    loge(message, **kwargs)
+
+def _flask_abort(http_code, message):
+    # We have to set status code + description in two places, one for
+    # the HTTP response, one for the exception raising
     response = flask.jsonify({ "_message": message })
     response.status_code = http_code
-    raise werkzeug.exceptions.HTTPException(response = response)
+    e = werkzeug.exceptions.HTTPException(message, response = response)
+    e.code = http_code
+    raise e
+
+
+def flask_loge_abort(http_code, message, **kwargs):
+    loge(message, **kwargs)
+    _flask_abort(http_code, message)
+
 
 def flask_logw_abort(http_code, message, **kwargs):
     logw(message, **kwargs)
-    response = flask.jsonify({ "_message": message })
-    response.status_code = http_code
-    raise werkzeug.exceptions.HTTPException(response = response)
+    _flask_abort(http_code, message)
+
 
 def flask_logi_abort(http_code, message, **kwargs):
     logi(message, **kwargs)
-    response = flask.jsonify({ "_message": message })
-    response.status_code = http_code
-    raise werkzeug.exceptions.HTTPException(response = response)
+    _flask_abort(http_code, message)
+
 
 def flask_logd_abort(http_code, message, **kwargs):
     logd(message, **kwargs)
-    response = flask.jsonify({ "_message": message })
-    response.status_code = http_code
-    raise werkzeug.exceptions.HTTPException(response = response)
+    _flask_abort(http_code, message)
+
 
 def flask_log_abort(l, http_code, message, **kwargs):
     logdl(l, message, **kwargs)
-    response = flask.jsonify({ "_message": message })
-    response.status_code = http_code
-    raise werkzeug.exceptions.HTTPException(response = response)
+    _flask_abort(http_code, message)
+
+
 
 # FIXME: Can't figure out a way how to just handle all with this one,
 # so I need to link each
