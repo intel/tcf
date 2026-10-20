@@ -29,6 +29,9 @@ import sys
 import time
 import tty
 
+# oh gawd, this is horrible, but it is needed until we move
+# _admin_required into ttbl/__init__.py
+import __main__
 
 try:
     import setproctitle
@@ -1139,6 +1142,24 @@ class serial_pc(ttbl.power.socat_pc, generic_c):
         generic_c.target_setup(self, target, iface_name, component)
         ttbl.power.socat_pc.target_setup(self, target, iface_name, component)
 
+        # FIXME: ugh, until  __main__._admin_required is moved to
+        # ttbl, tis the way
+        #
+        # don't let anyone but admins set the the device, so there is
+        # no chance that some one that should not tries to do
+        # something that makes socat do something funny, like EXEC:
+        # whatever; this is because we are still doing the templating
+        # in a funky way we shall move away from doing--this provides
+        # a short term fix until we have the funky way undone.
+        if "device" not in  __main__._admin_required:
+            __main__._admin_required.append("device")
+        # don't let anyone who is not a user point the driver to read
+        # from any serial port in the system.
+        if f"instrumentation.{iface_name}.{component}.usb_serial_number" \
+           not in  __main__._admin_required:
+            __main__._admin_required.append(
+                f"instrumentation.{iface_name}.{component}.usb_serial_number")
+
 
     # console interface; state() is implemented by generic_c
     def on(self, target, component):
@@ -1189,6 +1210,11 @@ class serial_pc(ttbl.power.socat_pc, generic_c):
             else:
                 self.kws['device'] = device_resolver.tty_find_by_spec()
 
+        # no need to check on self.kws['device'] more; if it comes
+        # from self.serial_file_name, we assume it is correct config
+        # and socat will die if not; if it comes from the resolver, it
+        # has verified it's existance.
+
         # this publishes what final device we are using at the system
         # level, which helps in diagnosing and is also used by other
         # pieces of code
@@ -1208,10 +1234,20 @@ class serial_pc(ttbl.power.socat_pc, generic_c):
         self.kws['baudrate'] = target.property_get(
             f"instrumentation.{self.upid_index}.baudrate",
             self.baudrate)
+        if not re.search("^[0-9]+$", str(self.kws['baudrate'])):
+            raise RuntimeError(
+                f"CONFIG-BUG? {component}/on: baudrate property"
+                f" instrumentation.{self.upid_index}.baudrate"
+                f" is not a positive integer: {self.kws['baudrate']}")
         # socat wants 0 or 1; that's it.
         self.kws['crtscts'] = target.property_get(
             f"instrumentation.{self.upid_index}.crtscts",
             self.crtscts)
+        if self.kws['crtscts'] not in ( "0", "1" ):
+            raise RuntimeError(
+                f"CONFIG-BUG? {component}/on: crtscts property"
+                f" instrumentation.{self.upid_index}.crtscts"
+                f" is not 0 or 1: {self.kws['crtscts']}")
 
         ttbl.power.socat_pc.on(self, target, component)
         generation_set(target, component)
