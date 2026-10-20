@@ -197,6 +197,14 @@ Common metadata
   Each interconnect might have the following (or other fields) with
   address assignments, etc:
 
+  - *boot_filename* (str): this interconnect shall tell the target to
+    use this filename to boot--this might be used by TFTP or HTTP BOOT
+    protocols.
+
+  - *boot_server* (str): this interconnect shall tell the target to
+    use this server to boot--this might be used by TFTP or HTTP BOOT
+    protocols.
+
   - *bt_addr* (str): Bluetooth Address (48bits HH:HH:HH:HH:HH:HH,
     where HH are two hex digits) that will be assigned to this target
     in this interconnect (when describing a Bluetooth interconnect)
