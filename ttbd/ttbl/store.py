@@ -72,7 +72,8 @@ class interface(ttbl.tt_interface):
         "capture": False,
     }
 
-    def _validate_file_path(self, target, file_path, user_path):
+    def _validate_file_path(self, target, target_owned: bool,
+                            file_path, user_path):
         """
         Translate and validate a client provided file path into a
         real, safe path in the server's filesystem
@@ -110,6 +111,11 @@ class interface(ttbl.tt_interface):
           target, eg: when doing top level user storage operations)
         :type target: ttbl.test_target
 
+        :param bool target_owned: *True* if the calling user owns the
+            target and has it locked, *False* otherwise; this is used to
+            determine if the user can access the target's state
+            directories (eg: ``capture/``) or not.
+
         :param str file_path: file path as provided by the client;
           maybe relative (user's storage) or absolute (system
           location in :data:`paths_allowed`), or start with a target
@@ -137,7 +143,7 @@ class interface(ttbl.tt_interface):
             raise ValueError("%s: file path cannot contains components: "
                              "%s" % (file_path, " ".join(matches)))
 
-        if target:
+        if target and target_owned:
             for subpath, rw in self.target_sub_paths.items():
                 if file_path.startswith(subpath + "/"):
                     # file comes from the targt's designated state
@@ -172,8 +178,8 @@ class interface(ttbl.tt_interface):
 
 
 
-    def _validate_path(self, target, path):
-        if target:
+    def _validate_path(self, target, target_owned: bool, path):
+        if target and target_owned:
             for subpath, _rw in self.target_sub_paths.items():
                 if path.startswith(subpath + "/") or path == subpath:
                     # file comes from the targt's designated state
@@ -186,6 +192,8 @@ class interface(ttbl.tt_interface):
                 return path.replace(valid_path, translated_path, 1)
         raise RuntimeError("%s: path not allowed" % path)
 
+
+
     valid_digests = {
         "md5": "MD5",
         "sha256": "SHA256",
@@ -193,7 +201,7 @@ class interface(ttbl.tt_interface):
         "zero": "no signature"
     }
 
-    def _get_list(self, target, _who, args, _files, user_path, version):
+    def _get_list(self, target, target_owned, _who, args, _files, user_path, version):
         filenames = self.arg_get(args, 'filenames', list,
                                  allow_missing = True, default = [ ])
         path = self.arg_get(args, 'path', str,
@@ -203,7 +211,7 @@ class interface(ttbl.tt_interface):
         elif path == "/":
             pass	# special handling
         else:
-            path = self._validate_path(target, path)
+            path = self._validate_path(target, target_owned, path)
 
         if version == 1:
             digest_default = "sha256"
@@ -294,30 +302,43 @@ class interface(ttbl.tt_interface):
         return file_data
 
 
+
     def get_list(self, target, who, args, _files, user_path):
         if target.target_is_owned_and_locked(who):
             target.timestamp()
-        r = self._get_list(target, who, args, _files, user_path,
+            target_owned = True
+        else:
+            target_owned = False
+        r = self._get_list(target, target_owned, who, args, _files, user_path,
                            version = 1)
         r['result'] = dict(r)	# COMPAT
         return r
 
 
+
     def get_list2(self, target, who, args, _files, user_path):
         if target.target_is_owned_and_locked(who):
             target.timestamp()
-        r = self._get_list(target, who, args, _files, user_path,
+            target_owned = True
+        else:
+            target_owned = False
+        r = self._get_list(target, target_owned, who, args, _files, user_path,
                            version = 2)
         return r
+
 
 
     def post_file(self, target, who, args, files, user_path):
         if target.target_is_owned_and_locked(who):
             target.timestamp()
+            target_owned = True
+        else:
+            target_owned = False
         # we can only upload to the user's storage path, never to
         # paths_allowed -> hence why we alway prefix it.
         file_path = self.arg_get(args, 'file_path', str)
-        file_path_final, rw = self._validate_file_path(target, file_path, user_path)
+        file_path_final, rw = self._validate_file_path(target, target_owned,
+                                                       file_path, user_path)
         if not rw:
             raise PermissionError(f"{file_path}: is a read only location")
         file_object = files['file']
@@ -326,16 +347,22 @@ class interface(ttbl.tt_interface):
         target.log.debug("%s: saved" % file_path_final)
         return dict()
 
+
+
     def get_file(self, target, who, args, _files, user_path):
         if target.target_is_owned_and_locked(who):
             target.timestamp()
+            target_owned = True
+        else:
+            target_owned = False
         # we can get files from the user's path or from paths_allowed;
         # an absolute path is assumed to come from paths_allowed,
         # otherwise from the user's storage area.
         file_path = self.arg_get(args, 'file_path', str)
         offset = self.arg_get(args, 'offset', int,
                               allow_missing = True, default = 0)
-        file_path_final, _ = self._validate_file_path(target, file_path, user_path)
+        file_path_final, _ = self._validate_file_path(target, target_owned,
+                                                      file_path, user_path)
         # interface core has file streaming support builtin
         # already, it will take care of streaming the file to the
         # client
@@ -351,11 +378,17 @@ class interface(ttbl.tt_interface):
             stream_offset = offset,
         )
 
+
+
     def delete_file(self, target, who, args, _files, user_path):
         if target.target_is_owned_and_locked(who):
             target.timestamp()
+            target_owned = True
+        else:
+            target_owned = False
         file_path = self.arg_get(args, 'file_path', str)
-        file_path_final, rw = self._validate_file_path(target, file_path, user_path)
+        file_path_final, rw = self._validate_file_path(target, target_owned,
+                                                       file_path, user_path)
         if not rw:
             raise PermissionError(f"{file_path}: is a read only location")
         commonl.rm_f(file_path_final)
