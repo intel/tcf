@@ -919,6 +919,7 @@ def _ttb_get():
 
 _admin_required = [
     'disabled',
+    'bridge_ifname', # ttbl/qemu.py
     'instrumentation',
     'instrumentation.*',
     'interfaces',

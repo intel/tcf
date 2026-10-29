@@ -100,6 +100,10 @@ import socket
 import subprocess
 import time
 
+# oh gawd, this is horrible, but it is needed until we move
+# _admin_required into ttbl/__init__.py
+import __main__
+
 import commonl
 import ttbl
 import ttbl.console
@@ -1013,6 +1017,19 @@ class network_tap_pc(ttbl.power.impl_c):
             "Virtual network over tun/tap device",
             name = "tuntap",
         )
+
+
+
+    def target_setup(self, target, iface_name, component):
+
+        # FIXME: ugh, until  __main__._admin_required is moved to
+        # ttbl, tis the way
+        #
+        # don't let anyone but admins set the bridge_ifname, so none
+        # can override and try to reach networks they should not
+        if "bridge_ifname" not in  __main__._admin_required:
+            __main__._admin_required.append("bridge_ifname")
+
 
 
     @staticmethod
