@@ -205,6 +205,14 @@ class server_c(ttbl.power.daemon_c):
             "--dev-type", "tap",
             "--dev", f"%(bridge_ifname)s.{tap_suffix}",
             "--server-bridge",	# bridge: so we can do DHCP and L2 routing
+
+            # allow multiple clients to connect with the same
+            # certificate; we provide a single certificate per
+            # allocation per network to simplify the process and we
+            # limit the max number of clients to avoid run aways or
+            # possible DoS; FIXME: make this configurable.
+            "--duplicate-cn",
+            "--max-clients", "10",
             "--ca", "%(path)s/certificates/ca.cert",
             "--cert", "%(path)s/certificates/server.cert",
             "--key", "%(path)s/certificates/server.key",
