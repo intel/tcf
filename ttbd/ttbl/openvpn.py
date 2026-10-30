@@ -253,7 +253,7 @@ class server_c(ttbl.power.daemon_c):
         # this path for sure is available
         cert_client_path = os.path.join(target.state_dir, "certificates_client")
         cert_path = os.path.join(target.state_dir, "certificates")
-        openvpn_host = target.property_get(f"interfaces.{iface_name}.openvpn_tcp.openvpn_host")
+        openvpn_host = target.property_get(f"interfaces.{iface_name}.FIXMECOMPONENT.openvpn_host")
         if openvpn_host == None: 	# not specified in properties, default
             openvpn_host = self.openvpn_host
         if openvpn_host == None:
@@ -275,6 +275,7 @@ dev tap
 proto {self.ip_protocol}
 # host to connect to; can also be obtained from inventory
 remote {openvpn_host} {self.openvpn_port}
+#http-proxy HOSTNAME PORT [proxyuser] [proxypass]
 ca cert-{allocdb.allocid}-{target.id}-ca.cert
 cert cert-{allocdb.allocid}-{target.id}-openvpn.cert
 key cert-{allocdb.allocid}-{target.id}-openvpn.key
