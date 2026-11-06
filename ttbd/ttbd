@@ -919,9 +919,15 @@ def _ttb_get():
 
 
 _admin_required = [
+    # this describes architecture
+    'bsps',
+    'bsps.*',
     # see also ttbl.test_target.properties_user
     'disabled',
-    'bridge_ifname', # ttbl/qemu.py
+    # disallow anyone tricking someone else, since this is used by UIs
+    "description",
+    'bridge_ifname',		# ttbl/qemu.py
+    'ip_hostnames',		# ttbl/dnsmasq.py uses this
     'instrumentation',
     'instrumentation.*',
     'interfaces',
@@ -937,6 +943,7 @@ _admin_required = [
     #   NAME.ipv*_addr
     #   NAME.ipv*_prefix_len
     #   NAME.tunnel_allow_lan
+    "pos.*",
     'pos_capable',
     'pos_capable.*',
     'pos_partsizes',
