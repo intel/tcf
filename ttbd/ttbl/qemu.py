@@ -694,11 +694,14 @@ class pc(ttbl.power.daemon_c,
         username, _ticket = ttbl.who_split(who)
         user_path = os.path.join(ttbl.test_target.files_path, username)
         for image_key in image_keys:
+            if image_key == "qemu-image-kernel-args":
+                continue    # not a file, just kernel args
             dest = target.fsdb.get(image_key)
             # note you need to add any default files to
             # ttbl.store.paths_allowed, see doc
             try:
-                target.store._validate_file_path(target, dest, user_path)
+                # if we are here, it's owned and locked
+                target.store._validate_file_path(target, True, dest, user_path)
             except Exception as e:
                 raise PermissionError(
                     "QEMU: %s: image '%s': destination '%s' is not allowed: %s"
