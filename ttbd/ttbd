@@ -917,14 +917,26 @@ def _ttb_get():
             d['herd'] = herd
     return d
 
+
 _admin_required = [
+    # see also ttbl.test_target.properties_user
     'disabled',
     'bridge_ifname', # ttbl/qemu.py
     'instrumentation',
     'instrumentation.*',
     'interfaces',
+    'interfaces.*',
+    # To set somewhat we want the user to be able to set,
+    # ttbl.test_target.properties_user includes
+    # - interfaces.console.default
     'interconnects',
     'interconnects.*',
+    # interconnects.*  disallows setting things such as
+    #   NAME.bridge_ifname
+    #   NAME.mac_addr
+    #   NAME.ipv*_addr
+    #   NAME.ipv*_prefix_len
+    #   NAME.tunnel_allow_lan
     'pos_capable',
     'pos_capable.*',
     'pos_partsizes',
@@ -937,12 +949,21 @@ _admin_required = [
     'versions.*',
 ]
 
-def _target_property_set_policy_check(target, props, user_is_admin):
+def _target_property_set_policy_check(target, props, user_is_admin,
+                                      user_owns: bool = False):
     for prop in props:
         for check_prop in _admin_required:
-            if fnmatch.fnmatchcase(prop, check_prop) and not user_is_admin:
-                flask_logi_abort(
-                    403, "not enough privilege to change property %s" % prop)
+            if fnmatch.fnmatchcase(prop, check_prop):
+                if not user_is_admin:
+                    if user_owns:
+                        property_is_user = target.property_is_user(prop)
+                    else:
+                        property_is_user = False
+                    if not property_is_user:
+                        flask_logi_abort(
+                            403, "not enough privilege to change property %s" % prop)
+
+
 
 def _target_property_set(target, prop, value, user_is_admin, ticket):
     if value != None \
@@ -990,10 +1011,12 @@ def _target_patch(target_id):
         ticket = ttbl.tt_interface.arg_get(
             flask.request.form, 'ticket', str, True, "")
         user_is_admin = current_user_is_admin()
+        user_owns = target.target_is_owned_and_locked(calling_user.get_id())
         try:
             # check policy setting first
             _target_property_set_policy_check(
-                target, list(flask.request.form.keys()), user_is_admin)
+                target, list(flask.request.form.keys()),
+                user_is_admin, user_owns)
             data = flask.request.get_json()
             if data:
                 if 'ticket' in data:
@@ -1004,9 +1027,10 @@ def _target_patch(target_id):
                 data_flat = commonl.dict_to_flat(data, add_dict = False)
                 # Set parameter via form parameters -- just the keys, it can be long
                 audit_record.kws['data_flat_keys'] = [ i[0] for i in data_flat ]
+                # this needs to check if target is ins properties_user
                 _target_property_set_policy_check(
                     target, [ x[0] for x in data_flat ],
-                    user_is_admin)
+                    user_is_admin, user_owns)
 
             # Set parameter via form parameters -- just the keys, --
             # since it might not be many, we can do individual

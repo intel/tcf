@@ -1042,6 +1042,8 @@ class test_target(object):
     #: Note this is a global variable that can be speciazed to each
     #: class/target.
     properties_user = set([
+        # needed by tcfl/target_ext_console.py
+        'interfaces.console.default',
         # provisioning OS mode
         'pos_mode',
         re.compile('^pos_root_[_a-z0-9A-Z]+$'),
