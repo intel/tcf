@@ -408,6 +408,9 @@ class pc(ttbl.power.daemon_c):
                 # auth-server=%(id)s,b%(id)s",
                 f"auth-zone=%(id)s,{ifname}",
                 "dhcp-authoritative",
+                # identify leases by MAC, not client-id/DUID variants
+                # to ensure clients do what we tell them
+                "dhcp-ignore-clid",
                 # logging -- can be accessed with a console, see class doc
                 "log-dhcp",
                 "log-facility=%(path)s/dnsmasq.log",
