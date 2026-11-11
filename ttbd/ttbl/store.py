@@ -291,7 +291,8 @@ class interface(ttbl.tt_interface):
             for filename in filenames:
                 if not isinstance(filename, str):
                     continue
-                file_path, _rw = self._validate_file_path(target, filename, path)
+                file_path, _rw = self._validate_file_path(
+                    target, target_owned, filename, path)
                 _list_filename(filename, file_path)
         else:
             # we only list what is in that path, no going down, so use
