@@ -1044,13 +1044,17 @@ class test_target(object):
     properties_user = set([
         # needed by tcfl/target_ext_console.py
         'interfaces.console.default',
+        re.compile('^interfaces\.console\.[-_a-z0-9A-Z]\.re_enable_if_dead$'),
+        # ttbl.console.seria_pc.on()
+        re.compile('^instrumentation\.[-_a-z0-9A-Z]\.\(baudrate\|rtscts\)$'),
         # provisioning OS mode
         'pos_mode',
-        re.compile('^pos_root_[_a-z0-9A-Z]+$'),
+        'pos.mode',
+        re.compile('^pos[_\.]root_[_a-z0-9A-Z]+$'),
     ])
     #: Properties that should not be cleared on target release
     properties_keep_on_release = set([
-        re.compile('^pos_root_[_a-z0-9A-Z]+$'),
+        re.compile('^pos[_\.]_root_[_a-z0-9A-Z]+$'),
         'linux_options_append',
     ])
 
