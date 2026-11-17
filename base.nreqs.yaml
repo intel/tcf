@@ -65,6 +65,10 @@ packaging: python3-packaging
 
 ply: python3-ply
 
+psutil:
+  reason: used to find misc information about the system
+  distro: python3-psutil
+
 pykwalify: python3-pykwalify
 
 pymongo:
