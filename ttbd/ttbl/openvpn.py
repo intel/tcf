@@ -10,10 +10,9 @@ Power control module to start OpenVPN services when a network is powered on
 """
 
 import os
-import socket
-import subprocess
 import zipfile
 
+import commonl.network_map
 import ttbl.power
 
 class server_c(ttbl.power.daemon_c):
@@ -194,7 +193,8 @@ class server_c(ttbl.power.daemon_c):
             # FIXME: how do do it so it doesn't listen on the NUTs --
             # doesn't really matter, we need the certs
             "--local", "0.0.0.0",
-            # we need one port per NUT
+            # we need one port per NUT --note this is the original
+            # port, not the translated one we put in the inventory
             "--port", str(self.openvpn_port),
             # UDP: more efficient and reliable
             # TCP: allows hopping firewalls
@@ -312,7 +312,9 @@ dev tap
 proto {self.ip_protocol}
 
 # host to connect to; can also be obtained from inventory
-remote {openvpn_host} {self.openvpn_port}
+remote {openvpn_host} {openvpn_port}
+
+# Do you need to proxy? Needs TCP protocol
 #http-proxy HOSTNAME PORT [proxyuser] [proxypass]
 
 ca cert-{allocdb.allocid}-{target.id}-ca.cert
@@ -337,15 +339,21 @@ verb 1
     def target_setup(self, target, iface_name, component):
         target.property_set(f"interfaces.{iface_name}.{component}.openvpn_protocol",
                             self.ip_protocol)
-        openvpn_host = target.property_get(f"interfaces.{iface_name}.{component}.openvpn_host")
-        if openvpn_host == None: 	# not specified in properties, default
-            openvpn_host = self.openvpn_host
-            if openvpn_host == None:
-                openvpn_host = socket.getfqdn()
-            target.property_set(f"interfaces.{iface_name}.{component}.openvpn_host",
-                                openvpn_host)
+        openvpn_host, openvpn_port, _ = commonl.network_map.translate(
+            host = self.openvpn_host, ip_protocol = self.ip_protocol, port = self.openvpn_port)
+
+        # in theory .translate() will ALWAYS provide a mapping, even
+        # defaulting to a local NIC IP.
+        if openvpn_host == None or openvpn_port == None:
+            raise RuntimeError(
+                f"{target.id}.{iface_name}.{component}: CONFIG-BUG? can't"
+                f" configure OpenVPN endpoint -> {openvpn_host=} {openvpn_port=}")
+
+        target.property_set(f"interfaces.{iface_name}.{component}.openvpn_host",
+                            openvpn_host)
         target.property_set(f"interfaces.{iface_name}.{component}.openvpn_port",
-                            self.openvpn_port)
+                            openvpn_port)
+
         # FIXME: quick hack -- we should have
         # ttbl.power.tt_interface._allocate_hook iterate over
         # registered components
