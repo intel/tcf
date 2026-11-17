@@ -709,7 +709,12 @@ class cisco_catalyst_c(router_c):
 
         if self.p != None:
             try:
-                self.logger.info("reuse previous connection: checking if possible")
+                ts = time.time()
+                ts_delta = ts - self.p.last_ts
+                if ts_delta > 10:
+                    raise RuntimeError(f"idle {ts_delta} s")
+                self.logger.info("reuse previous connection: checking if"
+                                 f" possible, {ts_delta:.1f=}s")
                 self.p.send(b"\x03")	# send a Ctrl-C to clear and get prompt
                 try:	# flush as much as we find
                     r = self.p.expect(b".*", timeout = 0.1)
@@ -737,14 +742,25 @@ class cisco_catalyst_c(router_c):
                     # be verbose (for debugging) and allocate a terminal
                     "-vtt",
                     "-p", str(self.port),
+                    #
+                    # DO NOT ENABLE ControlMaster
+                    #
+                    # For some reason, in Cisco Catalyst the master
+                    # connection gets hung even if we get it only to
+                    # last 10s--takes forever to restart.
+                    #
                     # We place the control file for the shared
                     # connection in /var/cache/ttbd-production/ssh-NAME-HOSTNAME.control;
                     # this way is shared by all targets that same the
                     # same PDU and username to it.
                     #
                     # IF DISABLED IT WILL OVERWHELM WITH CONNECTIONS
-                    "-oControlMaster auto",
-                    f"-oControlPath {ttbl.test_target.files_path}/ssh-{self.username}-{self.hostname}.control",
+                    #"-oControlMaster auto",
+                    #f"-oControlPath {ttbl.test_target.files_path}/ssh-{self.username}-{self.hostname}.control",
+                    # persist 10 secs max, since the connection idles
+                    # and dies in the switch side and then the master
+                    # will just hold it
+                    #"-oControlPersist 10",
                     # old SSH impl in the switch requires old algorithms
                     "-o", "PubkeyAcceptedAlgorithms +ssh-rsa",
                     #"-oHostKeyAlgorithms +ssh-rsa,ssh-dss",
@@ -776,6 +792,7 @@ class cisco_catalyst_c(router_c):
             self.logger.info(f"found prompt: {r}")
             # disable pagination
             self._cmd("ter len 0")
+            self.p.last_ts = time.time()
             self.ssh_connections[( self.hostname, self.username, password )] = self.p
             return
 
@@ -801,6 +818,7 @@ class cisco_catalyst_c(router_c):
                 raise self.command_e(
                     f"{self.hostname}: command failed: {self.p.before}"
                 )
+            self.p.last_ts = time.time()	# we RXed, conn
             return self.p.match.group(0)
         except pexpect.exceptions.EOF as e:
             self.logger.info(f"didn't find (EOF): {expectation}")
@@ -825,6 +843,7 @@ class cisco_catalyst_c(router_c):
                 # otherwise sometimes it gets out of sync; prompt
                 # regexing is hard
                 self.p.expect(self.prompt_regex, timeout = 0.1)
+                self.p.last_ts = time.time()	# we RXed, conn
                 r += self.p.before
                 self.logger.info("prompt received[%d]: %s", count, r)
                 self.logger.info("prompt received[%d]: after: %s", count, self.p.after)
@@ -969,7 +988,8 @@ class cisco_catalyst_c(router_c):
                 "config terminal",
                 # select the interface/port where the server is
                 # connected
-                f"int {server_switch_port}",
+                # Catalyst needs "range" so we can do multiple with commas, etc
+                f"int range {server_switch_port}",
                 "shutdown",	# disable it while we reconfigure
                 # convert from layer 3 -> layer2 switching (vs
                 # noswitchport that converts to layer 3)
