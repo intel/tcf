@@ -263,11 +263,16 @@ class server_c(ttbl.power.daemon_c):
 
         cert_client_path = os.path.join(target.state_dir, "certificates_client")
         cert_path = os.path.join(target.state_dir, "certificates")
-        openvpn_host = target.property_get(f"interfaces.{iface_name}.FIXMECOMPONENT.openvpn_host")
-        if openvpn_host == None: 	# not specified in properties, default
-            openvpn_host = self.openvpn_host
-        if openvpn_host == None:
-            openvpn_host = socket.getfqdn()
+
+        # find the name of this component in the interface, so we can
+        # get the properties for it
+        try:
+            iface_name, component = iface_name_composite.split("#", 1)
+        except Exception as e:
+            raise RuntimeError(f"BUG! {iface_name_composite=}") from e
+        openvpn_host = target.property_get(f"interfaces.{iface_name}.{component}.openvpn_host")
+        openvpn_port = target.property_get(f"interfaces.{iface_name}.{component}.openvpn_port")
+
         with open(f"{cert_client_path}/{target.id}-{allocdb.allocid}-{self.ip_protocol}.openvpn", "w") as f:
             f.write(f"""\
 #
@@ -384,4 +389,6 @@ verb 1
         with target.lock:
             # ok, just a copy is fine
             allocdb = target._allocdb_get()
-        self._allocate_hook(target, "power", allocdb)
+        # power#COMPONENT -> convention to be able to get the
+        # component name
+        self._allocate_hook(target, "power#" + component, allocdb)
