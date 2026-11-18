@@ -269,15 +269,22 @@ def _cmdline_alloc_rm(cli_args: argparse.Namespace):
             return 1
 
         retval = 0
-        for allocid in cli_args.allocid:
-            retval, r = tcfl.ui_cli.run_fn_on_each_server(
-                tcfl.server_c.servers,
-                _alloc_rm_by_allocid, cli_args, allocid)
-            # r is a dict keyed by server name of tuples ( retval,
-            # exception, traceback )
-            if all(i[0] == 0 for i in r.values()):
-                logger.error("allocation '%s' not found in any server",
-                             allocid)
+        for requested_id in cli_args.allocid:
+            servers = tcfl.server_c.servers
+            server, allocid = _aka_allocid_extract(requested_id)
+            if server is not None:
+                servers = { server.url: server }
+            elif '/' in requested_id:
+                # The alias was not found; this ID has no other destination.
+                retval = 1
+                continue
+
+            _, results = tcfl.ui_cli.run_fn_on_each_server(
+                servers, _alloc_rm_by_allocid, cli_args, allocid)
+            if any(error is not None for _, error, _ in results.values()):
+                retval = 1
+            elif not any(removed for removed, _, _ in results.values()):
+                logger.error("allocation '%s' not found", requested_id)
                 retval = 1
         return retval
 
