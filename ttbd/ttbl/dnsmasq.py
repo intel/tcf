@@ -35,6 +35,7 @@ import ipaddress
 import logging
 import os
 import shutil
+import string
 
 import commonl
 import ttbl.pxe
@@ -68,6 +69,40 @@ class pc(ttbl.power.daemon_c):
 
       - *str*: serve TFTP files from the given path (templated
         against the daemon's keywords, eg: *%(path)s/tftp.root*)
+
+
+    :param dict userclass: dictionary of userclass specific values to
+      feed into the dnsmasq configuration
+
+      This is keyed by userclass name (per DHCP RFC it's a < 255 byte
+      string; recommendation is to keep it short and simple)
+
+      Value is a dictionary of option spaces; so far only *boot* is
+      recognized
+
+      This can be used, for example, to provide iPXE with a path to
+      it's *autoexec.ipxe*:
+
+      >>> {
+      >>>     "iPXE": {
+      >>>         "boot": "somepath/autoexec.ipxe"
+      >>>     }
+      >>> }
+
+      Even if DHCP doesn't impose a restriction on what the user class
+      can be (just a string of bytes), per DNSMASQ restrictions, we
+      restrict it to be simple and short (ASCII alphanumeric, _ -).
+
+      This would be translated into the config file as adding::
+
+        dhcp-userclass=set:iPXE,iPXE
+        dhcp-boot=tag:iPXE,somepath/autoexec.ipxe
+
+      and for each host::
+
+        dhcp-host=...
+        dhcp-boot=tag:!iPXE,tag:qu09,/somepath/ipxe-x86_64.efi
+        dhcp-option=...
 
     This is meant to be used in the power rail of an interconnect
     target that represents a network to which the server is physically
@@ -203,8 +238,8 @@ class pc(ttbl.power.daemon_c):
     def __init__(self, path = "/usr/sbin/dnsmasq", ifname = None,
                  allow_other_macs: bool = False,
                  tftp: bool = True,
-                 configlinesl: list = None
-                 ):
+                 configlinesl: list = None,
+                 userclass: dict = None):
         assert isinstance(allow_other_macs, bool), \
             f"allow_other_macs: expected bool; got {type(allow_other_macs)}"
         assert isinstance(tftp, ( bool, str )), \
@@ -220,6 +255,28 @@ class pc(ttbl.power.daemon_c):
                                     name = "network interface name")
         self.ifname = ifname
         self.allow_other_macs = allow_other_macs
+
+        if userclass is not None:
+            commonl.assert_dict_of_types(userclass, "userclass", dict)
+            for userclass_name, userclass_data in userclass.items():
+                assert len(userclass_name) < 255, \
+                    f"DHCP User Class {userclass_name}: name too long; " \
+                    "must be < 255 bytes per DHCP RFC"
+                commonl.verify_str_safe(userclass_name, name = "DHCP User Class")
+                for option, value in userclass_data.items():
+                    assert option in self.dhcp_supported_options, \
+                        f"DHCP User Class {userclass_name}: option {option}" \
+                        " not supported; supported options are:" \
+                        f" {','.join(self.dhcp_supported_options.keys())}"
+                commonl.verify_str_safe(
+                    value,
+                    # for paths this is enough, we won't allow spaces
+                    # since in general they are a mistake
+                    safe_chars = '-_/' + string.ascii_letters + string.digits,
+                    name = f"DHCP {userclass_name}/{option} option value")
+            self.userclass = userclass
+        else:
+            self.userclass = {}
 
         cmdline = [
             path,
@@ -250,6 +307,9 @@ class pc(ttbl.power.daemon_c):
             serial_number = commonl.mkid(" ".join(cmdline))
         )
 
+    dhcp_supported_options = {
+        "boot": None,
+    }
 
     @staticmethod
     def _target_boot_filename_get(
@@ -416,6 +476,14 @@ class pc(ttbl.power.daemon_c):
                 "log-facility=%(path)s/dnsmasq.log",
             ]
 
+            for tag, data in self.userclass.items():
+                # eg: dhcp-userclass=set:iPXE,iPXE"
+                configl.append(f"dhcp-userclass=set:{tag},{tag}")
+                for key, value in data.items():
+                    # key has been validated to be already in self.dhcp_supported_options
+                    # eg: dhcp-boot=tag:iPXE,some/autoexec.ipxe
+                    configl.append(f"dhcp-{key}=tag:{tag},{value}")
+
             if self.tftp:
                 configl += [
                     # Enable TFTP server to STATEDIR/tftp.root
@@ -500,6 +568,10 @@ class pc(ttbl.power.daemon_c):
             for config in configl:
                 f.write(config % ic.kws + "\n")
 
+            optionl_userclass = []
+            for tag in self.userclass:
+                optionl_userclass.append(f"tag:!{tag}")
+
             # For each target we know can connect, create a dhcp-host entry
             for ( target, qualifier ), data in dhcp_hosts.items():
                 if 'mac_addr' not in data:
@@ -581,9 +653,16 @@ class pc(ttbl.power.daemon_c):
 
                 boot_filename = self._target_boot_filename_get(target, ic, bsp)
                 if boot_filename:
-                    f.write(
-                        "dhcp-option=tag:%(id)s%(qualifier)s," % kws
-                        + "option:bootfile-name," + boot_filename + "\n")
+                    optionl = optionl_userclass + [
+                        #"tag:!iPXE",
+                        f"tag:{kws['id']}{kws['qualifier']}",
+                        boot_filename
+                    ]
+                    ##  dhcp-boot=tag:!iPXE,tag:HOSTNAME[-QUALIFIER],BOOTFILENAME
+                    f.write("dhcp-boot=" + ','.join(optionl) + "\n")
+                    # we keep the server separate so we can have
+                    # separate filenames per server, but with a single
+                    # server
                     if ic_ipv4_addr:
                         f.write(
                             "dhcp-option=tag:%(id)s%(qualifier)s," % kws
