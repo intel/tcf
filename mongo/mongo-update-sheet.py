@@ -1543,7 +1543,9 @@ def sheet_update_key_value(runid, records, name, create = True,
     for key in keys:	# the order is important
         value = records.get(key, None)
         # we only can put escalars in there
-        if not isinstance(value, (str, bytes, int, float, complex, bool)):
+        if value == None:
+            value = 0
+        elif not isinstance(value, (str, bytes, int, float, complex, bool)):
             value = f"unsupported/{type(value).__name__}"
         row.append(value)
     try:
