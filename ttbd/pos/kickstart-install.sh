@@ -131,7 +131,8 @@ append="$append inst.stage2=cdrom"
 ls -l $tmpdir
 mv $tmpdir/initrd.img $tmpdir/initrd
 qemu-system-x86_64 -no-reboot \
-                   -enable-kvm -cpu host -m 3072 \
+                   -enable-kvm -cpu host -m ${QEMU_RAM:-3072} \
+                    ${QEMU_OPTIONS_PRE:-} \
                    -kernel $tmpdir/vmlinuz \
                    -initrd $tmpdir/initrd \
                    -append "$append" \
@@ -139,7 +140,8 @@ qemu-system-x86_64 -no-reboot \
                    -cdrom $isofile \
                    ${gfx} \
                    -hda $qcowfile \
-                   -hdb $tmpdir/ks.drive
+                   -hdb $tmpdir/ks.drive \
+                    ${QEMU_OPTIONS_POST:-} \
 
 # done -- on EXIT, everything is wiped except for the ISO and the QCOW
 # unless you manually specified TMPDIR
